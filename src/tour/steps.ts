@@ -1,5 +1,5 @@
 /** Painel que o passo precisa aberto. `close` volta para a tela. */
-export type TourPanel = 'opportunity' | 'proposal' | 'demand' | 'purchase' | 'technical' | 'project' | 'budget' | 'title' | 'person' | 'service' | 'asset' | 'close'
+export type TourPanel = 'opportunity' | 'proposal' | 'demand' | 'purchase' | 'technical' | 'project' | 'budget' | 'person' | 'service' | 'asset' | 'close'
 
 export interface TourStep {
   target?: string
@@ -17,7 +17,7 @@ export const WELCOME_TOUR: TourStep[] = [
   t('home-blocks', 'A tela inicial é o mapa', 'Cada bloco é uma área. Dentro dele estão só as telas daquele trabalho. Os atalhos abrem a tela direto; Entrar abre a primeira dela.'),
   t('home-producao', 'Operações', 'Aqui ficam o painel da fábrica, o fluxo, o planejamento, a produção, a qualidade e o tablet. Ao entrar, a barra de módulos no topo mostra apenas isso.'),
   t('home-cadastros', 'Cadastros', 'Produtos e revisões, pessoas, serviços e ativos formam a base compartilhada dos demais fluxos.'),
-  t('search', 'Busca', 'De qualquer área, encontre pedidos, OPs, itens, oportunidades, demandas, projetos, chamados, títulos ou pessoas. O resultado abre o detalhe à direita.'),
+  t('search', 'Busca', 'De qualquer área, encontre pedidos, OPs, itens, oportunidades, demandas, projetos, chamados ou pessoas. O resultado abre o detalhe à direita.'),
   t('role', 'Visualizar perfis', 'Só o Administrador vê este seletor. Ele mostra como outro perfil enxerga a interface sem trocar a identidade real. Perfis recebem funcionalidades, não apenas módulos.'),
   t('help', 'Guia de cada tela', 'Depois de entrar numa área, cada tela explica a si mesma na primeira visita. Este botão reabre o guia.'),
 ]
@@ -28,6 +28,11 @@ export const ORDER_DRAWER_TOUR: TourStep[] = [
   t('drawer-injection', 'OP de injeção · a peça', 'Cada cartão azul é uma ordem de injeção: a peça plástica (moldura, tampa, bumper) feita na injetora. Quando ela termina, a peça entra no estoque. O selo "OP de injeção" identifica.'),
   t('drawer-assembly', 'OP de montagem · o case', 'O cartão verde é a ordem de montagem: o case que o cliente comprou. Ela junta as peças das OPs de injeção com os componentes comprados. É outra OP, de outro posto.'),
 ]
+
+/** Chave do guia para a rota: telas com id na URL compartilham um guia. */
+export function tourKey(path: string): string {
+  return path.startsWith('/produtos/item/') ? '/produtos/item' : path
+}
 
 export const PAGE_TOURS: Record<string, TourStep[]> = {
   '/': [
@@ -61,6 +66,23 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('product-list', 'Lista feita para milhares de itens', 'A faixa acima da tabela filtra o tipo: todos, produto acabado, matéria-prima e os demais. Busque por código, descrição, EAN ou NCM e refine situação, classificação ou pendência. Marque vários itens para agir em lote.'),
     t('new-record', 'Um código por item', 'O item nasce em rascunho, com código sequencial e sem significado. O sistema avisa se já existe descrição parecida. Rascunho não entra em pedido, compra nem produção.'),
   ],
+  '/produtos/item': [
+    t('product-header', 'A ficha do item', 'Foto, código, tipo, classificação e versão vigente. As etiquetas abaixo apontam pendências, como atributo obrigatório vazio ou fiscal em conflito com o Omie.'),
+    t('product-kpis', 'Indicadores clicáveis', 'Custo, saldo, lead time, roteiro, onde é usado e mudanças abertas. Cada indicador leva à seção que explica o número. No ferramental, mostram cavidades, ciclo e vida útil.'),
+    t('product-layers', 'Seções por assunto', 'Identificação, engenharia, logística, comercial e fiscal, documentos e governança. Só aparecem as seções que o tipo do item usa; o número ao lado indica o que há dentro.'),
+    t('product-attributes', 'Atributos herdados', 'Os atributos vêm da classificação. Os marcados com asterisco são obrigatórios para homologar.'),
+  ],
+  '/produtos/classificacao': [
+    t('product-side', 'Árvore e atributos', 'Selecione um nó para ver os itens, criar filhos e definir atributos. O que é definido num nó vale para todos os nós abaixo.'),
+    t('class-attributes', 'Atributos da classe', 'Defina tipo, unidade, opções e se é obrigatório ou eixo de variação da grade. Os herdados de nós acima aparecem marcados.'),
+  ],
+  '/produtos/mudancas': [
+    t('changes-board', 'Quadro de mudanças', 'Cada cartão é uma mudança de engenharia. Ela anda de Solicitada a Implementada; a versão nova da estrutura e do roteiro só vale depois da implementação.'),
+    t('changes-new', 'Solicitar mudança', 'Descreva o problema, escolha os itens, o destino do estoque atual e a data de efetividade. O impacto (saldo, OPs, pedidos e compras) é calculado na hora.'),
+  ],
+  '/produtos/ferramental': [
+    t('tooling-list', 'Moldes e gabaritos', 'Cavidades ativas, ciclo, máquinas compatíveis, vida útil e dono. A barra fica vermelha acima de 85% da vida. O contador de golpes vem do ativo na manutenção.'),
+  ],
   '/produtos/homologacao': [
     t('product-life', 'Filas em vez de quadro', 'Cada fila mostra um tipo de trabalho: o que espera a sua aprovação, rascunhos, exceções de campo-chave, ativos com cadastro incompleto, bloqueados e obsoletos com saldo.'),
   ],
@@ -70,7 +92,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('manual-search', 'Busca', 'Procure qualquer palavra, como “lote”, “garantia” ou “orçamento”. Acentos não importam.'),
   ],
   '/pessoas': [
-    t('org-chart', 'Organograma', 'Cada setor tem gestor e centro de custo. Clique em um setor para filtrar as pessoas dele.', 'close'),
+    t('org-chart', 'Organograma', 'Cada setor tem gestor e o código do centro padrão. O cadastro do centro fica em Finanças. Clique em um setor para filtrar as pessoas dele.', 'close'),
     t('record-list', 'A lista abre a ficha', 'Clique em uma pessoa para abrir a ficha à direita. O guia entra nela agora.', 'close'),
     t('new-record', 'Nova pessoa', 'O cadastro gera o PIN do tablet e aplica as permissões do papel escolhido.', 'close'),
     t('person-role', 'Papel, setor e acesso', 'O papel define o que a pessoa vê no sistema. Desativar o acesso tira a pessoa do tablet e das telas, sem apagar o histórico.', 'person'),
@@ -93,7 +115,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('record-list', 'Uma fila para a empresa inteira', 'A demanda pode nascer de uma OP, do estoque mínimo, da manutenção, da assistência ou de um projeto. Clique na linha para decidir como atender.', 'close'),
     t('new-record', 'Nova demanda', 'Escolha material, serviço ou ativo. A origem define o responsável e já deixa o vínculo preenchido: uma demanda aberta dentro de um projeto nasce ligada a ele.', 'close'),
     t('demand-stock', 'Dá para atender agora?', 'Estoque, reservado para OPs e saldo livre. Se o livre cobre a quantidade, o almoxarifado entrega. Se não cobre, o lead time estima quando a compra chega.', 'demand'),
-    t('demand-actions', 'Três caminhos', 'Atender pelo estoque dá baixa e cancela a previsão. Gerar pedido usa a previsão já criada pela demanda, sem duplicá-la. Em serviço, Concluir gera o contas a pagar e o realizado espera o pagamento do Omie.', 'demand'),
+    t('demand-actions', 'Três caminhos', 'Atender pelo estoque dá baixa e cancela a previsão. Gerar pedido usa a previsão já criada pela demanda, sem duplicá-la. Em serviço, Concluir encerra a execução; o pagamento fica no Omie e o realizado espera a confirmação dele.', 'demand'),
     t('demand-links', 'Origem, categoria e período', 'A origem abre a OP, o chamado ou o projeto. O pedido e o orçamento mostram a categoria, o mês e o saldo que esta demanda consome.', 'demand'),
   ],
   '/crm': [
@@ -115,32 +137,31 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
   ],
   '/projetos': [
     t('project-gantt', 'Portfólio no tempo', 'A barra é o prazo, o preenchimento é o avanço físico, a bandeira é o marco e a linha laranja é hoje. Clique numa linha para abrir o projeto.', 'close'),
-    t('record-list', 'O projeto junta tudo', 'Marcos, demandas, compras, orçamento e títulos ficam na mesma ficha. O guia entra nela agora.', 'close'),
+    t('record-list', 'O projeto junta tudo', 'Marcos, demandas, compras e orçamento ficam na mesma ficha. O guia entra nela agora.', 'close'),
     t('new-record', 'Novo projeto', 'O tipo escolhido cria os marcos padrão. O valor informado entra no orçamento anual de P&D e cria uma previsão rastreável do projeto.', 'close'),
     t('project-actions', 'Pedir material ou serviço', 'Os dois botões abrem uma demanda já vinculada ao projeto, com categoria, período e custo estimado para o orçamento.', 'project'),
     t('project-milestones', 'Marcos com responsável', 'Marque o marco para concluí-lo. O atraso aparece em vermelho. Quando todos estão concluídos, o projeto encerra. Dá para incluir um marco novo aqui embaixo.', 'project'),
-    t('project-costs', 'Orçamento e títulos do projeto', 'A previsão mostra custos ainda abertos. O realizado só aparece quando o Omie confirma o pagamento; os títulos de origem abrem daqui.', 'project'),
+    t('project-costs', 'Orçamento do projeto', 'A previsão mostra custos ainda abertos. O realizado só aparece quando o Omie confirma o pagamento.', 'project'),
   ],
   '/orcamentos': [
-    t('budget-tabs', 'Três visões do controle', 'Visão geral só acompanha. Ações decide nota sem vínculo e saldo excedido. Configurações informa o ano, o limiar e o que acontece com saldo negativo.', 'close'),
-    t('budget-tab-acoes', 'Quem decide o quê', 'O sino avisa e, ao clicar na notificação, abre esta aba. A linha mostra o tipo da ação, sem o código. O Financeiro e o Administrador reclassificam o pagamento retido e ligam a nota que chegou sem documento.', 'close'),
-    t('budget-tab-configuracao', 'O ano na linha', 'O valor do ano é editado direto na coluna, sem motivo. O grupo e a categoria macro mostram a soma. Inativar também inativa a categoria no Omie.', 'close'),
-    t('budget-summary', 'A fatia do período', 'Os cartões usam a lente escolhida acima, na ordem orçamento, realizado pago e previsão aberta. No mês, o orçamento é 1/12 do ano. O grupo começa em todos e também mostra o uso.', 'close'),
-    t('record-list', 'Desvio no chip', 'O valor fica num chip verde quando ainda cabe, amarelo no limiar e vermelho acima de 100%. A seta abre as subcategorias. Clique na linha para ver os lançamentos.', 'close'),
-    t('budget-detail', 'A nota e de onde ela veio', 'O realizado é a nota do Omie. A linha diz a compra, o projeto ou a ordem. Sem esse vínculo, a nota já está no custo e o Financeiro liga o documento em Ações.', 'budget'),
-    t('budget-adjust', 'Valor do ano', 'Na coluna Orçamento, o Financeiro e o Administrador gravam o ano ao sair do campo. Não há motivo. O limiar e o saldo negativo ficam ao lado.', 'close'),
+    t('budget-tabs', 'Cinco abas, na ordem do trabalho', 'Visão geral acompanha. Ações decide. Categorias define o valor e os centros. Centros de custo cadastra os responsáveis. Planejamento monta o ano. O guia passa por uma de cada vez.', 'close'),
+    t('period-scope', 'Período e empresa', 'Escolha o ano e o intervalo de meses. Quem tem a consulta consolidada também escolhe a empresa do grupo ou a soma do grupo, só para leitura.', 'close'),
+    t('record-list', 'Visão geral', 'Custo, despesa e investimento no período: orçado, realizado, previsão, desvio e uso, com a cor da situação. Clique numa conta para abrir a origem do desvio: os centros lado a lado com o percentual usado e o responsável, e as origens por valor. Clique num centro para filtrar.', 'close'),
+    t('budget-detail', 'A ficha da conta', 'O realizado é a nota do Omie. A linha diz a compra, o projeto ou a ordem. Sem esse vínculo, o Financeiro liga o documento em Ações.', 'budget'),
+    t('budget-actions', 'Ações', 'O sino avisa e abre esta aba. Saldo excedido é do Gestor. Pagamento sem categoria e nota sem vínculo são do Financeiro. Cada linha mostra quem decide.', 'close'),
+    t('budget-categories', 'Categorias', 'O valor do ano mora na subcategoria. A categoria-mãe soma as filhas, e as filhas aparecem recuadas com uma linha guia.', 'close'),
+    t('budget-split', 'Centros da conta, no mesmo lugar', 'O botão abre os centros desta conta logo abaixo da linha. O sistema já propõe as fatias pelo realizado do ano anterior. Ajuste o percentual ou o valor e salve. O que ficar sem centro fica com o Financeiro.', 'close'),
+    t('budget-centers', 'Centros de custo', 'Código igual ao do Omie, nome e responsável. O responsável recebe os alertas das contas em que o centro tem fatia. A coluna mostra essas contas e abre cada uma.', 'close'),
+    t('budget-sector', 'Centro padrão do setor', 'Cada setor aponta um centro em cada empresa. Demanda, compra e projeto nascem com ele e podem trocar.', 'close'),
+    t('budget-plan-modes', 'Planejamento', 'Anual monta o ano sobre o realizado anterior, Mensal reparte pelos meses e CAPEX trata o investimento à parte.', 'close'),
+    t('budget-summary', 'Meta de faturamento', 'O realizado do ano anterior e o percentual necessário para a meta. Definir meta aplica esse percentual a todas as contas. A coluna Cresc. % ajusta conta por conta.', 'close'),
+    t('budget-seasonality', 'Sazonalidade em um clique', 'No Mensal, este botão reparte o ano de cada conta pelo peso de cada mês no realizado do ano anterior. Conta sem base fica como está.', 'close'),
   ],
-  '/contas-pagar': [
-    t('aging', 'Vencimentos', 'Saldo em aberto por faixa de prazo. Compra recebida e serviço de terceiro concluído geram o título sozinhos.', 'close'),
-    t('record-list', 'A linha abre o título', 'Clique para ver quem gerou o valor, baixar ou renegociar. O guia abre um título agora.', 'close'),
-    t('title-actions', 'Baixar ou renegociar', 'Registrar pagamento simula o evento vindo do Omie e transforma a previsão em realizado pago. Renegociar pede a nova data e o motivo. Fiscal, banco e a baixa oficial continuam no Omie.', 'title'),
-    t('title-origin', 'Quem gerou este título', 'A compra, o serviço, o projeto e o orçamento de origem. Cada um abre a ficha correspondente.', 'title'),
-  ],
-  '/contas-receber': [
-    t('aging', 'Vencimentos', 'Saldo a receber por faixa de prazo. O faturamento da venda e a assistência cobrável geram o título sozinhos.', 'close'),
-    t('record-list', 'A linha abre o título', 'Clique para ver o pedido ou o chamado de origem, baixar ou renegociar.', 'close'),
-    t('title-actions', 'Receber ou renegociar', 'Registrar recebimento dá baixa operacional e confere com o Omie. Renegociar pede a nova data e o motivo. A cobrança bancária continua no Omie.', 'title'),
-    t('title-origin', 'Quem gerou este título', 'O pedido faturado ou o chamado de assistência, com o cliente e os outros títulos dele.', 'title'),
+  '/dre': [
+    t('period-scope', 'Período e empresa', 'Ano, mês inicial e mês final. Quem tem a consulta consolidada escolhe também a empresa do grupo ou a soma do grupo.', 'close'),
+    t('dre-cards', 'Realizado em destaque', 'O número grande é o realizado, na cor da situação. O orçado fica em cima, como referência, com o percentual atingido.', 'close'),
+    t('dre-statement', 'O demonstrativo', 'Receita, custos, EBITDA e lucro do período, orçado e realizado. O investimento fica separado e não entra no lucro.', 'close'),
+    t('dre-reading', 'Leitura do período', 'As frases saem dos mesmos números da tabela: meta de receita, consumo de custos, EBITDA e o centro que mais gastou.', 'close'),
   ],
   '/programacao': [
     t('capacity', 'Carga por recurso', 'A ocupação de cada injetora e célula de montagem é calculada pelo tempo padrão das operações programadas.'),
@@ -154,10 +175,10 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('mrp-table', 'Necessidades de materiais', 'Saldo, reservas, compras em andamento e falta de cada item. As requisições já nascem vinculadas ao pedido e à OP que precisam do material.'),
   ],
   '/compras': [
-    t('purchase-orders', 'Pedidos de compra', 'Clique num pedido para abrir a ficha: cotação, aprovação, recebimento e o título que ele gera. O guia entra num pedido agora.', 'close'),
-    t('po-flow', 'Aprovar formaliza, receber gera o título', 'Aprovar envia o pedido ao fornecedor sem criar outra previsão. Receber o saldo dá entrada no estoque, conclui a demanda e gera o contas a pagar. O realizado pago só nasce quando o Omie confirma o pagamento.', 'purchase'),
+    t('purchase-orders', 'Pedidos de compra', 'Clique num pedido para abrir a ficha: cotação, aprovação e recebimento. O guia entra num pedido agora.', 'close'),
+    t('po-flow', 'Aprovar formaliza, receber conclui', 'Aprovar envia o pedido ao fornecedor sem criar outra previsão. Receber o saldo dá entrada no estoque e conclui a demanda. O contas a pagar fica no Omie; o realizado pago só nasce quando ele confirma o pagamento.', 'purchase'),
     t('po-quotes', 'Escolher a cotação', 'Antes da aprovação, escolha o fornecedor. Preço e prazo do pedido passam a ser os da cotação escolhida.', 'purchase'),
-    t('po-links', 'Demanda, projeto e categoria', 'A demanda de origem, o projeto, a categoria do mês e o título a pagar. Cada linha abre o registro correspondente.', 'purchase'),
+    t('po-links', 'Demanda, projeto e categoria', 'A demanda de origem, o projeto e a categoria do mês. Cada linha abre o registro correspondente.', 'purchase'),
     t('purchase-pipeline', 'Requisições do cenário atual', 'O fluxo novo passa por Demandas. Estas colunas guardam as requisições que já estavam no caminho: cotação, aprovação, pedido no Omie e recebimento.', 'close'),
   ],
   '/estoque': [

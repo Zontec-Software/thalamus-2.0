@@ -6,6 +6,7 @@ import { canEdit, catalogOf, classDescendants, classLabel, editorsLabel } from '
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import type { ItemClass } from '../../types/domain'
+import ClassAttributesSection from './sections/ClassAttributesSection.vue'
 import { listState } from './shared'
 
 const store = useErpStore()
@@ -80,6 +81,7 @@ function expandAll(value: boolean) {
             <ChevronDown v-if="open[row.node.id]" :size="14" /><ChevronRight v-else :size="14" />
           </button>
           <button class="name" @click="pick(row.node)">{{ row.node.name }}</button>
+          <span v-if="row.node.attributes?.length" class="count" title="Atributos definidos neste nó">{{ row.node.attributes.length }} atributo(s)</span>
           <span class="count">{{ total(row.node.id) }} item(ns)</span>
         </div>
       </div>
@@ -106,8 +108,9 @@ function expandAll(value: boolean) {
           <button class="button secondary small" :disabled="children(selected.id).length > 0 || (direct[selected.id] ?? 0) > 0" @click="remove"><Trash2 :size="13" /> Remover nó</button>
           <p class="cell-sub" style="margin-top:6px">Só nó sem filhos e sem itens pode ser removido. Reclassifique os itens antes (seleção em lote na lista).</p>
         </fieldset>
+        <ClassAttributesSection :class-id="selected.id" />
       </template>
-      <p v-else class="empty-note">Escolha um nó para ver os itens, criar filhos ou renomear.</p>
+      <p v-else class="empty-note">Escolha um nó para ver os itens, criar filhos, renomear e definir os atributos que os itens herdam.</p>
     </article>
   </div>
 </template>

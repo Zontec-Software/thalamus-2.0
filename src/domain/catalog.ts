@@ -2,7 +2,7 @@ import { hasFullAccess } from './access'
 import type { ErpState } from './engine'
 import { addDays, DomainError, log, nextId, now, today } from './engine'
 import type {
-  ApprovalRole, BranchStock, CatalogLayer, Item, ItemCatalog, ItemClass, ItemLifecycle, ItemNature, ItemType, KeyChangeRequest,
+  ApprovalRole, AttributeDef, AttributeKind, BranchStock, CatalogLayer, Item, ItemCatalog, ItemClass, ItemLifecycle, ItemNature, ItemType, KeyChangeRequest,
   ProductRevision, Role, UnitContext, UnitConversion,
 } from '../types/domain'
 
@@ -10,11 +10,11 @@ export const LIFECYCLE: ItemLifecycle[] = ['Rascunho', 'Em homologação', 'Ativ
 
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   PA: 'Produto acabado', SE: 'Peça injetada', MP: 'Matéria-prima', CP: 'Componente', EM: 'Embalagem',
-  SV: 'Serviço', KF: 'Kit físico', KT: 'Kit virtual', IM: 'Imobilizado',
+  SV: 'Serviço', KF: 'Kit físico', KT: 'Kit virtual', IM: 'Imobilizado', FE: 'Ferramental',
 }
 
 export const LAYER_LABEL: Record<CatalogLayer, string> = {
-  nucleo: 'Núcleo', estoque: 'Estoque', unidades: 'Unidades', manufatura: 'Estrutura e roteiro', comercial: 'Comercial', fiscal: 'Fiscal',
+  nucleo: 'Núcleo', estoque: 'Estoque', unidades: 'Unidades', manufatura: 'Estrutura e roteiro', ferramental: 'Ferramental', comercial: 'Comercial', fiscal: 'Fiscal',
   midia: 'Mídia', projetos: 'Projetos', ciclo: 'Ciclo de vida',
 }
 
@@ -44,6 +44,7 @@ export const NCM_TABLE: { code: string; name: string; st: boolean; cest: string 
   { code: '83024200', name: 'Suportes e guarnições', st: false, cest: '' },
   { code: '48191000', name: 'Caixas de papelão', st: false, cest: '' },
   { code: '94032090', name: 'Móveis de metal', st: false, cest: '' },
+  { code: '84807100', name: 'Moldes para injeção de plástico', st: false, cest: '' },
 ]
 
 export const UNIT_CONTEXTS: UnitContext[] = ['Compra', 'Produção', 'Estoque', 'Venda']
@@ -56,6 +57,7 @@ export const EDITORS: Record<CatalogLayer, Role[]> = {
   estoque: ['Administrador', 'Gestor', 'Almoxarifado', 'Engenharia', 'Compras'],
   unidades: ['Administrador', 'Gestor', 'Almoxarifado', 'Engenharia', 'Compras'],
   manufatura: ['Administrador', 'Gestor', 'Engenharia', 'PCP'],
+  ferramental: ['Administrador', 'Gestor', 'Engenharia', 'PCP', 'Manutenção'],
   comercial: ['Administrador', 'Gestor', 'Comercial'],
   fiscal: ['Administrador', 'Gestor', 'Financeiro'],
   midia: ['Administrador', 'Gestor', 'Engenharia', 'Comercial'],
@@ -96,7 +98,7 @@ export function ncmInfo(code: string) {
 export function natureOf(type: ItemType): ItemNature {
   if (type === 'SV') return 'Serviço'
   if (type === 'KT') return 'Kit virtual'
-  if (type === 'IM') return 'Imobilizado'
+  if (type === 'IM' || type === 'FE') return 'Imobilizado'
   return 'Bem'
 }
 
@@ -119,12 +121,18 @@ export function needsStructure(item: Item) {
   return ['PA', 'SE', 'KF', 'KT'].includes(item.type)
 }
 
+/** Produto acabado, kit físico e peça injetada têm roteiro; a peça injetada roda no molde. */
+export function hasRouting(item: Item) {
+  return ['PA', 'KF', 'SE'].includes(item.type)
+}
+
 export function sellable(item: Item) {
   return ['PA', 'KF', 'KT', 'SV'].includes(item.type)
 }
 
 export function layersOf(item: Item): CatalogLayer[] {
   const nature = catalogOf(item).nature
+  if (item.type === 'FE') return ['ferramental', 'fiscal', 'midia', 'projetos']
   if (nature === 'Serviço') return ['comercial', 'fiscal', 'projetos']
   if (nature === 'Imobilizado') return ['fiscal', 'midia']
   if (nature === 'Kit virtual') return ['manufatura', 'comercial', 'fiscal', 'midia', 'projetos']
@@ -139,6 +147,7 @@ export function requiredApprovals(item: Item): ApprovalRole[] {
   const catalog = catalogOf(item)
   const list: ApprovalRole[] = []
   if (catalog.nature === 'Serviço') list.push('fiscal', 'comercial')
+  else if (item.type === 'FE') list.push('fiscal', 'pcp')
   else if (catalog.nature === 'Imobilizado') list.push('fiscal')
   else {
     list.push('fiscal')
@@ -180,6 +189,7 @@ export function approvalIssues(item: Item, approval: ApprovalRole): string[] {
     if (!item.bom?.length) issues.push('Sem estrutura liberada')
     if ((item.type === 'PA' || item.type === 'KF') && !item.routing?.length) issues.push('Sem roteiro de produção')
   }
+  if (approval === 'pcp' && item.type === 'FE') issues.push(...toolingIssues(catalog.tooling))
   if (approval === 'comercial') {
     if (!catalog.commercialName.trim()) issues.push('Descrição comercial vazia')
     if ((item.type === 'PA' || item.type === 'KF') && !catalog.gtin) issues.push('EAN/GTIN principal não informado')
@@ -192,6 +202,20 @@ export function approvalIssues(item: Item, approval: ApprovalRole): string[] {
   return issues
 }
 
+/** O ferramental só entra em roteiro com os dados que definem o tempo por peça e onde ele roda. */
+export function toolingIssues(tooling: ItemCatalog['tooling']): string[] {
+  const issues: string[] = []
+  if (!tooling) return ['Ferramental sem dados técnicos']
+  if (tooling.kind === 'Molde') {
+    if (!(tooling.cavities >= 1)) issues.push('Informe as cavidades do molde')
+    if (!(tooling.activeCavities >= 1 && tooling.activeCavities <= tooling.cavities)) issues.push('Cavidades ativas ficam entre 1 e as cavidades nominais')
+    if (!(tooling.cycleSeconds > 0)) issues.push('Informe o ciclo padrão do molde')
+  }
+  if (!tooling.compatibleResourceIds.length) issues.push(tooling.kind === 'Molde' ? 'Informe ao menos uma injetora compatível' : 'Informe ao menos um posto compatível')
+  if (tooling.owner === 'Cliente' && !tooling.ownerName?.trim()) issues.push('Ferramental de cliente precisa do nome do dono')
+  return issues
+}
+
 export function activationIssues(state: ErpState, item: Item): string[] {
   const catalog = catalogOf(item)
   const issues: string[] = []
@@ -199,8 +223,8 @@ export function activationIssues(state: ErpState, item: Item): string[] {
     if (!catalog.approvals[role]) issues.push(`Falta a aprovação ${APPROVAL_LABEL[role].toLowerCase()}`)
     issues.push(...approvalIssues(item, role))
   }
+  issues.push(...missingAttributes(state, item).map(def => `Atributo obrigatório sem valor: ${def.label}`))
   if (catalog.keyChanges.some(change => change.status === 'Pendente')) issues.push('Há exceção de campo-chave pendente')
-  void state
   return [...new Set(issues)]
 }
 
@@ -222,7 +246,93 @@ export function itemFlags(state: ErpState, item: Item): string[] {
   if (catalog.keyChanges.some(change => change.status === 'Pendente')) flags.push('Exceção pendente')
   if (state.productRevisions.some(entry => entry.itemId === item.id && entry.status === 'Rascunho')) flags.push('Versão em rascunho')
   if (catalog.lifecycle === 'Obsoleto' && item.stock > 0) flags.push('Obsoleto com saldo')
+  if (missingAttributes(state, item).length) flags.push('Atributos pendentes')
+  if (catalog.fiscalSync?.status === 'Conflito') flags.push('Fiscal em conflito com o Omie')
+  if (item.type === 'FE' && toolingIssues(catalog.tooling).length) flags.push('Ferramental incompleto')
   return flags
+}
+
+/* ---------- Atributos por classe ---------- */
+
+/** Atributos que valem para a classe: do nó raiz até ela. O nó mais próximo redefine a mesma chave. */
+export function classAttributes(state: ErpState, classId: string): (AttributeDef & { classId: string; inherited: boolean })[] {
+  const merged = new Map<string, AttributeDef & { classId: string; inherited: boolean }>()
+  for (const node of classPath(state, classId)) {
+    for (const def of node.attributes ?? []) merged.set(def.key, { ...def, classId: node.id, inherited: node.id !== classId })
+  }
+  return [...merged.values()]
+}
+
+export function missingAttributes(state: ErpState, item: Item) {
+  const values = catalogOf(item).attributes
+  return classAttributes(state, catalogOf(item).classId).filter(def => def.required && !values[def.key]?.trim())
+}
+
+export interface AttributeInput {
+  key?: string
+  label: string
+  kind: AttributeKind
+  options: string[]
+  unit: string
+  required: boolean
+  variantAxis: boolean
+}
+
+export function saveClassAttribute(state: ErpState, classId: string, input: AttributeInput, actor: string, role: Role) {
+  if (!canEdit(role, 'nucleo')) throw new DomainError('Somente Engenharia e Gestor mantêm os atributos da classificação')
+  const node = state.itemClasses.find(entry => entry.id === classId)
+  if (!node) throw new DomainError('Nó não encontrado')
+  const label = input.label.trim()
+  if (label.length < 2) throw new DomainError('Dê um nome ao atributo')
+  const options = [...new Set(input.options.map(entry => entry.trim()).filter(Boolean))]
+  if (input.kind === 'Lista' && options.length < 2) throw new DomainError('Atributo de lista precisa de ao menos duas opções')
+  if (input.variantAxis && input.kind !== 'Lista') throw new DomainError('Só atributo de lista vira eixo de grade')
+  /** A chave é o próprio rótulo: é ela que a grade usa como nome do eixo. */
+  const key = input.key ?? label
+  node.attributes ??= []
+  const existing = node.attributes.find(entry => entry.key === key)
+  if (!input.key && classAttributes(state, classId).some(entry => entry.key === key || entry.label.toLowerCase() === label.toLowerCase())) {
+    throw new DomainError('Já existe um atributo com esse nome nesta classe ou acima dela')
+  }
+  const def: AttributeDef = { key, label, kind: input.kind, options: input.kind === 'Lista' ? options : undefined, unit: input.unit.trim() || undefined, required: input.required, variantAxis: input.variantAxis || undefined }
+  if (existing) Object.assign(existing, def)
+  else node.attributes.push(def)
+  log(state, 'Produtos', actor, `${classLabel(state, classId)}: atributo ${label} ${existing ? 'alterado' : 'criado'}${input.required ? ' (obrigatório)' : ''}`)
+  return def
+}
+
+export function removeClassAttribute(state: ErpState, classId: string, key: string, actor: string, role: Role) {
+  if (!canEdit(role, 'nucleo')) throw new DomainError('Somente Engenharia e Gestor mantêm os atributos da classificação')
+  const node = state.itemClasses.find(entry => entry.id === classId)
+  const def = node?.attributes?.find(entry => entry.key === key)
+  if (!node || !def) throw new DomainError('Atributo não encontrado neste nó. Atributo herdado se remove no nó de origem')
+  const users = state.items.filter(item => !item.catalog?.deletedAt && item.catalog?.attributes[key]?.trim() && classDescendants(state, classId).includes(item.catalog.classId))
+  if (users.length) throw new DomainError(`${users.length} item(ns) já têm valor neste atributo. Limpe os valores antes de remover`)
+  node.attributes = node.attributes!.filter(entry => entry.key !== key)
+  log(state, 'Produtos', actor, `${classLabel(state, classId)}: atributo ${def.label} removido`)
+}
+
+/** Grava os valores do item contra as definições herdadas da classe. Chave fora da classe é recusada. */
+export function setItemAttributes(state: ErpState, itemId: string, values: Record<string, string>, actor: string, role: Role = 'Gestor') {
+  const item = findItem(state, itemId)
+  const catalog = editable(item, role, 'nucleo')
+  const defs = classAttributes(state, catalog.classId)
+  const changes: Change[] = []
+  const next = { ...catalog.attributes }
+  for (const [key, raw] of Object.entries(values)) {
+    const def = defs.find(entry => entry.key === key)
+    if (!def) throw new DomainError('Atributo não pertence à classificação do item')
+    const value = raw.trim()
+    if (value && def.kind === 'Número' && !Number.isFinite(Number(value.replace(',', '.')))) throw new DomainError(`${def.label} aceita apenas número`)
+    if (value && def.kind === 'Lista' && !def.options?.includes(value)) throw new DomainError(`${def.label}: escolha uma das opções da lista`)
+    if (catalog.modelId && def.variantAxis && (catalog.attributes[key] ?? '') !== value) throw new DomainError(`${def.label} é eixo da grade: a variante tem valor fixo`)
+    track(changes, `Atributo · ${def.label}`, catalog.attributes[key] ?? '', value)
+    if (value) next[key] = value
+    else delete next[key]
+  }
+  if (!changes.length) throw new DomainError('Nada mudou')
+  catalog.attributes = next
+  commit(catalog, actor, changes)
 }
 
 /* ---------- Classificação ---------- */
@@ -452,6 +562,10 @@ export function updateFiscal(state: ErpState, itemId: string, patch: { ncm: stri
   catalog.origin = patch.origin
   catalog.gtinTax = gtinTax
   if (catalog.lifecycle === 'Em homologação') delete catalog.approvals.fiscal
+  const fiscalTouched = changes.some(change => change.field !== 'GTIN tributável')
+  if (fiscalTouched && catalog.lifecycle !== 'Rascunho') {
+    catalog.fiscalSync = { ...catalog.fiscalSync, status: catalog.fiscalSync?.status === 'Conflito' ? 'Conflito' : 'Enviar ao Omie', at: now(), by: actor }
+  }
   commit(catalog, actor, changes)
 }
 
@@ -606,6 +720,8 @@ export function submitItem(state: ErpState, itemId: string, actor: string, role:
   const item = findItem(state, itemId)
   const catalog = editable(item, role, 'ciclo')
   if (catalog.lifecycle !== 'Rascunho') throw new DomainError('Só um rascunho segue para homologação')
+  const missing = missingAttributes(state, item)
+  if (missing.length) throw new DomainError(`Preencha os atributos obrigatórios da classe: ${missing.map(def => def.label).join(', ')}`)
   catalog.approvals = {}
   transition(state, item, 'Em homologação', actor, 'Cadastro completo, enviado aos aprovadores')
 }
@@ -763,8 +879,9 @@ export function openBomVersion(state: ErpState, itemId: string, notes: string, a
   const code = last ? String.fromCharCode(last.charCodeAt(0) + 1) : 'A'
   const revision: ProductRevision = {
     id: `rev-${itemId}-${code.toLowerCase()}-${nextId(state, 'RV').split('-')[1]}`, itemId, code, status: 'Rascunho', createdAt: now(), createdBy: actor,
-    checklist: [{ label: 'Estrutura conferida', done: false }, ...(item.type === 'PA' || item.type === 'KF' ? [{ label: 'Roteiro conferido', done: false }] : [])],
+    checklist: [{ label: 'Estrutura conferida', done: false }, ...(hasRouting(item) ? [{ label: 'Roteiro conferido', done: false }] : [])],
     notes: notes.trim() || 'Alteração controlada da estrutura', lines: (item.bom ?? []).map(line => ({ ...line })),
+    routing: hasRouting(item) ? (item.routing ?? []).map(step => ({ ...step, instructions: [...step.instructions] })) : undefined,
   }
   state.productRevisions.unshift(revision)
   log(state, 'Engenharia', actor, `${item.code}: versão ${code} aberta`, undefined, item.id)
@@ -848,6 +965,7 @@ export function seedPath(item: Pick<Item, 'id' | 'type' | 'family'>): string[] {
   if (item.type === 'SV') return ['Serviços', 'Campo']
   if (item.type === 'KT' || item.type === 'KF') return ['Kits', 'Venda']
   if (item.type === 'IM') return ['Patrimônio', 'Logística']
+  if (item.type === 'FE') return ['Ferramental', 'Moldes de injeção']
   return ['Componentes', 'Diversos']
 }
 
@@ -879,6 +997,7 @@ function typedDefaults(type: ItemType): Partial<ItemCatalog> {
   if (type === 'EM') return { ncm: '48191000', conversions: [{ unit: 'fardo', factor: 20, context: 'Compra' }] }
   if (type === 'KT' || type === 'KF') return { ncm: '39269090', cest: '28.061.00' }
   if (type === 'IM') return { ncm: '94032090' }
+  if (type === 'FE') return { ncm: '84807100' }
   return {}
 }
 

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import { ArrowLeft, ArrowRight, X } from 'lucide-vue-next'
 import { sectorOf } from '../domain/enterprise'
 import { useErpStore } from '../stores/erp'
@@ -9,7 +8,6 @@ import type { TourPanel } from '../tour/steps'
 
 const ui = useUiStore()
 const store = useErpStore()
-const route = useRoute()
 let openedPanel = false
 const rect = ref<DOMRect | null>(null)
 const step = computed(() => ui.tourSteps[ui.tourIndex])
@@ -48,11 +46,6 @@ function recordId(panel: Exclude<TourPanel, 'close'>): string | null {
   if (panel === 'technical') return pick(state.technicalServiceOrders, state.technicalServiceOrders.find(entry => entry.status === 'Agendada') ?? state.technicalServiceOrders.find(entry => entry.status !== 'Concluída' && entry.status !== 'Cancelada'))
   if (panel === 'project') return pick(state.projects, state.projects.find(entry => entry.status === 'Em andamento'))
   if (panel === 'budget') return pick(state.budgets, state.budgets.find(entry => state.purchaseOrders.some(order => order.budgetId === entry.id)))
-  if (panel === 'title') {
-    const kind = route.path === '/contas-pagar' ? 'Pagar' : route.path === '/contas-receber' ? 'Receber' : undefined
-    const list = state.financialTitles.filter(entry => !kind || entry.kind === kind)
-    return pick(list, list.find(entry => entry.status === 'Aberto'))
-  }
   if (panel === 'person') {
     const manager = state.users.find(user => state.sectors.some(sector => sector.managerId === user.id && state.users.some(member => member.id !== user.id && sectorOf(state, member)?.id === sector.id)))
     return manager?.id ?? state.users[0]?.id ?? null

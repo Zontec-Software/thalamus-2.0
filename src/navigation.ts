@@ -1,9 +1,9 @@
 import type { Component } from 'vue'
 export { moduleFeature } from './domain/access'
 import {
-  BadgeDollarSign, BarChart3, Boxes, BriefcaseBusiness, Building2, CalendarRange, CircleDollarSign,
+  ArrowDownToLine, ArrowUpFromLine, BadgeDollarSign, BarChart3, Boxes, BriefcaseBusiness, Building2, CalendarRange, CircleDollarSign, Landmark,
   ClipboardCheck, Factory, FolderKanban, Gauge, HandCoins, Headset, LifeBuoy, ListChecks, PackageCheck,
-  PackageSearch, ReceiptText, ShoppingCart, Tablet, Truck, Unplug, UserRoundCog, Users, Warehouse, Workflow, Wrench,
+  PackageSearch, ShoppingCart, Tablet, Truck, Unplug, UserRoundCog, Users, Warehouse, Workflow, Wrench,
 } from 'lucide-vue-next'
 
 export interface NavItem {
@@ -87,10 +87,16 @@ export const AREAS: Area[] = [
     ],
   },
   {
-    id: 'financas', label: 'Finanças', description: 'Orçamento e compromissos operacionais, sem duplicar o Omie.', icon: CircleDollarSign,
+    id: 'financas', label: 'Finanças', description: 'Resultado, orçamento e centros de custo. Banco e contabilidade ficam no Omie.', icon: CircleDollarSign,
     groups: [
-      { label: 'Planejamento', items: [{ label: 'Orçamentos', to: '/orcamentos', icon: BadgeDollarSign, module: 'Orçamentos' }] },
-      { label: 'Títulos', items: [{ label: 'Contas a pagar', to: '/contas-pagar', icon: ReceiptText, module: 'Contas a pagar' }, { label: 'Contas a receber', to: '/contas-receber', icon: CircleDollarSign, module: 'Contas a receber' }] },
+      { label: 'Planejamento', items: [
+        { label: 'DRE', to: '/dre', icon: Landmark, module: 'DRE' },
+        { label: 'Orçamentos', to: '/orcamentos', icon: BadgeDollarSign, module: 'Orçamentos' },
+      ] },
+      { label: 'Títulos (em estruturação)', items: [
+        { label: 'Contas a pagar', to: '/contas-pagar', icon: ArrowUpFromLine, module: 'Orçamentos' },
+        { label: 'Contas a receber', to: '/contas-receber', icon: ArrowDownToLine, module: 'Orçamentos' },
+      ] },
     ],
   },
 ]

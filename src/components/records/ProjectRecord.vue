@@ -53,7 +53,6 @@ const projectRealized = computed(() => store.state.budgetEntries.filter(entry =>
 const budgetUse = computed(() => projectPlan.value?.amount ? Math.round(projectCosts.value / projectPlan.value.amount * 100) : 0)
 const demands = computed(() => store.state.demands.filter(entry => entry.projectId === props.id || (entry.origin === 'Projeto' && entry.originId === props.id)))
 const purchases = computed(() => store.state.purchaseOrders.filter(entry => entry.projectId === props.id))
-const titles = computed(() => store.state.financialTitles.filter(entry => entry.projectId === props.id))
 const opportunity = computed(() => store.state.opportunities.find(entry => entry.id === project.value?.opportunityId))
 const revision = computed(() => project.value?.itemId ? store.state.productRevisions.find(entry => entry.itemId === project.value!.itemId && entry.status === 'Rascunho') : undefined)
 /** Itens que apontam para este projeto na aba Projetos do cadastro, com a atividade da EAP de cada vínculo. */
@@ -151,10 +150,6 @@ function addRisk() {
       <button v-else class="list-row" @click="ui.openRecord('budget', 'new', { projectId: project.id, name: `Projeto ${project.name}` })">
         <div><strong>Sem orçamento</strong><span>Crie um orçamento para controlar compras e serviços do projeto</span></div><span class="link">Criar</span>
       </button>
-      <button v-for="title in titles" :key="title.id" class="list-row" @click="ui.openRecord('title', title.id)">
-        <div><strong>{{ title.id }} · {{ title.description }}</strong><span>{{ fmtCurrency(title.amount) }} · vence {{ fmtDate(title.dueDate) }}</span></div><StatusBadge :value="title.status" />
-      </button>
-
       </div>
 
       <h3 class="drawer-title">Demandas e compras</h3>

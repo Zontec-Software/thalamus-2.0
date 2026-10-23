@@ -3,8 +3,7 @@ import type { AccessProfile, Functionality, FunctionalityId, Role } from '../typ
 export const MODULES = [
   'Painel', 'Fluxo do pedido', 'Vendas', 'CRM', 'Produtos', 'Pessoas', 'Serviços', 'Ativos', 'Planejamento',
   'Ordens de produção', 'Demandas', 'Compras', 'Almoxarifado', 'Injeção', 'Montagem', 'Qualidade', 'Expedição',
-  'Manutenção', 'Assistência Técnica', 'Indicadores', 'Projetos', 'Orçamentos', 'Contas a pagar',
-  'Contas a receber', 'Organização', 'Integração Omie',
+  'Manutenção', 'Assistência Técnica', 'Indicadores', 'Projetos', 'Orçamentos', 'DRE', 'Organização', 'Integração Omie',
 ]
 
 export const moduleFeature = (module: string): FunctionalityId => `modulo.${module.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_')}.consultar`
@@ -30,10 +29,10 @@ export const FUNCTIONALITIES: Functionality[] = [
 const roleModuleGrants: Record<Role, string[]> = {
   Administrador: MODULES,
   Gestor: MODULES,
-  Comercial: ['CRM', 'Vendas', 'Expedição', 'Contas a receber', 'Produtos'],
+  Comercial: ['CRM', 'Vendas', 'Expedição', 'Produtos'],
   Engenharia: ['Produtos', 'Serviços', 'Ativos', 'Projetos'],
   PCP: ['Painel', 'Fluxo do pedido', 'Vendas', 'Produtos', 'Planejamento', 'Ordens de produção', 'Demandas', 'Injeção', 'Montagem', 'Indicadores'],
-  Compras: ['Painel', 'Demandas', 'Compras', 'Almoxarifado', 'Contas a pagar', 'Orçamentos', 'Produtos'],
+  Compras: ['Painel', 'Demandas', 'Compras', 'Almoxarifado', 'Orçamentos', 'Produtos'],
   Almoxarifado: ['Almoxarifado', 'Compras', 'Demandas', 'Ordens de produção', 'Produtos'],
   'Líder de produção': ['Painel', 'Fluxo do pedido', 'Planejamento', 'Ordens de produção', 'Demandas', 'Injeção', 'Montagem', 'Qualidade', 'Manutenção'],
   Operador: [],
@@ -41,7 +40,7 @@ const roleModuleGrants: Record<Role, string[]> = {
   Expedição: ['Expedição', 'Vendas'],
   Manutenção: ['Manutenção', 'Ativos', 'Serviços', 'Demandas', 'Injeção'],
   Assistência: ['Assistência Técnica', 'Serviços', 'Demandas', 'Almoxarifado'],
-  Financeiro: ['Orçamentos', 'Contas a pagar', 'Contas a receber', 'Projetos', 'Indicadores', 'Produtos'],
+  Financeiro: ['Orçamentos', 'DRE', 'Projetos', 'Indicadores', 'Produtos'],
 }
 
 const profileDescription: Record<Role, string> = {
@@ -50,7 +49,7 @@ const profileDescription: Record<Role, string> = {
   Comercial: 'Relacionamento, propostas, vendas e expedição.',
   Engenharia: 'Produtos, estruturas, serviços, ativos e projetos.',
   PCP: 'Planejamento e acompanhamento da produção.',
-  Compras: 'Demandas, compras, estoque e compromissos.',
+  Compras: 'Demandas, compras, estoque e orçamento.',
   Almoxarifado: 'Recebimento, separação, estoque e demandas.',
   'Líder de produção': 'Execução, planejamento e metas da fábrica.',
   Operador: 'Apontamentos somente pelo tablet.',
@@ -58,7 +57,7 @@ const profileDescription: Record<Role, string> = {
   Expedição: 'Conferência, expedição e vendas.',
   Manutenção: 'Ativos, corretivas, preventivas e demandas.',
   Assistência: 'Chamados, serviços, demandas e peças.',
-  Financeiro: 'Orçamento, títulos, projetos e indicadores.',
+  Financeiro: 'Orçamento, centros de custo, projetos e indicadores.',
 }
 
 export const profileCode = (role: Role) => role.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-')
@@ -73,8 +72,8 @@ export function seededProfiles(tenantId = 'tenant-roboflex'): AccessProfile[] {
     const functionalityIds = role === 'Administrador'
       ? FUNCTIONALITIES.map(entry => entry.id)
       : roleModuleGrants[role].map(moduleFeature)
-    if (role === 'Gestor') functionalityIds.push('orcamentos.liberar_saldo', 'produtos.aprovar')
-    if (role === 'Financeiro') functionalityIds.push('orcamentos.gerir')
+    if (role === 'Gestor') functionalityIds.push('orcamentos.liberar_saldo', 'orcamentos.consultar_consolidado', 'produtos.aprovar')
+    if (role === 'Financeiro') functionalityIds.push('orcamentos.gerir', 'orcamentos.consultar_consolidado')
     if (role === 'Engenharia') functionalityIds.push('produtos.editar', 'produtos.aprovar')
     return {
       id: `profile-${profileCode(role)}`,

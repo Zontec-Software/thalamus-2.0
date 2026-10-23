@@ -1,5 +1,5 @@
 import type {
-  AccessProfile, Asset, Budget, BudgetAlert, BudgetCategory, BudgetEntry, BudgetException, BusinessPartner, Customer, Demand, Downtime, EconomicGroup, FinancialTitle, FiscalRule, FlowEvent, FlowStage, Functionality, Item, ItemClass, ItemModel, JobPosition, OmieConnection,
+  AccessProfile, Asset, Budget, BudgetAlert, BudgetCategory, BudgetEntry, BudgetException, BudgetSimulation, BusinessPartner, CostCenter, Customer, Demand, Downtime, EconomicGroup, EngineeringChange, FiscalRule, FlowEvent, FlowStage, Functionality, Item, ItemClass, ItemModel, JobPosition, OmieConnection,
   MachineState, MaintenanceOrder, NonConformity, Opportunity, OpMaterial, Operation, PriceTable, ProductRevision, ProductionOrder, Project,
   OmieCategory, OmiePayment, Proposal, PurchaseOrder, Requisition, RequisitionStatus, Resource, SalesOrder, Sector, ServiceCatalogItem,
   ShopAlert, StockMovement, SyncLog, TechnicalServiceOrder, Tenant, User, UserProfileAssignment,
@@ -13,6 +13,7 @@ export interface ErpState {
   assets: Asset[]
   users: User[]
   sectors: Sector[]
+  costCenters: CostCenter[]
   positions: JobPosition[]
   partners: BusinessPartner[]
   salesOrders: SalesOrder[]
@@ -27,6 +28,7 @@ export interface ErpState {
   events: FlowEvent[]
   syncLogs: SyncLog[]
   productRevisions: ProductRevision[]
+  engineeringChanges: EngineeringChange[]
   services: ServiceCatalogItem[]
   demands: Demand[]
   purchaseOrders: PurchaseOrder[]
@@ -39,9 +41,9 @@ export interface ErpState {
   budgetEntries: BudgetEntry[]
   budgetExceptions: BudgetException[]
   budgetAlerts: BudgetAlert[]
+  budgetSimulations: BudgetSimulation[]
   omiePayments: OmiePayment[]
   omieCategoryInbox: OmieCategory[]
-  financialTitles: FinancialTitle[]
   priceTables: PriceTable[]
   itemModels: ItemModel[]
   fiscalRules: FiscalRule[]
@@ -65,6 +67,8 @@ export const PAUSE_REASONS = [
 ]
 
 export const SCRAP_REASONS = ['Rebarba excessiva', 'Bolha / chupagem', 'Peça incompleta', 'Risco / mancha', 'Montagem incorreta']
+/** Fração da vida útil do ferramental que abre a preventiva de reforma. */
+export const TOOL_LIFE_ALERT = 0.85
 
 const MAINTENANCE_REASONS = ['Quebra de máquina']
 const REQUISITION_FLOW: RequisitionStatus[] = ['Solicitada', 'Em cotação', 'Aprovada', 'Pedido emitido', 'Recebida']
@@ -287,22 +291,45 @@ export function createRequisition(state: ErpState, itemId: string, quantity: num
 
 /* ---------- Planejamento ---------- */
 
-function toOperation(step: { id: string; name: string; resourceId: string; minutesPerUnit: number; instructions: string[] }): Operation {
-  return { ...step, instructions: [...step.instructions], status: 'Aguardando', good: 0, scrap: 0, accumulatedMs: 0 }
+type StepSource = Pick<Operation, 'id' | 'name' | 'resourceId' | 'minutesPerUnit' | 'instructions' | 'setupMinutes' | 'toolId' | 'firstPiece'>
+
+function toOperation(step: StepSource): Operation {
+  const { id, name, resourceId, minutesPerUnit, instructions, setupMinutes, toolId, firstPiece } = step
+  return { id, name, resourceId, minutesPerUnit, instructions: [...instructions], setupMinutes, toolId, firstPiece, status: 'Aguardando', good: 0, scrap: 0, accumulatedMs: 0 }
+}
+
+/** Injeção da peça: o roteiro com molde (ferramental FE) manda; sem ele, valem os campos antigos da peça. */
+export function injectionSetup(state: ErpState, part: Item) {
+  const step = part.routing?.find(entry => entry.toolId && state.items.find(item => item.id === entry.toolId)?.catalog?.tooling?.kind === 'Molde')
+  const tool = step ? state.items.find(item => item.id === step.toolId) : undefined
+  const tooling = tool?.catalog?.tooling
+  const mold = state.assets.find(asset => asset.id === (tooling?.assetId ?? part.moldId))
+  const cavities = tooling?.activeCavities ?? part.cavities ?? 1
+  const cycleSeconds = tooling?.cycleSeconds ?? part.cycleSeconds ?? 45
+  return {
+    step, tool, tooling, mold, cavities, cycleSeconds,
+    resourceId: step?.resourceId ?? mold?.resourceId ?? 'inj1',
+    minutesPerUnit: step?.minutesPerUnit ?? round(cycleSeconds / cavities / 60),
+  }
 }
 
 function createInjectionOp(state: ErpState, order: SalesOrder, part: Item, quantity: number, due: string, actor: string) {
-  const mold = state.assets.find(asset => asset.id === part.moldId)
-  const resourceId = mold?.resourceId ?? 'inj1'
+  const setup = injectionSetup(state, part)
+  const { mold, resourceId } = setup
   const id = nextId(state, 'OP')
   const op: ProductionOrder = {
     id, kind: 'Injeção', salesOrderId: order.id, itemId: part.id, revisionId: part.currentRevisionId, quantity, dueDate: due, scheduledDate: addDays(due, -1),
     resourceId, status: 'Aguardando material', createdAt: now(), budgetCategoryId: 'BC-OPER', budgetPeriod: due.slice(0, 7), estimatedCost: round(part.cost * quantity),
     materials: (part.bom ?? []).map(line => ({ itemId: line.itemId, required: lineNeed(line, quantity), reserved: 0, picked: false })),
-    operations: [toOperation({
-      id: `${id}-inj`, name: 'Injeção', resourceId, minutesPerUnit: round((part.cycleSeconds ?? 45) / (part.cavities ?? 1) / 60),
-      instructions: [`Montar molde ${mold?.name ?? part.moldId}`, `Ciclo padrão ${part.cycleSeconds}s · ${part.cavities} cavidade(s)`, 'Liberar primeira peça com a qualidade', 'Separar refugo por motivo'],
-    })],
+    operations: setup.step
+      ? part.routing!.map(entry => toOperation({
+        ...entry, id: `${id}-${entry.id}`,
+        instructions: entry === setup.step ? [`Montar molde ${setup.tool!.name}`, `Ciclo padrão ${setup.cycleSeconds}s · ${setup.cavities} cavidade(s) ativa(s)`, ...entry.instructions] : entry.instructions,
+      }))
+      : [toOperation({
+        id: `${id}-inj`, name: 'Injeção', resourceId, minutesPerUnit: setup.minutesPerUnit,
+        instructions: [`Montar molde ${mold?.name ?? part.moldId}`, `Ciclo padrão ${setup.cycleSeconds}s · ${setup.cavities} cavidade(s)`, 'Liberar primeira peça com a qualidade', 'Separar refugo por motivo'],
+      })],
   }
   state.productionOrders.push(op)
   log(state, 'PCP', actor, `${id} de injeção criada: ${quantity} un. de ${part.name}`, order.id)
@@ -325,6 +352,7 @@ export function applyDueRevisions(state: ErpState, date = today()) {
     for (const older of due.slice(1)) older.status = 'Substituída'
     if (item.currentRevisionId === current.id) continue
     if (current.lines) item.bom = current.lines.map(line => ({ ...line }))
+    if (current.routing) item.routing = current.routing.map(step => ({ ...step, instructions: [...step.instructions] }))
     item.revision = current.code
     item.currentRevisionId = current.id
   }
@@ -564,16 +592,31 @@ export function reportProduction(state: ErpState, opId: string, operationId: str
   const previous = index > 0 ? op.operations[index - 1] : undefined
   const limit = operation.name === 'Retrabalho' ? op.quantity : previous ? previous.good : Math.ceil(op.quantity * 1.05)
   if (operation.good + good > limit) throw new DomainError(`Quantidade acima do disponível para esta etapa (máximo ${limit - operation.good})`)
+  if (operation.firstPiece && !operation.firstPieceAt && operation.good + good > 1) {
+    throw new DomainError(operation.good ? 'A primeira peça aguarda liberação da qualidade' : 'Aponte só a primeira peça e peça a liberação da qualidade')
+  }
   operation.good += good
   operation.scrap += scrap
   const scrapText = scrap ? ` e ${scrap} refugo (${scrapReason})` : ''
   log(state, 'Produção', operator, `${op.id} · ${operation.name}: +${good} boas${scrapText}`, op.salesOrderId)
 }
 
+export function approveFirstPiece(state: ErpState, opId: string, operationId: string, inspector: string) {
+  const { op, operation } = findOperation(state, opId, operationId)
+  if (!operation.firstPiece) throw new DomainError('Esta operação não exige inspeção de primeira peça')
+  if (operation.firstPieceAt) throw new DomainError('A primeira peça já foi liberada')
+  if (operation.good < 1) throw new DomainError('Ainda não há primeira peça apontada')
+  if (inspector === operation.operator) throw new DomainError('Quem produziu não libera a própria primeira peça')
+  operation.firstPieceBy = inspector
+  operation.firstPieceAt = now()
+  log(state, 'Qualidade', inspector, `${op.id} · primeira peça de ${operation.name} liberada`, op.salesOrderId)
+}
+
 export function finishOperation(state: ErpState, opId: string, operationId: string, operator: string) {
   const { op, operation } = findOperation(state, opId, operationId)
   if (!['Em execução', 'Pausada'].includes(operation.status)) throw new DomainError('Operação não está em andamento')
   if (operation.good <= 0) throw new DomainError('Aponte as peças boas antes de concluir')
+  if (operation.firstPiece && !operation.firstPieceAt) throw new DomainError('A primeira peça aguarda liberação da qualidade')
   operation.accumulatedMs = elapsedMs(operation)
   operation.startedAt = undefined
   operation.status = 'Concluída'
@@ -587,12 +630,17 @@ export function finishOperation(state: ErpState, opId: string, operationId: stri
   }
   if (op.kind === 'Injeção') {
     const part = getItem(state, op.itemId)
-    const mold = state.assets.find(asset => asset.id === part.moldId)
+    const { mold, cavities, tooling } = injectionSetup(state, part)
     if (mold) {
-      mold.shots = (mold.shots ?? 0) + Math.ceil(operation.good / (part.cavities ?? 1))
+      const injected = op.operations.find(entry => entry.toolId) ?? op.operations[0]
+      mold.shots = (mold.shots ?? 0) + Math.ceil((injected.good + injected.scrap) / cavities)
       const limit = mold.preventiveLimit ?? 250000
-      if (mold.shots >= limit && !state.maintenanceOrders.some(order => order.assetId === mold.id && order.type === 'Preventiva' && order.status !== 'Concluída')) {
+      const openPreventive = () => state.maintenanceOrders.some(order => order.assetId === mold.id && order.type === 'Preventiva' && order.status !== 'Concluída')
+      if (mold.shots >= limit && !openPreventive()) {
         createMaintenance(state, mold.id, 'Preventiva', `Preventiva por contador: ${mold.shots} ciclos`, 'Contador do apontamento', 'Sistema')
+      }
+      if (tooling?.lifeShots && mold.shots >= tooling.lifeShots * TOOL_LIFE_ALERT && !openPreventive()) {
+        createMaintenance(state, mold.id, 'Preventiva', `Ferramental com ${Math.round(mold.shots / tooling.lifeShots * 100)}% da vida útil: avaliar reforma`, 'Vida útil do ferramental', 'Sistema')
       }
     }
     const lot = receiveStock(state, part, operation.good, op.id)
@@ -700,12 +748,6 @@ export function invoiceOrder(state: ErpState, orderId: string, syncLogId?: strin
   if (pending) {
     pending.status = 'sincronizado'
     pending.message = `${order.shipment.invoice} emitida e autorizada`
-  }
-  if (!state.financialTitles.some(entry => entry.kind === 'Receber' && entry.reference === order.id)) {
-    state.financialTitles.unshift({
-      id: nextId(state, 'AR'), kind: 'Receber', partnerId: order.customerId, description: `${order.shipment.invoice} · ${getItem(state, order.itemId).name}`,
-      reference: order.id, amount: order.value, dueDate: addDays(today(), 28), status: 'Aberto', createdAt: now(), origin: 'Venda', costCenter: 'CC-210',
-    })
   }
   log(state, 'Faturamento', 'Integração Omie', `${order.shipment.invoice} emitida no Omie`, order.id)
 }

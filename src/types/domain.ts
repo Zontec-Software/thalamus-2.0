@@ -1,13 +1,13 @@
 export type SyncStatus = 'sincronizado' | 'pendente' | 'erro'
 
 /** PA acabado, SE semiacabado injetado, MP matéria-prima, CP componente, EM embalagem, SV serviço, KF kit físico, KT kit virtual, IM imobilizado */
-export type ItemType = 'PA' | 'SE' | 'MP' | 'CP' | 'EM' | 'SV' | 'KF' | 'KT' | 'IM'
+export type ItemType = 'PA' | 'SE' | 'MP' | 'CP' | 'EM' | 'SV' | 'KF' | 'KT' | 'IM' | 'FE'
 
 export type ItemLifecycle = 'Rascunho' | 'Em homologação' | 'Ativo' | 'Bloqueado' | 'Obsoleto' | 'Inativo'
 export type ItemNature = 'Bem' | 'Serviço' | 'Kit virtual' | 'Imobilizado'
 export type UnitContext = 'Compra' | 'Produção' | 'Estoque' | 'Venda'
 export type ApprovalRole = 'fiscal' | 'pcp' | 'comercial' | 'tecnica'
-export type CatalogLayer = 'nucleo' | 'estoque' | 'unidades' | 'manufatura' | 'comercial' | 'fiscal' | 'midia' | 'projetos' | 'ciclo'
+export type CatalogLayer = 'nucleo' | 'estoque' | 'unidades' | 'manufatura' | 'ferramental' | 'comercial' | 'fiscal' | 'midia' | 'projetos' | 'ciclo'
 
 export type BarcodeKind = 'EAN-13' | 'EAN-8' | 'DUN-14' | 'UPC-A'
 
@@ -42,7 +42,7 @@ export interface StandardCost {
   reason: string
 }
 
-export type MediaKind = 'Foto' | 'Desenho' | 'Ficha técnica'
+export type MediaKind = 'Foto' | 'Desenho' | 'Ficha técnica' | 'Instrução de trabalho'
 
 export interface ItemMedia {
   id: string
@@ -54,6 +54,10 @@ export interface ItemMedia {
   main: boolean
   uploadedBy: string
   uploadedAt: string
+  /** Versão de engenharia a que o documento pertence; sem versão vale para o item todo. */
+  revisionCode?: string
+  /** Vai junto com a ordem de produção (desenho, instrução de montagem). */
+  sendToOp?: boolean
 }
 
 export interface ProjectLink {
@@ -159,6 +163,71 @@ export interface ItemClass {
   id: string
   name: string
   parentId?: string
+  /** Atributos definidos neste nó; os filhos herdam e podem acrescentar. */
+  attributes?: AttributeDef[]
+}
+
+export type AttributeKind = 'Texto' | 'Número' | 'Lista'
+
+export interface AttributeDef {
+  key: string
+  label: string
+  kind: AttributeKind
+  options?: string[]
+  unit?: string
+  /** Sem valor, o item não sai do rascunho para a homologação. */
+  required: boolean
+  /** Pode virar eixo da grade de variantes. */
+  variantAxis?: boolean
+}
+
+export type ToolKind = 'Molde' | 'Gabarito' | 'Dispositivo'
+
+/** Ferramental é item do catálogo; a manutenção acompanha o mesmo ativo pelo contador de golpes. */
+export interface Tooling {
+  kind: ToolKind
+  cavities: number
+  activeCavities: number
+  cycleSeconds: number
+  shotWeightG: number
+  compatibleResourceIds: string[]
+  owner: 'Roboflex' | 'Cliente'
+  ownerName?: string
+  assetId?: string
+  lifeShots: number
+  value: number
+}
+
+export type PackagingLevelName = 'Unidade' | 'Caixa' | 'Palete'
+
+export interface PackagingLevel {
+  level: PackagingLevelName
+  /** Quantas unidades base cabem neste nível. */
+  units: number
+  packageItemId?: string
+  gtin?: string
+  weightKg: number
+  lengthCm: number
+  widthCm: number
+  heightCm: number
+}
+
+export type FiscalSyncStatus = 'Sincronizado' | 'Enviar ao Omie' | 'Conflito'
+
+export interface FiscalSnapshot {
+  ncm: string
+  cest: string
+  origin: string
+  exTipi: string
+  cClassTrib: string
+}
+
+/** Fiscal é editável dos dois lados; a divergência simultânea vira conflito para alguém decidir. */
+export interface FiscalSync {
+  status: FiscalSyncStatus
+  at: string
+  by: string
+  remote?: FiscalSnapshot
 }
 
 /** Camadas de extensão do item. O núcleo (código, tipo, unidade, status) continua em Item. */
@@ -210,6 +279,9 @@ export interface ItemCatalog {
   audit: CatalogAudit[]
   deletedAt?: string
   deletedBy?: string
+  tooling?: Tooling
+  packaging?: PackagingLevel[]
+  fiscalSync?: FiscalSync
 }
 
 export type Role = 'Administrador' | 'Gestor' | 'Comercial' | 'Engenharia' | 'PCP' | 'Compras' | 'Almoxarifado' | 'Líder de produção' | 'Operador' | 'Qualidade' | 'Expedição' | 'Manutenção' | 'Assistência' | 'Financeiro'
@@ -295,6 +367,14 @@ export interface RouteStep {
   resourceId: string
   minutesPerUnit: number
   instructions: string[]
+  /** Preparação por lote: troca de molde, regulagem, primeira peça. */
+  setupMinutes?: number
+  /** Ferramental (item FE). Com molde, o tempo por peça vem do ciclo ÷ cavidades ativas. */
+  toolId?: string
+  /** Pessoas na operação; multiplica a mão de obra. */
+  crew?: number
+  /** Exige liberação da primeira peça pela qualidade. */
+  firstPiece?: boolean
 }
 
 export interface Item {
@@ -337,6 +417,8 @@ export interface Resource {
   name: string
   kind: 'Injetora' | 'Montagem' | 'Almoxarifado' | 'Qualidade' | 'Expedição'
   dailyMinutes: number
+  /** Custo-hora do posto (máquina, energia, depreciação), sem a mão de obra. */
+  hourlyRate?: number
 }
 
 export type MachineState = 'Produzindo' | 'Parada' | 'Livre' | 'Manutenção'
@@ -356,6 +438,10 @@ export interface Asset {
   manufacturer?: string
   acquiredAt?: string
   value?: number
+  /** Valor de aquisição usado na depreciação estimada do DRE. */
+  acquisitionValue?: number
+  /** Vida útil em anos. Sem isto, a estimativa usa 10 anos para máquina e 5 para molde. */
+  usefulLifeYears?: number
   criticality?: 'A' | 'B' | 'C'
 }
 
@@ -408,6 +494,12 @@ export interface Operation {
   accumulatedMs: number
   operator?: string
   pauseReason?: string
+  setupMinutes?: number
+  toolId?: string
+  /** Só segue além da 1ª peça boa depois da liberação por outra pessoa. */
+  firstPiece?: boolean
+  firstPieceBy?: string
+  firstPieceAt?: string
 }
 
 export type OpStatus = 'Aguardando material' | 'Planejada' | 'Liberada' | 'Em produção' | 'Inspeção' | 'Concluída'
@@ -541,7 +633,19 @@ export interface Sector {
   name: string
   managerId?: string
   parentId?: string
-  costCenter: string
+  /** Código do centro de custo padrão desta equipe em cada empresa (id da empresa → código). */
+  costCenters: Record<string, string>
+}
+
+/** Plano de centros de custo da empresa. O código é o mesmo que o Omie usa para classificar o gasto. */
+export interface CostCenter {
+  id: string
+  tenantId: string
+  code: string
+  name: string
+  /** Usuário que responde pelo gasto deste centro e recebe os alertas das contas em que ele tem fatia. */
+  responsibleUserId: string
+  status: EntityStatus
 }
 
 export interface JobPosition {
@@ -575,8 +679,33 @@ export interface ProductRevision {
   notes: string
   /** Estrutura desta versão; a liberada copia para o item. */
   lines?: BomLine[]
+  /** Roteiro desta versão; estrutura e roteiro são liberados juntos. */
+  routing?: RouteStep[]
+  /** Mudança de engenharia que originou a versão. */
+  changeId?: string
   validFrom?: string
   validTo?: string
+}
+
+export type ChangeStage = 'Solicitada' | 'Em análise' | 'Aprovada' | 'Implementada' | 'Recusada'
+export type ChangeDisposition = 'Usar até acabar' | 'Retrabalhar' | 'Sucatear' | 'Sem estoque'
+
+/** Mudança de engenharia (ECO): pede, analisa impacto, aprova e libera as versões juntas. */
+export interface EngineeringChange {
+  id: string
+  title: string
+  reason: string
+  priority: 'Normal' | 'Urgente'
+  stage: ChangeStage
+  itemIds: string[]
+  disposition: ChangeDisposition
+  effectiveDate: string
+  requestedBy: string
+  requestedAt: string
+  approvedBy?: string
+  approvedAt?: string
+  implementedAt?: string
+  history: { at: string; actor: string; text: string }[]
 }
 
 export interface ServiceCatalogItem {
@@ -748,12 +877,15 @@ export interface Project {
 }
 
 export type BudgetCategoryStatus = 'Ativa' | 'Inativa'
-export type BudgetEntryKind = 'Previsão' | 'Realizado pago'
+export type BudgetEntryKind = 'Previsão' | 'Realizado pago' | 'Realizado recebido'
 export type BudgetEntryStatus = 'Ativo' | 'Parcial' | 'Liquidado' | 'Cancelado' | 'Estornado' | 'Retido'
 export type BudgetExceptionStatus = 'Pendente' | 'Autorizada' | 'Rejeitada' | 'Resolvida'
+/** Receita soma para a meta de faturamento; despesa é o que o orçamento sempre controlou. */
+export type BudgetCategoryNature = 'Receita' | 'Despesa'
 
 export interface BudgetAlert {
   id: string
+  tenantId: string
   categoryId: string
   period: string
   kind: 'Alerta' | 'Bloqueio'
@@ -761,6 +893,8 @@ export interface BudgetAlert {
   use: number
   message: string
   notifiedRoles: Role[]
+  /** Usuário responsável pela categoria no momento do aviso. */
+  notifiedUserIds?: string[]
   status: 'Aberto' | 'Ciente' | 'Encerrado'
   at: string
   sourceId?: string
@@ -780,26 +914,38 @@ export interface BudgetAudit {
 
 export interface BudgetCategory {
   id: string
+  tenantId: string
   code: string
   name: string
   group: string
   parentId?: string
-  responsibleRole: Role
   status: BudgetCategoryStatus
   audit: BudgetAudit[]
   /** Identificador da mesma categoria no Omie. A conciliação é dos dois lados. */
   omieId?: string
+  /** Receita soma para a meta de faturamento; sem isto a categoria é despesa, como sempre foi. */
+  nature?: BudgetCategoryNature
+  /** Investimento (CAPEX): aparece em grupo próprio, fora do acompanhamento normal de custo/despesa. */
+  isCapex?: boolean
 }
 
 /** Valor informado, sem workflow, para a chave obrigatória categoria + mês. */
 export interface Budget {
   id: string
+  tenantId: string
   categoryId: string
   period: string
   amount: number
   alertThreshold: number
   blockOnOverrun: boolean
   audit: BudgetAudit[]
+  /** Distribuição mês a mês do valor anual. Sem isto, a fatia do mês é 1/12 igual para todos. */
+  monthlyAmounts?: number[]
+  /** Parte do valor anual de cada centro de custo. A soma pode ficar abaixo do ano; o que falta fica com o Financeiro. Não pode passar do ano. */
+  costCenterSplit?: {
+    mode: 'percent' | 'amount'
+    lines: { costCenterId: string; value: number }[]
+  }
 }
 
 export interface BudgetEntryEvent {
@@ -816,6 +962,7 @@ export type InvoiceLinkModule = 'Compras' | 'Projetos' | 'Manutenção' | 'Deman
 
 export interface BudgetEntry {
   id: string
+  tenantId: string
   kind: BudgetEntryKind
   categoryId: string
   period: string
@@ -841,8 +988,19 @@ export interface BudgetEntry {
   heldAmount?: number
 }
 
+/** Retrato do plano de um ano, guardado para ser usado depois. Não altera o orçamento até ser aplicado. */
+export interface BudgetSimulation {
+  id: string
+  tenantId: string
+  year: string
+  lines: { categoryId: string; growthPct: number; amount: number }[]
+  savedAt: string
+  savedBy: string
+}
+
 export interface BudgetException {
   id: string
+  tenantId: string
   kind: 'Sem categoria' | 'Múltiplas categorias' | 'Duplicidade' | 'Erro de sincronização' | 'Saldo excedido' | 'Sem vínculo'
   status: BudgetExceptionStatus
   sourceModule: string
@@ -869,7 +1027,6 @@ export interface OmieCategory {
 
 export interface OmiePayment {
   id: string
-  titleId?: string
   sourceId: string
   /** Número da NF. Quando falta, a nota entra no custo e fica sem vínculo até alguém apontar o documento. */
   invoiceNumber?: string
@@ -879,25 +1036,7 @@ export interface OmiePayment {
   paidAt: string
   categoryIds: string[]
   event: 'Pagamento' | 'Estorno'
+  /** Pagar (custo, padrão) ou Receber (realizado de receita). Sem isto, é Pagar — compatível com o que já existia. */
+  flow?: 'Pagar' | 'Receber'
   error?: string
-}
-
-export interface FinancialTitle {
-  id: string
-  kind: 'Pagar' | 'Receber'
-  partnerId: string
-  description: string
-  reference: string
-  amount: number
-  dueDate: string
-  status: 'Aberto' | 'Baixado'
-  paidAt?: string
-  projectId?: string
-  createdAt: string
-  origin?: 'Compra' | 'Venda' | 'Assistência' | 'Serviço' | 'Manual'
-  budgetId?: string
-  costCenter?: string
-  notes?: string
-  budgetCategoryId?: string
-  budgetPeriod?: string
 }

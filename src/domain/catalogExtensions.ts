@@ -262,7 +262,7 @@ export function moveRoutingStep(state: ErpState, itemId: string, stepId: string,
 
 /* ---------- Mídia ---------- */
 
-export const MEDIA_KINDS: MediaKind[] = ['Foto', 'Desenho', 'Ficha técnica']
+export const MEDIA_KINDS: MediaKind[] = ['Foto', 'Desenho', 'Ficha técnica', 'Instrução de trabalho']
 /** Na demonstração o arquivo fica no navegador; o limite protege o armazenamento local. */
 export const MEDIA_LIMIT_BYTES = 450_000
 
@@ -289,6 +289,23 @@ export function addMedia(state: ErpState, itemId: string, input: { kind: MediaKi
   catalog.media.push(media)
   commit(catalog, actor, [{ field: 'Mídia', from: '', to: `${input.kind}: ${name}${media.main ? ' (principal)' : ''}` }])
   return media
+}
+
+/** Liga o documento a uma versão de engenharia e decide se ele acompanha a OP. */
+export function setMediaUsage(state: ErpState, itemId: string, mediaId: string, usage: { revisionCode: string; sendToOp: boolean }, actor: string, role: Role = 'Gestor') {
+  const item = findItem(state, itemId)
+  const catalog = editable(item, role, 'midia')
+  const media = catalog.media.find(entry => entry.id === mediaId)
+  if (!media) throw new DomainError('Arquivo não encontrado')
+  if (usage.revisionCode && !state.productRevisions.some(entry => entry.itemId === itemId && entry.code === usage.revisionCode)) throw new DomainError('Versão não encontrada para este item')
+  if (usage.sendToOp && media.kind === 'Foto') throw new DomainError('Foto de vitrine não vai para a OP. Use desenho ou instrução de trabalho')
+  const changes: Change[] = []
+  track(changes, `Mídia · ${media.name} · versão`, media.revisionCode ?? '', usage.revisionCode)
+  track(changes, `Mídia · ${media.name} · vai na OP`, media.sendToOp ? 'Sim' : 'Não', usage.sendToOp ? 'Sim' : 'Não')
+  if (!changes.length) throw new DomainError('Nada mudou')
+  media.revisionCode = usage.revisionCode || undefined
+  media.sendToOp = usage.sendToOp || undefined
+  commit(catalog, actor, changes)
 }
 
 export function removeMedia(state: ErpState, itemId: string, mediaId: string, actor: string, role: Role = 'Gestor') {
@@ -552,11 +569,12 @@ export function combinations(model: ItemModel): Record<string, string>[] {
   return model.axes.reduce<Record<string, string>[]>((list, axis) => list.flatMap(combo => axis.values.map(value => ({ ...combo, [axis.name]: value }))), [{}])
 }
 
-const sameCombo = (a: Record<string, string>, b: Record<string, string>) => Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([key, value]) => b[key] === value)
+/** Os atributos do item também guardam os da classe; só os eixos da combinação são comparados. */
+const sameCombo = (combo: Record<string, string>, attributes: Record<string, string>) => Object.entries(combo).every(([key, value]) => attributes[key] === value)
 
 export function missingCombinations(state: ErpState, model: ItemModel) {
   const taken = variantsOf(state, model.id).map(item => catalogOf(item).attributes)
-  return combinations(model).filter(combo => !taken.some(attributes => sameCombo(attributes, combo)))
+  return combinations(model).filter(combo => !taken.some(attributes => sameCombo(combo, attributes)))
 }
 
 export function createModel(state: ErpState, input: { templateId: string; name: string; axes: { name: string; values: string[] }[]; templateAttributes: Record<string, string> }, actor: string, role: Role = 'Gestor') {
@@ -607,7 +625,7 @@ export function generateVariants(state: ErpState, modelId: string, combos: Recor
       commercialName: `${base.commercialName || model.name} ${values.join(' ')}`.trim(), brand: base.brand, productLine: base.productLine, categories: [...base.categories],
       weightKg: base.weightKg, lengthCm: base.lengthCm, widthCm: base.widthCm, heightCm: base.heightCm, minLot: base.minLot, lotMultiple: base.lotMultiple,
       productionLeadDays: base.productionLeadDays, lot: base.lot, expiry: base.expiry, serial: base.serial,
-      conversions: base.conversions.map(entry => ({ ...entry })), modelId: model.id, attributes: { ...combo },
+      conversions: base.conversions.map(entry => ({ ...entry })), modelId: model.id, attributes: { ...base.attributes, ...combo },
     })
     commit(catalog, actor, [{ field: 'Grade', from: '', to: `${model.name} · ${values.join(' · ')} (gerado de ${template.code})` }])
     created.push(item)

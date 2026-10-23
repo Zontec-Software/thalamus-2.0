@@ -10,7 +10,7 @@ A tabela `OWNERSHIP` (exibida na tela **Integração Omie**) define o dono de ca
 | --- | --- | --- | --- |
 | Clientes e condições comerciais | Omie | Omie → Thalamus | Webhook + conciliação diária |
 | Pedidos de venda aprovados | Omie | Omie → Thalamus | Webhook de aprovação |
-| Cadastro fiscal do item (NCM, Ex-TIPI, CEST, origem, benefício por UF, reforma) | Thalamus | Thalamus → Omie | Ativação do item e cada vigência que entra |
+| Cadastro fiscal do item (NCM, Ex-TIPI, CEST, origem, benefício por UF, reforma) | Thalamus | Bidirecional | Ativação, cada vigência e cada alteração aqui; webhook de alteração no Omie, com conflito decidido na ficha do item |
 | Apuração fiscal e NF-e (CST e alíquota aplicados na nota) | Omie | Omie → Thalamus | Emissão da nota |
 | Códigos de barras do item (EAN, DUN, UPC) | Thalamus | Thalamus → Omie | Ativação do item e troca do código principal |
 | Tabelas de preço de venda | Thalamus | Thalamus → Omie | Preço que entra em vigência |
@@ -21,7 +21,7 @@ A tabela `OWNERSHIP` (exibida na tela **Integração Omie**) define o dono de ca
 | Recebimento / NF-e de entrada | Omie | Omie → Thalamus | Webhook de recebimento |
 | Saldo contábil de estoque | Omie | Bidirecional | Ajustes com motivo + conciliação |
 | Faturamento e NF-e de saída | Omie | Omie → Thalamus | Solicitado na expedição |
-| Contas a pagar/receber operacionais | Thalamus | Derivado | Recebimento, faturamento ou assistência |
+| Contas a pagar e a receber | Omie | Omie → Thalamus | O título nasce e é baixado no Omie. O Thalamus lê o pagamento e o recebimento como realizado do orçamento. A cobrança de assistência vai ao Omie para faturar |
 | Categoria financeira | Thalamus | Bidirecional | Criação ou alteração no Thalamus. Inativar envia conta_inativa. O Omie devolve o que mudou lá |
 | Orçamento anual | Thalamus | Interno | Definido no cadastro; acompanhamento mensal, trimestral, semestral ou anual |
 | Nota de custo | Omie | Omie → Thalamus | Entra no realizado. Sem documento de origem, o vínculo é manual em Ações |
@@ -31,7 +31,11 @@ A tabela `OWNERSHIP` (exibida na tela **Integração Omie**) define o dono de ca
 
 O fiscal é dividido em duas responsabilidades, para não haver dois cadastros divergentes:
 
-- **Cadastro fiscal do item** é do Thalamus. O item é homologado aqui, com NCM validado, Ex-TIPI, CEST, origem, benefícios por UF e a classe da reforma com vigência. É daqui que sai o registro 0200 do SPED.
+- **Cadastro fiscal do item** nasce no Thalamus. O item é homologado aqui, com NCM validado, Ex-TIPI, CEST, origem, benefícios por UF e a classe da reforma com vigência. É daqui que sai o registro 0200 do SPED. A sincronização é de **mão dupla**:
+  - alteração no Thalamus marca o item como "Enviar ao Omie" e é publicada pelo botão da ficha (no real, pela fila);
+  - alteração no Omie (webhook de produto) em item sincronizado é aplicada aqui e auditada com o ator "Omie";
+  - alteração no Omie com envio pendente vira **Conflito**: a ficha mostra campo a campo (NCM, CEST, origem, Ex-TIPI, cClassTrib) e alguém com permissão fiscal escolhe "Manter o Thalamus" (reenvia) ou "Aceitar o Omie" (aplica e audita);
+  - rascunho não sincroniza.
 - **Apuração e emissão** são do Omie. A matriz fiscal do Thalamus (`Produtos → Fiscal → Matriz fiscal`) apenas **sugere** CFOP, CST e alíquotas por operação, UF e NCM, para quem cadastra conferir. O valor que vai na nota é o que o Omie aplicar.
 
 Quando a matriz do Thalamus e a do Omie divergirem, vale a do Omie, e a diferença precisa aparecer como erro na tela de integração.
@@ -40,7 +44,7 @@ Quando a matriz do Thalamus e a do Omie divergirem, vale a do Omie, e a diferen�
 
 1. **Pedido aprovado**: o pedido chega à fila e é importado sem duplicar (chave: id do pedido no Omie).
 2. **Compras**: a demanda atendida por compra origina cotação e pedido. Ao aprovar, o pedido é incluído no Omie.
-3. **Recebimento**: cada recebimento parcial dá entrada no estoque e libera reservas; o saldo final conclui a demanda e gera o título operacional, mas não realiza orçamento.
+3. **Recebimento**: cada recebimento parcial dá entrada no estoque e libera reservas; o saldo final conclui a demanda. O título a pagar é do Omie e o orçamento só realiza com o pagamento confirmado por ele.
 4. **Inventário**: cada ajuste vai ao Omie com motivo. Não é possível ajustar abaixo do que já está reservado.
 5. **Produto**: a ativação publica no Omie o cadastro do item, com o fiscal, os códigos de barras e o preço vigente. Depois disso, uma nova revisão de estrutura ou roteiro, um preço que entra em vigência ou uma nova classe da reforma republicam o item.
 6. **Expedição**: a carga expedida solicita o faturamento, a NF-e volta para o pedido e gera a conta a receber operacional.

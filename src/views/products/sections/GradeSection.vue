@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
-import { canEdit, catalogOf, editorsLabel } from '../../../domain/catalog'
+import { computed, reactive, ref, watch } from 'vue'
+import { canEdit, catalogOf, classAttributes, editorsLabel } from '../../../domain/catalog'
 import { combinations, missingCombinations, modelOf, variantsOf } from '../../../domain/catalogExtensions'
 import { useErpStore } from '../../../stores/erp'
 import { useUiStore } from '../../../stores/ui'
@@ -16,11 +16,15 @@ const variants = computed(() => model.value ? variantsOf(store.state, model.valu
 const missing = computed(() => model.value ? missingCombinations(store.state, model.value) : [])
 const comboKey = (combo: Record<string, string>) => Object.values(combo).join(' · ')
 const matrix = computed(() => model.value ? combinations(model.value).map(combo => ({
-  combo, item: variants.value.find(entry => comboKey(catalogOf(entry).attributes) === comboKey(combo)),
+  combo, item: variants.value.find(entry => Object.entries(combo).every(([key, value]) => catalogOf(entry).attributes[key] === value)),
 })) : [])
 const picked = ref<string[]>([])
 
-const draft = reactive({ name: '', axes: 'Cor: Preto, Laranja, Azul' })
+const classAxes = computed(() => classAttributes(store.state, catalogOf(props.item).classId).filter(def => def.variantAxis && def.options?.length))
+const draft = reactive({ name: '', axes: '' })
+watch(classAxes, axes => {
+  draft.axes = axes.length ? axes.map(def => `${def.label}: ${def.options!.join(', ')}`).join('\n') : 'Cor: Preto, Laranja, Azul'
+}, { immediate: true })
 const parsedAxes = computed(() => draft.axes.split('\n').map(row => {
   const [name, values = ''] = row.split(':')
   return { name: name.trim(), values: values.split(',').map(value => value.trim()).filter(Boolean) }
@@ -66,7 +70,7 @@ function generate() {
     <fieldset class="layer" :disabled="!allowed">
       <div class="form-grid">
         <div class="field"><label>Nome do modelo</label><input v-model="draft.name" :placeholder="item.name" /></div>
-        <div class="field"><label>Eixos e valores (um eixo por linha)</label><textarea v-model="draft.axes" rows="2" /><small>Formato "Eixo: valor, valor". Até 3 eixos.</small></div>
+        <div class="field"><label>Eixos e valores (um eixo por linha)</label><textarea v-model="draft.axes" rows="2" /><small>{{ classAxes.length ? 'Sugerido pelos atributos de lista marcados como eixo na classe. ' : '' }}Formato "Eixo: valor, valor". Até 3 eixos.</small></div>
       </div>
       <div class="filter-row" style="margin:6px 0">
         <span class="cell-sub">Este item é:</span>

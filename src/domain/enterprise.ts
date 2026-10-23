@@ -5,7 +5,7 @@ import * as budgetDomain from './budget'
 import type { ErpState } from './engine'
 import { addDays, addSyncLog, applyDueRevisions, assertUsable, availableQty, consumeStock, DomainError, getItem, getOp, log, nextId, now, receiveStock, today } from './engine'
 import type {
-  Asset, Budget, BusinessPartner, CrmActivity, Demand, FinancialTitle, Item, Opportunity, Project, Proposal, ProposalLine,
+  Asset, Budget, BusinessPartner, CrmActivity, Demand, Item, Opportunity, Project, Proposal, ProposalLine,
   PurchaseOrder, Role, ServiceCatalogItem, TechnicalServiceOrder, User,
 } from '../types/domain'
 
@@ -39,12 +39,13 @@ function realize(state: ErpState, budget: Budget | undefined, amount: number, ac
 }
 
 export function createBudget(state: ErpState, input: { categoryId: string; period: string; amount: number; reason?: string }, actor: string) {
-  return budgetDomain.setBudget(state, input.categoryId, input.period, input.amount, input.reason ?? 'Planejamento inicial', actor, 'Financeiro')
+  const tenantId = budgetDomain.categoryOf(state, input.categoryId).tenantId
+  return budgetDomain.setBudget(state, tenantId, input.categoryId, input.period, input.amount, input.reason ?? 'Planejamento inicial', actor, 'Financeiro')
 }
 
 export function adjustBudget(state: ErpState, id: string, amount: number, reason: string, actor: string) {
   const budget = find(state.budgets, id, 'Orçamento')
-  return budgetDomain.setBudget(state, budget.categoryId, budget.period, amount, reason, actor, 'Financeiro')
+  return budgetDomain.setBudget(state, budget.tenantId, budget.categoryId, budget.period, amount, reason, actor, 'Financeiro')
 }
 
 /* ---------- Demandas ---------- */
@@ -130,12 +131,6 @@ export function completeDemand(state: ErpState, id: string, actor: string) {
     const amount = service.cost * demand.quantity
     const budget = budgetFor(state, { projectId: demand.projectId, category: 'Serviço' }) ?? budgetFor(state, { category: service.category === 'Manutenção' ? 'Manutenção' : 'Material' })
     realize(state, budget, amount, actor, demand.id)
-    if (service.outsourced || demand.supplierId) {
-      createTitle(state, {
-        kind: 'Pagar', partnerId: demand.supplierId ?? service.supplierId ?? 'f1', description: `${service.name} · ${demand.id}`, reference: demand.id,
-        amount, dueDate: addDays(today(), 21), origin: 'Serviço', projectId: demand.projectId, budgetId: budget?.id,
-      }, actor)
-    }
   }
   log(state, 'Demandas', actor, `${demand.id} concluída`, undefined, demand.id)
   return demand
@@ -247,12 +242,6 @@ export function advancePurchaseOrder(state: ErpState, id: string, actor: string,
       }
       const amount = order.quantity * order.unitPrice
       realize(state, budget, amount, actor, order.id)
-      createTitle(state, {
-        kind: 'Pagar', partnerId: order.supplierId, description: `Compra ${order.id} · ${getItem(state, order.itemId).name}`,
-        reference: order.id, amount, dueDate: addDays(today(), 28), origin: 'Compra', projectId: order.projectId, budgetId: budget?.id,
-        budgetCategoryId: state.demands.find(entry => order.demandIds.includes(entry.id))?.budgetCategoryId,
-        budgetPeriod: state.demands.find(entry => order.demandIds.includes(entry.id))?.budgetPeriod,
-      }, actor)
     }
   } else throw new DomainError('Este pedido não pode avançar')
   log(state, 'Compras', actor, `${order.id}: ${order.status}`, undefined, order.id)
@@ -642,10 +631,7 @@ export function advanceTechnicalOrder(state: ErpState, id: string, actor: string
       const parts = (technical.parts ?? []).reduce((sum, part) => sum + getItem(state, part.itemId).cost * part.quantity * 1.3, 0)
       const labor = (technical.laborHours ?? 0) * 120
       technical.chargeAmount = Math.round((visit?.price ?? 480) + parts + labor)
-      createTitle(state, {
-        kind: 'Receber', partnerId: technical.partnerId, description: `Assistência ${technical.id}`, reference: technical.id,
-        amount: technical.chargeAmount, dueDate: addDays(today(), 14), origin: 'Assistência', costCenter: 'CC-500',
-      }, actor)
+      addSyncLog(state, { entity: 'Cobrança de assistência', reference: technical.id, direction: 'Thalamus → Omie', status: 'pendente', message: `Cobrança de ${money(technical.chargeAmount)} enviada ao Omie para faturar` })
     }
     if (technical.nonConformityId) {
       const nc = state.nonConformities.find(entry => entry.id === technical.nonConformityId)
@@ -697,11 +683,12 @@ export function createProject(
     const year = input.startDate.slice(0, 4)
     const period = input.startDate.slice(0, 7)
     const current = budgetDomain.allocationOf(state, 'BC-PD', year)
-    const allocation = budgetDomain.setBudget(state, 'BC-PD', year, (current?.amount ?? 0) + budget, `Projeto ${project.id}`, actor, 'Financeiro')
+    const tenantId = budgetDomain.categoryOf(state, 'BC-PD').tenantId
+    const allocation = budgetDomain.setBudget(state, tenantId, 'BC-PD', year, (current?.amount ?? 0) + budget, `Projeto ${project.id}`, actor, 'Financeiro')
     project.budgetId = allocation.id
     budgetDomain.upsertForecast(state, {
       categoryId: 'BC-PD', period, amount: budget, sourceModule: 'Projetos', sourceType: project.kind,
-      sourceId: project.id, description: project.name, projectId: project.id, costCenter: sector?.costCenter ?? 'CC-310',
+      sourceId: project.id, description: project.name, projectId: project.id, costCenter: (sector && budgetDomain.sectorCostCenter(sector, tenantId)) || 'CC-310',
     }, actor)
   }
   return project
@@ -747,50 +734,6 @@ export function addProjectRisk(state: ErpState, id: string, risk: string, actor:
   project.risks = [...(project.risks ?? []), risk]
   log(state, 'Projetos', actor, `Risco registrado: ${risk}`, undefined, id)
   return project
-}
-
-/* ---------- Finanças ---------- */
-
-type TitleInput = Pick<FinancialTitle, 'kind' | 'partnerId' | 'description' | 'reference' | 'amount' | 'dueDate'>
-  & Partial<Pick<FinancialTitle, 'origin' | 'projectId' | 'budgetId' | 'costCenter' | 'notes' | 'budgetCategoryId' | 'budgetPeriod'>>
-
-export function createTitle(state: ErpState, input: TitleInput, actor: string) {
-  if (input.amount <= 0) throw new DomainError('Informe um valor maior que zero')
-  if (!input.partnerId) throw new DomainError('Escolha o parceiro')
-  const title: FinancialTitle = { id: nextId(state, input.kind === 'Pagar' ? 'AP' : 'AR'), status: 'Aberto', createdAt: now(), origin: 'Manual', ...input }
-  state.financialTitles.unshift(title)
-  log(state, 'Finanças', actor, `${title.id} gerado: ${money(title.amount)} vence ${title.dueDate.split('-').reverse().join('/')}`, undefined, title.id)
-  log(state, 'Finanças', actor, `Título ${title.id} gerado (${money(title.amount)})`, undefined, input.reference)
-  if (input.projectId) log(state, 'Finanças', actor, `${title.id} lançado no projeto`, undefined, input.projectId)
-  return title
-}
-
-export function settleTitle(state: ErpState, id: string, actor: string) {
-  const title = find(state.financialTitles, id, 'Título')
-  if (title.status !== 'Aberto') throw new DomainError('Título já baixado')
-  if (title.kind === 'Pagar') {
-    const categoryId = title.budgetCategoryId ?? state.budgets.find(entry => entry.id === title.budgetId)?.categoryId
-    budgetDomain.applyOmiePayment(state, {
-      id: `PG-${title.id}`, titleId: title.id, sourceId: title.reference, amount: title.amount, paidAt: now(),
-      categoryIds: categoryId ? [categoryId] : [], event: 'Pagamento',
-    })
-    addSyncLog(state, { entity: 'Pagamento de NF', reference: title.id, direction: 'Omie → Thalamus', status: 'sincronizado', message: `Pagamento Omie conciliado (${money(title.amount)})` })
-  } else {
-    title.status = 'Baixado'
-    title.paidAt = now()
-  }
-  log(state, 'Finanças', actor, `${title.id} baixado pelo Omie`, undefined, title.id)
-  return title
-}
-
-export function rescheduleTitle(state: ErpState, id: string, dueDate: string, reason: string, actor: string) {
-  const title = find(state.financialTitles, id, 'Título')
-  if (title.status !== 'Aberto') throw new DomainError('Título já baixado')
-  if (!reason.trim()) throw new DomainError('Informe o motivo da renegociação')
-  const before = title.dueDate
-  title.dueDate = dueDate
-  log(state, 'Finanças', actor, `Vencimento ${before.split('-').reverse().join('/')} → ${dueDate.split('-').reverse().join('/')}: ${reason}`, undefined, id)
-  return title
 }
 
 /* ---------- Cadastros ---------- */
@@ -871,6 +814,8 @@ export function releaseRevision(state: ErpState, revisionId: string, actor: stri
   if (revision.status !== 'Rascunho') throw new DomainError('Só uma versão em rascunho pode ser liberada')
   if (revision.checklist.some(entry => !entry.done)) throw new DomainError('Complete o checklist antes de liberar')
   if (revision.lines && !revision.lines.length) throw new DomainError('A versão precisa ter ao menos um componente')
+  const owner = state.items.find(entry => entry.id === revision.itemId)
+  if (revision.routing && !revision.routing.length && (owner?.type === 'PA' || owner?.type === 'KF')) throw new DomainError('A versão precisa de ao menos uma operação no roteiro')
   if (validFrom < today()) throw new DomainError('A vigência não pode começar no passado')
   if (state.productRevisions.some(entry => entry.itemId === revision.itemId && entry.status === 'Liberada' && (entry.validFrom ?? '') > today())) {
     throw new DomainError('Já existe uma versão programada para vigorar. Aguarde a vigência ou ajuste aquela versão')
@@ -897,7 +842,7 @@ export function releaseRevision(state: ErpState, revisionId: string, actor: stri
 
 export interface DerivedTask { id: string; title: string; detail: string; to: string; record?: { kind: string; id: string } }
 
-export function tasksForRole(state: ErpState, role: Role) {
+export function tasksForRole(state: ErpState, role: Role, userId = '') {
   const tasks: DerivedTask[] = []
   const is = (...roles: Role[]) => hasFullAccess(role) || roles.includes(role)
   if (is('Comercial')) {
@@ -942,12 +887,9 @@ export function tasksForRole(state: ErpState, role: Role) {
       tasks.push({ id: `${project.id}-${milestone.id}`, title: milestone.title, detail: `${project.name} · ${milestone.dueDate < today() ? 'atrasado' : 'esta semana'}`, to: '/projetos', record: { kind: 'project', id: project.id } })
     }
   }
-  if (is('Financeiro')) {
-    for (const entry of state.financialTitles.filter(item => item.status === 'Aberto' && item.dueDate <= today())) tasks.push({ id: entry.id, title: `Título ${entry.id} vencido`, detail: entry.description, to: entry.kind === 'Pagar' ? '/contas-pagar' : '/contas-receber', record: { kind: 'title', id: entry.id } })
-  }
-  for (const alert of state.budgetAlerts.filter(item => item.status === 'Aberto' && is(...item.notifiedRoles))) {
+  for (const alert of state.budgetAlerts.filter(item => item.status === 'Aberto' && (is('Financeiro') || (Boolean(userId) && (item.notifiedUserIds ?? []).includes(userId))))) {
     const allocation = budgetDomain.allocationOf(state, alert.categoryId, alert.period)
-    tasks.push({ id: alert.id, title: alert.kind === 'Bloqueio' ? 'Lançamento retido por saldo' : `Orçamento em alerta · ${alert.period}`, detail: `${alert.message} O ciente fica no sino.`, to: '/orcamentos', record: allocation ? { kind: 'budget', id: allocation.id } : undefined })
+    tasks.push({ id: alert.id, title: alert.kind === 'Bloqueio' ? 'Lançamento retido por saldo' : `Orçamento em alerta · ${alert.period}`, detail: `${alert.message} O ciente fica em Minhas tarefas e no sino.`, to: '/tarefas', record: allocation ? { kind: 'budget', id: allocation.id } : undefined })
   }
   for (const entry of state.budgetExceptions.filter(item => item.status === 'Pendente' && budgetDomain.canDecide(item, role))) {
     const title = entry.kind === 'Saldo excedido' ? `Liberar ${entry.sourceId} acima do saldo` : entry.kind === 'Sem vínculo' ? 'Vincular nota sem origem' : `Pagamento retido · ${entry.kind}`

@@ -4,6 +4,7 @@ import * as catalog from '../domain/catalog'
 import * as extensions from '../domain/catalogExtensions'
 import * as engine from '../domain/engine'
 import * as enterprise from '../domain/enterprise'
+import * as engineering from '../domain/engineering'
 import * as budget from '../domain/budget'
 import { profileCan } from '../domain/access'
 import { provisionCompany, saveEconomicGroup, saveOmieConnection } from '../domain/platform'
@@ -11,23 +12,26 @@ import type { ErpState } from '../domain/engine'
 import { createSeedState } from '../mocks/seed'
 import type { OmieGateway } from '../services/omie/gateway'
 import { MockOmieGateway } from '../services/omie/mockOmieGateway'
-import type { AccessProfile, ApprovalRole, FunctionalityId, MaintenanceOrder, NonConformity, Role, SalesOrder, UnitConversion } from '../types/domain'
+import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NonConformity, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v18'
+const STORAGE_KEY = 'thalamus-erp-v32'
 
 function load(): ErpState {
+  const seed = createSeedState()
   const saved = localStorage.getItem(STORAGE_KEY)
   if (saved) {
     try {
       const state = JSON.parse(saved) as ErpState
+      /** Recarga a quente pode gravar o estado antigo na chave nova; faltando coleção, o seed regenera. */
+      if (Object.keys(seed).some(key => !(key in state))) throw new Error('Estado salvo de outra versão')
       engine.applyDueRevisions(state)
       return state
     } catch {
       localStorage.removeItem(STORAGE_KEY)
     }
   }
-  return createSeedState()
+  return seed
 }
 
 export const useErpStore = defineStore('erp', () => {
@@ -42,7 +46,7 @@ export const useErpStore = defineStore('erp', () => {
     clearTimeout(saveTimer)
     saveTimer = setTimeout(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(state)), 300)
   }, { deep: true })
-  budget.absorbOmieCategories(state)
+  budget.absorbOmieCategories(state, ui.activeTenantId)
 
   /** Executa uma regra de negócio; retorna o resultado (ou true) em caso de sucesso e undefined em caso de erro. */
   function run<T>(action: () => T, success?: string | ((result: T) => string)): Exclude<T, void | undefined> | true | undefined {
@@ -152,7 +156,7 @@ export const useErpStore = defineStore('erp', () => {
   const eventsOf = (orderId: string) => state.events.filter(event => event.orderId === orderId)
   const partnerName = (id: string) => state.partners.find(entry => entry.id === id)?.name ?? customerName(id)
   const serviceName = (id: string) => state.services.find(entry => entry.id === id)?.name ?? id
-  const tasks = () => enterprise.tasksForRole(state, ui.role)
+  const tasks = () => enterprise.tasksForRole(state, ui.role, ui.sessionUserId)
 
   /* Ações */
   function planOrder(orderId: string) {
@@ -176,10 +180,10 @@ export const useErpStore = defineStore('erp', () => {
     const orders = await omie.fetchApprovedOrders()
     run(() => engine.receiveOmieOrders(state, orders), count => count ? `${count} pedido(s) novo(s) importado(s) do Omie` : 'Nenhum pedido novo no Omie')
     const payments = await omie.fetchPaidInvoices()
-    const applied = payments.map(payment => budget.applyOmiePayment(state, payment)).filter(Boolean).length
+    const applied = payments.map(payment => budget.applyOmiePayment(state, tenantId(), payment)).filter(Boolean).length
     if (payments.length) ui.notify(applied ? 'success' : 'info', `${applied} pagamento(s) conciliado(s)`, `${payments.length - applied} retido(s) na fila de exceção`)
     const categories = await omie.fetchCategories()
-    const received = budget.applyRemoteCategories(state, categories)
+    const received = budget.applyRemoteCategories(state, tenantId(), categories)
     if (received.created || received.updated) ui.notify('success', 'Categorias conciliadas com o Omie', `${received.created} nova(s), ${received.updated} atualizada(s)`)
   }
 
@@ -204,6 +208,7 @@ export const useErpStore = defineStore('erp', () => {
   }, reason === 'Quebra de máquina' ? 'Parada registrada e manutenção acionada' : 'Parada registrada')
   const reportProduction = (opId: string, operationId: string, good: number, scrap: number, reason: string, operator: string) => run(() => engine.reportProduction(state, opId, operationId, good, scrap, reason, operator), 'Apontamento registrado')
   const finishOperation = (opId: string, operationId: string, operator: string) => run(() => engine.finishOperation(state, opId, operationId, operator), 'Operação concluída')
+  const approveFirstPiece = (opId: string, operationId: string, inspector: string) => run(() => engine.approveFirstPiece(state, opId, operationId, inspector), 'Primeira peça liberada')
   const raiseAlert = (resourceId: string, operator: string, message: string) => run(() => engine.raiseAlert(state, resourceId, operator, message), 'Líder de produção avisado')
   const resolveAlert = (id: string) => run(() => engine.resolveAlert(state, id, actor()), 'Chamado atendido')
 
@@ -275,34 +280,58 @@ export const useErpStore = defineStore('erp', () => {
   const setProjectStatus = bind(enterprise.setProjectStatus, project => `${project.id}: ${project.status}`)
   const addProjectRisk = bind(enterprise.addProjectRisk, 'Risco registrado')
   const createBudget = (input: { categoryId: string; period: string; amount: number; reason?: string }) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.setBudget(state, input.categoryId, input.period, input.amount, input.reason ?? 'Planejamento inicial', actor(), ui.role) }, 'Orçamento anual informado')
+    run(() => { requireFeature('orcamentos.gerir'); return budget.setBudget(state, tenantId(), input.categoryId, input.period, input.amount, input.reason ?? 'Planejamento inicial', actor(), ui.role) }, 'Orçamento anual informado')
   const distributeGroupBudget = (group: string, period: string, amount: number, reason: string) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.setGroupBudget(state, group, period, amount, reason, actor(), ui.role) }, 'Orçamento anual dividido entre as categorias')
+    run(() => { requireFeature('orcamentos.gerir'); return budget.setGroupBudget(state, tenantId(), group, period, amount, reason, actor(), ui.role) }, 'Orçamento anual dividido entre as categorias')
   const setAnnualBudget = (categoryId: string, period: string, amount: number) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.setBudget(state, categoryId, period, amount, 'Ajuste direto', actor(), ui.role) }, 'Orçamento anual informado')
+    run(() => { requireFeature('orcamentos.gerir'); return budget.setBudget(state, tenantId(), categoryId, period, amount, 'Ajuste direto', actor(), ui.role) }, 'Orçamento anual informado')
   const adjustBudget = (id: string, amount: number, reason: string) => {
     const entry = state.budgets.find(item => item.id === id)
-    return entry ? run(() => { requireFeature('orcamentos.gerir'); return budget.setBudget(state, entry.categoryId, entry.period, amount, reason, actor(), ui.role) }, 'Orçamento ajustado') : undefined
+    return entry ? run(() => { requireFeature('orcamentos.gerir'); return budget.setBudget(state, tenantId(), entry.categoryId, entry.period, amount, reason, actor(), ui.role) }, 'Orçamento ajustado') : undefined
   }
-  const createBudgetCategory = (input: Parameters<typeof budget.createBudgetCategory>[1]) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.createBudgetCategory(state, input, actor(), ui.role) }, 'Categoria criada')
-  const updateBudgetCategory = (id: string, patch: Parameters<typeof budget.updateBudgetCategory>[2], reason: string) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.updateBudgetCategory(state, id, patch, reason, actor(), ui.role) }, 'Categoria atualizada')
+  const createBudgetCategory = (input: Parameters<typeof budget.createBudgetCategory>[2]) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.createBudgetCategory(state, tenantId(), input, actor(), ui.role) }, 'Categoria criada')
+  const updateBudgetCategory = (id: string, patch: Parameters<typeof budget.updateBudgetCategory>[3], reason: string) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.updateBudgetCategory(state, tenantId(), id, patch, reason, actor(), ui.role) }, 'Categoria atualizada')
   const configureBudget = (id: string, threshold: number, block: boolean) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.configureBudget(state, id, threshold, block, actor(), ui.role) }, 'Regra atualizada')
+    run(() => { requireFeature('orcamentos.gerir'); return budget.configureBudget(state, tenantId(), id, threshold, block, actor(), ui.role) }, 'Regra atualizada')
   const decideBudgetException = (id: string, approve: boolean, note: string, categoryId?: string) =>
     run(() => {
       const exception = state.budgetExceptions.find(entry => entry.id === id)
       requireFeature(exception?.kind === 'Saldo excedido' ? 'orcamentos.liberar_saldo' : 'orcamentos.gerir')
-      return budget.decideBudgetException(state, id, approve, note, actor(), ui.role, categoryId)
+      return budget.decideBudgetException(state, tenantId(), id, approve, note, actor(), ui.role, categoryId)
     }, entry => entry.status === 'Resolvida'
       ? 'Pagamento reclassificado e lançado no realizado' : entry.status === 'Autorizada' ? 'Previsão liberada acima do saldo' : 'Exceção rejeitada')
-  const acknowledgeBudgetAlert = (id: string) => run(() => budget.acknowledgeAlert(state, id, actor(), ui.role), 'Alerta marcado como ciente')
-  const linkBudgetInvoice = (exceptionId: string, module: Parameters<typeof budget.linkBudgetInvoice>[2], documentId: string) =>
-    run(() => budget.linkBudgetInvoice(state, exceptionId, module, documentId, actor(), ui.role), 'Nota vinculada ao documento')
-  const createTitle = bind(enterprise.createTitle, title => `${title.id} lançado`)
-  const settleTitle = bind(enterprise.settleTitle, title => `${title.id} baixado`)
-  const rescheduleTitle = bind(enterprise.rescheduleTitle, 'Vencimento renegociado')
+  const acknowledgeBudgetAlert = (id: string) => run(() => budget.acknowledgeAlert(state, id, ui.sessionUserId, actor(), ui.role), 'Alerta marcado como ciente')
+  const linkBudgetInvoice = (exceptionId: string, module: Parameters<typeof budget.linkBudgetInvoice>[3], documentId: string) =>
+    run(() => budget.linkBudgetInvoice(state, tenantId(), exceptionId, module, documentId, actor(), ui.role), 'Nota vinculada ao documento')
+  const applyBudgetGrowth = (categoryIds: string[], year: string, growthPct: number, reason = '') =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.applyGrowthToCategories(state, tenantId(), categoryIds, year, growthPct, reason, actor(), ui.role) }, applied => `${applied.length} categoria(s) atualizada(s) com ${growthPct}% sobre o realizado`)
+  const applyRevenueTarget = (year: string, targetRevenue: number, reason = '') =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.applyRevenueTarget(state, tenantId(), year, targetRevenue, reason, actor(), ui.role) }, result => `Meta aplicada: ${result.growthPct >= 0 ? '+' : ''}${result.growthPct}% sobre ${year === '' ? '' : Number(year) - 1}`)
+  const applyPriorSeasonality = (categoryIds: string[], year: string) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.applyPriorSeasonality(state, tenantId(), categoryIds, year, actor(), ui.role) }, applied => `Sazonalidade de ${Number(year) - 1} aplicada a ${applied.length} conta(s)`)
+  const setMonthlyBudget = (categoryId: string, year: string, monthlyAmounts: number[], reason = '') =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.setMonthlyBudget(state, tenantId(), categoryId, year, monthlyAmounts, reason, actor(), ui.role) }, 'Distribuição mensal salva')
+  const setCostCenterSplit = (categoryId: string, year: string, mode: 'percent' | 'amount', lines: { costCenterId: string; value: number }[]) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.setCostCenterSplit(state, tenantId(), categoryId, year, mode, lines, actor(), ui.role) }, 'Distribuição por centro de custo salva')
+  const applyCategorySuggestion = (categoryId: string, year: string) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.applyCategorySuggestion(state, tenantId(), categoryId, year, actor(), ui.role) }, 'Centros sugeridos pelo realizado anterior')
+  const saveBudgetSimulation = (year: string) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.saveBudgetSimulation(state, tenantId(), year, actor(), ui.role) }, 'Simulação salva')
+  const applyBudgetSimulation = (year: string) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.applyBudgetSimulation(state, tenantId(), year, actor(), ui.role) }, 'Simulação aplicada ao orçamento')
+  const createCostCenter = (code: string, name: string, responsibleUserId: string) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.createCostCenter(state, tenantId(), { code, name, responsibleUserId }, actor(), ui.role) }, 'Centro de custo criado')
+  const updateCostCenter = (id: string, name: string, status: 'Ativo' | 'Inativo', responsibleUserId: string) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.updateCostCenter(state, tenantId(), id, { name, status, responsibleUserId }, actor(), ui.role) }, 'Centro de custo atualizado')
+  const setSectorDefaultCostCenter = (sectorId: string, code: string) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.setSectorDefaultCostCenter(state, tenantId(), sectorId, code, actor(), ui.role) }, 'Centro padrão do setor atualizado')
+  const requireGroupPlanning = () => { requireFeature('orcamentos.consultar_consolidado'); requireFeature('orcamentos.gerir') }
+  const applyGroupGrowth = (groupId: string, year: string, growthPct: number, reason = '') =>
+    run(() => { requireGroupPlanning(); return budget.applyGroupGrowth(state, groupId, year, growthPct, reason, actor(), ui.role) }, perTenant => `Planejamento aplicado a ${perTenant.length} empresa(s) do grupo`)
+  const applyGroupRevenueTarget = (groupId: string, year: string, targetRevenue: number, reason = '') =>
+    run(() => { requireGroupPlanning(); return budget.applyGroupRevenueTarget(state, groupId, year, targetRevenue, reason, actor(), ui.role) }, result => `Meta do grupo aplicada: ${result.growthPct >= 0 ? '+' : ''}${result.growthPct}% a cada empresa`)
   const createUser = bind(enterprise.createUser, user => `${user.name} cadastrado · PIN ${user.pin}`)
   const updateUser = bind(enterprise.updateUser, 'Cadastro atualizado')
   const createPartner = bind(enterprise.createPartner, partner => `${partner.name} cadastrado`)
@@ -384,6 +413,39 @@ export const useErpStore = defineStore('erp', () => {
   const removeFiscalRule = ext(extensions.removeFiscalRule, 'Regra removida da matriz')
   const createModel = ext(extensions.createModel, model => `Grade ${model.name} criada`)
   const generateVariants = ext(extensions.generateVariants, items => `${items.length} variante(s) criada(s) em rascunho`)
+  const setMediaUsage = ext(extensions.setMediaUsage, 'Uso do documento salvo')
+  const saveClassAttribute = ext(catalog.saveClassAttribute, def => `Atributo ${def.label} salvo`)
+  const removeClassAttribute = ext(catalog.removeClassAttribute, 'Atributo removido')
+  const setItemAttributes = ext(catalog.setItemAttributes, 'Atributos salvos')
+  const saveTooling = ext(engineering.saveTooling, 'Ferramental salvo')
+  const saveRevisionStep = ext(engineering.saveRevisionStep, 'Operação salva na versão')
+  const removeRevisionStep = ext(engineering.removeRevisionStep, 'Operação removida da versão')
+  const moveRevisionStep = ext(engineering.moveRevisionStep)
+  const copyRoutingFrom = ext(engineering.copyRoutingFrom, steps => `${steps.length} operação(ões) copiada(s)`)
+  const savePackaging = ext(engineering.savePackaging, 'Embalagem salva')
+  const createChange = ext(engineering.createChange, change => `${change.id} solicitada`)
+  const updateChange = ext(engineering.updateChange, 'Mudança atualizada')
+  const openChangeRevision = ext(engineering.openChangeRevision, revision => `Versão ${revision.code} vinculada à mudança`)
+  const moveChange = ext(engineering.moveChange, change => `${change.id} · ${change.stage}`)
+  const resolveFiscalConflict = ext(engineering.resolveFiscalConflict, 'Conflito fiscal resolvido')
+
+  function pushFiscal(itemId: string) {
+    const entry = item(itemId)
+    return as((name, role) => {
+      engineering.pushFiscal(state, itemId, name, role)
+      engine.addSyncLog(state, { entity: 'Produto', reference: entry.code, direction: 'Thalamus → Omie', status: 'sincronizado', message: 'Camada fiscal enviada ao Omie' })
+    }, 'Fiscal enviado ao Omie')
+  }
+
+  /** Simula o webhook do Omie avisando que alguém alterou o fiscal do produto lá. */
+  function simulateOmieFiscal(itemId: string, remote: Partial<FiscalSnapshot>) {
+    const entry = item(itemId)
+    return run(() => {
+      const result = engineering.receiveOmieFiscal(state, itemId, remote)
+      engine.addSyncLog(state, { entity: 'Produto', reference: entry.code, direction: 'Omie → Thalamus', status: result === 'conflito' ? 'erro' : 'sincronizado', message: result === 'conflito' ? 'Fiscal alterado no Omie com alteração local pendente: conflito' : result === 'aplicado' ? 'Fiscal atualizado a partir do Omie' : 'Sem diferença' })
+      return result
+    }, result => result === 'conflito' ? 'O Omie mudou o fiscal e há alteração local pendente: conflito aberto' : result === 'aplicado' ? 'Alteração fiscal recebida do Omie' : 'O Omie já estava igual')
+  }
 
   type BulkAction = 'submit' | 'approve' | 'block' | 'obsolete' | 'reclassify'
   /** Executa a mesma ação em vários itens; cada item passa pelas mesmas regras e as recusas voltam com o motivo. */
@@ -465,7 +527,7 @@ export const useErpStore = defineStore('erp', () => {
     machineState, eventsOf, can, isAccessAdministrator, isPlatformMaster, effectiveProfiles, previewProfile, enterPlatform, enterCompany, saveAccessProfile, createAccessProfile, assignProfile,
     createCompany, saveGroup, configureOmie,
     planOrder, syncOmie, advanceRequisition, pickOp, scheduleOp, adjustStock, startOperation,
-    pauseOperation, reportProduction, finishOperation, raiseAlert, resolveAlert, approveInspection, rejectInspection,
+    pauseOperation, reportProduction, finishOperation, approveFirstPiece, raiseAlert, resolveAlert, approveInspection, rejectInspection,
     updateNc, confirmShipment, shipOrder, createMaintenance, advanceMaintenance, retrySync, resetDemo,
     newRevision, toggleRevisionCheck, publishItem, createRequisition, releaseRevision, undoPick, eventsFor, userName,
     createCatalogItem, updateItemCore, updateItemCommercial, updateItemFiscal, updateItemStock, updateItemBranch, addItemConversion, removeItemConversion,
@@ -474,6 +536,8 @@ export const useErpStore = defineStore('erp', () => {
     addBarcode, removeBarcode, setMainBarcode, createPriceTable, setPrice, removePrice, setStandardCost, updateProductionLead,
     saveRoutingStep, removeRoutingStep, moveRoutingStep, addMedia, removeMedia, moveMedia, setMainMedia, linkProject, unlinkProject,
     addBenefit, removeBenefit, addReformEntry, removeReformEntry, addFiscalRule, removeFiscalRule, createModel, generateVariants,
+    setMediaUsage, saveClassAttribute, removeClassAttribute, setItemAttributes, saveTooling, saveRevisionStep, removeRevisionStep, moveRevisionStep, copyRoutingFrom,
+    savePackaging, createChange, updateChange, openChangeRevision, moveChange, resolveFiscalConflict, pushFiscal, simulateOmieFiscal,
     createDemand, attendDemand, attendDemandFromStock, contractService, completeDemand, cancelDemand,
     createPurchaseOrder, selectQuote, cancelPurchaseOrder, advancePurchaseOrder,
     createOpportunity, updateOpportunity, moveOpportunity, advanceOpportunity, loseOpportunity, addActivity, toggleActivity,
@@ -481,7 +545,7 @@ export const useErpStore = defineStore('erp', () => {
     createTechnicalOrder, scheduleTechnicalOrder, updateTechnicalOrder, addTechnicalPart, advanceTechnicalOrder, cancelTechnicalOrder,
     createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk,
     createBudget, distributeGroupBudget, setAnnualBudget, adjustBudget, createBudgetCategory, updateBudgetCategory, configureBudget, decideBudgetException, acknowledgeBudgetAlert, linkBudgetInvoice,
-    createTitle, settleTitle, rescheduleTitle,
+    applyBudgetGrowth, applyRevenueTarget, applyPriorSeasonality, setMonthlyBudget, setCostCenterSplit, applyCategorySuggestion, saveBudgetSimulation, applyBudgetSimulation, createCostCenter, updateCostCenter, setSectorDefaultCostCenter, applyGroupGrowth, applyGroupRevenueTarget,
     createUser, updateUser, createPartner, createService, updateService, createAsset, updateAsset,
   }
 })

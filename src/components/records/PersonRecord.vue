@@ -39,7 +39,7 @@ const access = computed(() => person.value ? AREAS.map(area => ({
 const position = computed(() => store.state.positions.find(entry => entry.id === person.value?.positionId))
 const managed = computed(() => store.state.sectors.filter(entry => entry.managerId === props.id))
 const team = computed(() => store.state.users.filter(entry => managed.value.some(sector => sectorOf(store.state, entry)?.id === sector.id) && entry.id !== props.id))
-const tasks = computed(() => person.value ? tasksForRole(store.state, person.value.role) : [])
+const tasks = computed(() => person.value ? tasksForRole(store.state, person.value.role, person.value.id) : [])
 const activity = computed(() => person.value ? store.state.events.filter(event => event.actor === person.value!.name).slice(0, 8) : [])
 
 function update(patch: Partial<Pick<User, 'role' | 'sector' | 'shift' | 'positionId' | 'active'>>) {

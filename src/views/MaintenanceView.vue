@@ -105,7 +105,7 @@ function requestPart(order: MaintenanceOrder) {
       <div class="field"><label>Equipamento</label><select v-model="form.assetId"><option v-for="asset in store.state.assets" :key="asset.id" :value="asset.id">{{ asset.name }}</option></select></div>
       <div class="field"><label>Tipo</label><select v-model="form.type"><option>Corretiva</option><option>Preventiva</option></select></div>
       <div class="field"><label>Custo estimado</label><input v-model.number="form.estimatedCost" type="number" min="0" /></div>
-      <div class="field"><label>Categoria</label><select v-model="form.budgetCategoryId"><option v-for="entry in store.state.budgetCategories.filter(category => category.status !== 'Inativa')" :key="entry.id" :value="entry.id">{{ entry.code }} · {{ entry.name }}</option></select></div>
+      <div class="field"><label>Categoria</label><select v-model="form.budgetCategoryId"><option v-for="entry in store.state.budgetCategories.filter(category => category.tenantId === ui.activeTenantId && category.status !== 'Inativa')" :key="entry.id" :value="entry.id">{{ entry.code }} · {{ entry.name }}</option></select></div>
       <div class="field"><label>Período</label><input v-model="form.budgetPeriod" type="month" /></div>
     </div>
     <div class="field"><label>Descrição</label><textarea v-model="form.description" rows="3" placeholder="Ex.: vazamento de óleo no cilindro de fechamento"></textarea></div>

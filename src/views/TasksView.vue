@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { CheckCircle2 } from 'lucide-vue-next'
 import { hasFullAccess } from '../domain/access'
+import { allocationOf } from '../domain/budget'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 import type { Role } from '../types/domain'
@@ -77,8 +78,13 @@ const tasks = computed<Task[]>(() => {
   for (const service of s.technicalServiceOrders.filter(entry => !['Concluída', 'Cancelada'].includes(entry.status))) {
     list.push({ id: service.id, owner: 'Assistência', title: `${service.id} · ${service.description}`, detail: `${store.partnerName(service.partnerId)} · ${service.status}`, urgent: service.status === 'Aguardando peça', action: 'Abrir chamado', run: () => ui.openRecord('technical', service.id) })
   }
-  for (const title of s.financialTitles.filter(entry => entry.status === 'Aberto' && entry.dueDate < '2026-10-15')) {
-    list.push({ id: title.id, owner: 'Financeiro', title: `${title.id} vencido`, detail: `${title.description} · ${title.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`, urgent: true, action: 'Baixar', run: () => store.settleTitle(title.id), open: () => ui.openRecord('title', title.id) })
+  for (const alert of s.budgetAlerts.filter(entry => entry.tenantId === ui.activeTenantId && entry.status === 'Aberto' && entry.kind === 'Alerta')) {
+    const mine = (alert.notifiedUserIds ?? []).includes(ui.sessionUserId)
+    const allocation = allocationOf(s, alert.categoryId, alert.period)
+    list.push({
+      id: alert.id, owner: mine ? ui.role : 'Financeiro', title: mine ? `Conta do seu centro em alerta · ${alert.period}` : `Orçamento em alerta · ${alert.period}`, detail: alert.message, urgent: alert.use >= 100,
+      action: 'Ciente', run: () => store.acknowledgeBudgetAlert(alert.id), open: allocation ? () => ui.openRecord('budget', allocation.id, { window: alert.period }) : undefined,
+    })
   }
   return list
 })

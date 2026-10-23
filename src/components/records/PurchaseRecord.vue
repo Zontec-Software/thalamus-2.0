@@ -20,7 +20,6 @@ const demands = computed(() => store.state.demands.filter(entry => order.value?.
 const budget = computed(() => store.state.budgets.find(entry => entry.id === order.value?.budgetId))
 const budgetCategory = computed(() => store.state.budgetCategories.find(entry => entry.id === budget.value?.categoryId))
 const budgetStatus = computed(() => budget.value ? budgetSummary(store.state, budget.value.categoryId, budget.value.period) : undefined)
-const titles = computed(() => store.state.financialTitles.filter(entry => entry.reference === props.id))
 const movements = computed(() => store.state.movements.filter(entry => entry.reference === props.id))
 const project = computed(() => store.state.projects.find(entry => entry.id === order.value?.projectId))
 const bestPrice = computed(() => Math.min(...(order.value?.quotes.map(entry => entry.unitPrice) ?? [0])))
@@ -49,7 +48,7 @@ const bestPrice = computed(() => Math.min(...(order.value?.quotes.map(entry => e
         <button v-if="order.status === 'Aprovado' || order.status === 'Recebido parcial'" class="button" @click="store.advancePurchaseOrder(order.id)"><PackageCheck :size="15" /> Receber saldo</button>
         <button v-if="order.received === 0 && order.status !== 'Cancelado'" class="button ghost" @click="store.cancelPurchaseOrder(order.id)"><Ban :size="15" /> Cancelar</button>
       </div>
-      <p v-if="order.status === 'Aguardando aprovação'" class="hint">A demanda já gera previsão. O recebimento conclui o fluxo físico e gera o contas a pagar; somente o pagamento confirmado pelo Omie vira realizado.</p>
+      <p v-if="order.status === 'Aguardando aprovação'" class="hint">A demanda já gera previsão. O recebimento conclui o fluxo físico; o contas a pagar fica no Omie e somente o pagamento confirmado por ele vira realizado.</p>
       </div>
 
       <h3 class="drawer-title">Cotações</h3>
@@ -78,9 +77,6 @@ const bestPrice = computed(() => Math.min(...(order.value?.quotes.map(entry => e
       </button>
       <button v-if="budget" class="list-row" @click="ui.openRecord('budget', budget.id)">
         <div><strong>{{ budgetCategory?.name }} · {{ budget.period }}</strong><span>Saldo {{ fmtCurrency(budgetStatus?.balance ?? 0) }}</span></div><span class="link">Abrir</span>
-      </button>
-      <button v-for="title in titles" :key="title.id" class="list-row" @click="ui.openRecord('title', title.id)">
-        <div><strong>{{ title.id }} · contas a pagar</strong><span>{{ fmtCurrency(title.amount) }} · vence {{ fmtDate(title.dueDate) }}</span></div><StatusBadge :value="title.status" />
       </button>
       </div>
 

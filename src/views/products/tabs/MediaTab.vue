@@ -15,6 +15,7 @@ const kind = ref<MediaKind>('Foto')
 const disabled = computed(() => readOnly(props.item, ui.role, 'midia'))
 const media = computed(() => sortedMedia(props.item))
 const input = ref<HTMLInputElement>()
+const revisionCodes = computed(() => [...new Set(store.state.productRevisions.filter(entry => entry.itemId === props.item.id).map(entry => entry.code))].sort())
 const size = (bytes: number) => bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
 
 function pick(event: Event) {
@@ -57,6 +58,14 @@ function download(entry: ItemMedia) {
         <b :title="entry.name">{{ entry.name }}</b>
         <span class="cell-sub">{{ entry.kind }} · {{ size(entry.size) }} · {{ entry.uploadedBy }}</span>
         <span v-if="entry.main" class="status success"><Star :size="11" /> Foto principal</span>
+        <div v-if="entry.kind !== 'Foto'" class="media-usage">
+          <select :value="entry.revisionCode ?? ''" class="filter" :disabled="disabled" title="Versão de engenharia do documento" @change="store.setMediaUsage(item.id, entry.id, { revisionCode: ($event.target as HTMLSelectElement).value, sendToOp: !!entry.sendToOp })">
+            <option value="">Todas as versões</option>
+            <option v-for="code in revisionCodes" :key="code" :value="code">Versão {{ code }}{{ code === item.revision ? ' (vigente)' : '' }}</option>
+          </select>
+          <label class="cell-sub"><input type="checkbox" :checked="!!entry.sendToOp" :disabled="disabled" @change="store.setMediaUsage(item.id, entry.id, { revisionCode: entry.revisionCode ?? '', sendToOp: ($event.target as HTMLInputElement).checked })" /> vai na OP</label>
+          <span v-if="entry.revisionCode && item.revision && entry.revisionCode !== item.revision" class="status warning">versão antiga</span>
+        </div>
       </div>
       <div class="row-actions">
         <button class="button ghost small" title="Antes" :disabled="disabled || index === 0" @click="store.moveMedia(item.id, entry.id, -1)"><ArrowUp :size="12" /></button>
@@ -66,6 +75,7 @@ function download(entry: ItemMedia) {
       </div>
     </div>
   </div>
-  <p v-else class="empty-note">Sem fotos, desenhos ou fichas técnicas.</p>
+  <p v-else class="empty-note">Sem fotos, desenhos, fichas técnicas ou instruções de trabalho.</p>
+  <p class="cell-sub">Desenho e instrução de trabalho marcados com "vai na OP" acompanham a ordem de produção da versão indicada.</p>
   <p class="cell-sub">A ordem define a sequência na vitrine e no catálogo. Desenhos e fichas acima do limite ficam só registrados (nome e tamanho); na produção, o arquivo vai para o repositório de documentos.</p>
 </template>

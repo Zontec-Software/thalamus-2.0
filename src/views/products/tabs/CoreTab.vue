@@ -8,6 +8,7 @@ import type { Item, ItemType } from '../../../types/domain'
 import { fmtCurrency } from '../../../utils/format'
 import PermHint from '../PermHint.vue'
 import KeyChangeModal from '../KeyChangeModal.vue'
+import AttributesSection from '../sections/AttributesSection.vue'
 import { readOnly } from '../shared'
 
 const props = defineProps<{ item: Item }>()
@@ -50,6 +51,8 @@ watch(() => [props.item.id, catalog.value.version], load, { immediate: true })
     <button class="button" @click="store.updateItemCore(item.id, { ...form })">Salvar núcleo</button>
   </fieldset>
 
+  <AttributesSection :item="item" />
+
   <h3 class="drawer-title">Dimensões de análise</h3>
   <div class="mini-stats">
     <div v-if="catalog.nature === 'Bem'" class="mini-stat">
@@ -58,7 +61,7 @@ watch(() => [props.item.id, catalog.value.version], load, { immediate: true })
     </div>
     <div class="mini-stat"><strong>{{ catalog.brand || '—' }}</strong><span>marca{{ catalog.productLine ? ` · linha ${catalog.productLine}` : '' }}</span></div>
     <div class="mini-stat"><strong>{{ catalog.categories.length }}</strong><span>{{ catalog.categories.join(', ') || 'sem categoria de e-commerce' }}</span></div>
-    <div v-if="model" class="mini-stat"><strong>{{ Object.values(catalog.attributes).join(' · ') }}</strong><span>grade {{ model.name }}</span></div>
+    <div v-if="model" class="mini-stat"><strong>{{ model.axes.map(axis => catalog.attributes[axis.name]).filter(Boolean).join(' · ') }}</strong><span>grade {{ model.name }}</span></div>
   </div>
   <p class="cell-sub">A classe ABC é calculada pelo valor consumido (saídas × custo-padrão) e não se digita. Marca, linha e categorias são mantidas na aba Comercial.</p>
   <KeyChangeModal :open="askUnit" :item="item" field="unit" @close="askUnit = false" />

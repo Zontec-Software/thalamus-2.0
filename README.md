@@ -23,13 +23,13 @@ Os dados são fictícios e ficam salvos no navegador. Para voltar ao cenário in
 - **Operações:** Planejamento, Produção, Qualidade e Tablet com revisão congelada na OP.
 - **Serviços:** Manutenção preventiva/corretiva e Assistência Técnica pós-venda.
 - **Gestão:** Indicadores, Projetos e tarefas por papel.
-- **Finanças:** Orçamentos, Contas a pagar e Contas a receber em nível operacional.
+- **Finanças:** DRE (entre dois meses, da empresa ou do grupo, com a leitura do período) e Orçamentos, com os centros de custo numa aba própria. Contas a pagar e a receber estão em estruturação; o título, o banco e a contabilidade ficam no Omie.
 
 Troque o **Perfil** no topo para ver o sistema como PCP, Compras, Almoxarifado, Qualidade, Expedição etc. O menu, as tarefas e as permissões mudam conforme o papel.
 
 ### Orçamento integrado
 
-O orçamento é controlado por **categoria + mês**. O valor informado, a previsão operacional de Demandas/OPs/OSs/Projetos e o realizado pago são mantidos separadamente. O realizado só nasce de pagamento confirmado pelo Omie; pagamentos parciais, estornos, idempotência, alertas registrados, previsão retida por falta de saldo e fila de exceções fazem parte do cenário navegável. A árvore tem grupo, categoria e subcategoria. O Financeiro define o orçamento e o Gestor libera exceções de saldo.
+O orçamento é controlado por **categoria + mês**. O valor informado, a previsão operacional de Demandas/OPs/OSs/Projetos e o realizado pago são mantidos separadamente. O realizado só nasce de pagamento confirmado pelo Omie; pagamentos parciais, estornos, idempotência, alertas registrados, previsão retida por falta de saldo e fila de exceções fazem parte do cenário navegável. A árvore tem grupo, categoria e subcategoria. O Financeiro define o orçamento e os centros de custo de cada conta no mesmo lugar, e o Gestor libera exceções de saldo. Quem responde pela conta é o responsável de cada centro com fatia; a parte sem centro fica com o Financeiro.
 
 ## Tablet do chão de fábrica (`/tablet`)
 
@@ -45,17 +45,25 @@ PINs: operadores `1234`, Carlos (almoxarifado) `4444`, Bruno (líder) `5555`, Fe
 
 ## Módulo de Produtos
 
-Cada item tem um núcleo comum e camadas que só aparecem para os tipos que precisam delas: estoque e unidades, estrutura e roteiro, comercial, fiscal, mídia e projetos. O cadastro passa por homologação multi-papel antes de ser ativado.
+Cada item tem um núcleo comum e camadas que só aparecem para os tipos que precisam delas: estoque e unidades, estrutura e roteiro, ferramental, comercial, fiscal, mídia e projetos. O cadastro passa por homologação multi-papel antes de ser ativado. A ficha do item é uma página de objeto: cabeçalho com indicadores clicáveis e seções agrupadas à esquerda.
 
-- **Estrutura versionada** com vigência e percentual de perda; a OP congela a versão usada.
+- **Estrutura e roteiro versionados** juntos, com vigência e percentual de perda; comparação entre versões; a OP congela a versão usada. O roteiro tem preparação, equipe, ferramental e inspeção de primeira peça.
+- **Atributos por classe**, herdados na árvore, obrigatórios para homologar e usados como eixos da grade.
+- **Ferramental** (moldes, gabaritos, dispositivos) como item FE: cavidades ativas, ciclo, máquinas compatíveis, vida útil, dono e vínculo com o ativo da manutenção.
+- **Mudanças de engenharia (ECO)** em quadro: impacto (saldo, OPs, pedidos, compras, onde é usado), destino do estoque e liberação conjunta das versões na data de efetividade.
+- **Embalagem** em níveis (unidade, caixa, master, palete) com GTIN, peso e medidas.
+- **Na produção:** a OP de injeção nasce do roteiro da peça com o molde e as cavidades ativas; operações com primeira peça só seguem após a liberação da qualidade no tablet; documentos "vai na OP" aparecem no posto; o molde acima de 85% da vida útil abre preventiva.
+
+O contrato futuro do backend está em `docs/contrato-backend-produtos.md`.
 - **Comercial:** marca, linha e categorias; códigos de barras múltiplos (EAN-13, EAN-8, DUN-14, UPC-A) com um principal; tabelas de preço com vigência, unidade e moeda; grade de variações que gera itens reais.
-- **Fiscal:** NCM validado, Ex-TIPI, CEST, origem, benefícios por UF, classe da reforma com vigência, matriz fiscal que sugere CFOP, CST e alíquotas, e geração dos registros 0190, 0200 e 0220 do SPED.
-- **Custos:** custo-padrão com vigência, custo calculado pela estrutura e curva ABC derivada das saídas.
+- **Fiscal:** NCM validado, Ex-TIPI, CEST, origem, benefícios por UF, classe da reforma com vigência, matriz fiscal que sugere CFOP, CST e alíquotas, geração dos registros 0190, 0200 e 0220 do SPED e sincronização em mão dupla com o Omie, com tratamento de conflito.
+- **Custos:** custo-padrão com vigência, custo calculado pela engenharia (material, máquina, mão de obra, preparação e desgaste do ferramental) e curva ABC derivada das saídas.
 
 ## Arquitetura
 
 - `src/domain/engine.ts`: motor de produção puro (planejamento, reservas, apontamentos, qualidade, expedição e manutenção).
 - `src/domain/catalog.ts` e `src/domain/catalogExtensions.ts`: cadastro de itens, camadas, homologação, auditoria e as extensões (preço, código de barras, fiscal, grade, mídia, ABC).
+- `src/domain/engineering.ts`: ferramental, roteiro da revisão, comparação de versões, custo da engenharia, embalagem, mudanças de engenharia e sincronização fiscal com o Omie.
 - `src/domain/enterprise.ts`: regras dos fluxos integrados de demanda, compras, CRM, assistência, projetos e finanças operacionais.
 - `src/domain/budget.ts`: categorias, planejamento mensal, ledger de previsão/realizado pago, bloqueios, auditoria e conciliação Omie.
 - `src/mocks/seed.ts`: cenário de demonstração gerado pelo próprio motor, com cada pedido em uma etapa diferente.

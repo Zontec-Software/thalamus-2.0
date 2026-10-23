@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Boxes, GitBranch, Receipt, ShieldCheck, Tags, Warehouse } from 'lucide-vue-next'
+import { Boxes, GitBranch, Receipt, ShieldCheck, Tags, Warehouse, Workflow, Wrench } from 'lucide-vue-next'
 import { canApprove, catalogOf, itemFlags, requiredApprovals } from '../../domain/catalog'
 import { hasFullAccess } from '../../domain/access'
 import { useErpStore } from '../../stores/erp'
@@ -14,8 +14,12 @@ const awaitingMe = computed(() => live.value.filter(item => {
   const catalog = catalogOf(item)
   return catalog.lifecycle === 'Em homologação' && requiredApprovals(item).some(role => !catalog.approvals[role] && canApprove(ui.role, role))
 }).length + (hasFullAccess(ui.role) ? live.value.reduce((sum, item) => sum + catalogOf(item).keyChanges.filter(change => change.status === 'Pendente').length, 0) : 0))
-const fiscalPending = computed(() => live.value.filter(item => itemFlags(store.state, item).some(flag => flag === 'Sem NCM' || flag === 'Sem CEST')).length)
+const fiscalPending = computed(() => live.value.filter(item => itemFlags(store.state, item).some(flag => flag === 'Sem NCM' || flag === 'Sem CEST') || (item.catalog?.fiscalSync && item.catalog.fiscalSync.status !== 'Sincronizado')).length)
 const draftVersions = computed(() => store.state.productRevisions.filter(entry => entry.status === 'Rascunho').length)
+const activeChanges = computed(() => store.state.engineeringChanges.filter(change => change.stage !== 'Implementada' && change.stage !== 'Recusada'))
+const openChanges = computed(() => activeChanges.value.length)
+const urgentChanges = computed(() => activeChanges.value.filter(change => change.priority === 'Urgente').length)
+const tooling = computed(() => live.value.filter(item => item.type === 'FE').length)
 
 interface MenuLink { to: string; label: string; icon: typeof Boxes; count: number; exact?: boolean; alert?: boolean }
 const MENU = computed<{ group: string; links: MenuLink[] }[]>(() => [
@@ -23,9 +27,13 @@ const MENU = computed<{ group: string; links: MenuLink[] }[]>(() => [
     { to: '/produtos', label: 'Itens', icon: Boxes, count: live.value.length, exact: true },
     { to: '/produtos/classificacao', label: 'Classificação', icon: Tags, count: store.state.itemClasses.length },
   ] },
+  { group: 'Engenharia', links: [
+    { to: '/produtos/estruturas', label: 'Estruturas e roteiros', icon: GitBranch, count: draftVersions.value, alert: draftVersions.value > 0 },
+    { to: '/produtos/mudancas', label: 'Mudanças', icon: Workflow, count: openChanges.value, alert: urgentChanges.value > 0 },
+    { to: '/produtos/ferramental', label: 'Ferramental', icon: Wrench, count: tooling.value },
+  ] },
   { group: 'Camadas', links: [
     { to: '/produtos/estoque', label: 'Estoque e unidades', icon: Warehouse, count: 0 },
-    { to: '/produtos/estruturas', label: 'Estruturas', icon: GitBranch, count: draftVersions.value, alert: draftVersions.value > 0 },
     { to: '/produtos/fiscal', label: 'Fiscal', icon: Receipt, count: fiscalPending.value, alert: fiscalPending.value > 0 },
   ] },
   { group: 'Governança', links: [

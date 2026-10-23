@@ -102,11 +102,12 @@ Exemplo: Empresa A pode usar `03.01 - CMV` e Empresa B `501 - Material direto`. 
 Regras:
 
 - `budgets`, `budget_entries`, `budget_exceptions`, `budget_alerts` e `budget_audits` recebem `tenant_id`.
-- A consulta individual retorna só o tenant ativo.
+- A consulta individual retorna só o tenant ativo. As telas filtram pelo tenant ativo antes de montar listas e totais: ler o array inteiro do estado mistura empresas do mesmo grupo.
 - A consulta consolidada recebe `economic_group_id`, exige `consultar_consolidado` e retorna totais por categoria corporativa, empresa e período.
 - Categorias locais não mapeadas aparecem como **Não classificada no grupo**, nunca são silenciosamente excluídas.
 - O saldo, bloqueio e aprovação de exceção continuam na empresa de origem. Não existe saldo operacional compartilhado por grupo nesta fase.
 - Um orçamento corporativo próprio, com alocação entre empresas, é uma evolução futura e terá entidade separada (`group_budgets`). Não será inferido somando orçamentos locais.
+- O planejamento de grupo já existe no mockup e segue a mesma regra: a meta é combinada, mas a gravação cria um orçamento em cada empresa, calculado sobre o realizado da própria empresa. A soma exibida é sempre uma projeção.
 
 ## API e contratos
 

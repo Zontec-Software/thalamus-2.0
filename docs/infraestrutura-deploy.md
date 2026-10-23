@@ -126,7 +126,7 @@ Por enquanto são dois. A área do menu não abre repositório.
 | `thalamus-2-core` | Backend Laravel inteiro. Módulos são pastas; a fronteira entre eles é o schema | Agora. A pasta local é `C:\Users\Mari\Documents\GitHub\thalamus-2-core` |
 | `thalamus-infra` | Manifestos Kubernetes (Kustomize), políticas e runbooks | Só na publicação |
 
-Dentro do `thalamus-2-core`, cada módulo usa só o próprio schema: `t2_core`, `t2_orcamentos`, `t2_cadastros`, `t2_suprimentos`, `t2_comercial`, `t2_operacoes`. Finanças, quando for evoluída, reúne orçamento, contas a pagar e contas a receber em `t2_orcamentos`. Indicadores leem os outros módulos pelo código deles, sem schema próprio. O esboço inteiro continua usável no frontend enquanto o schema correspondente ainda não existe.
+Dentro do `thalamus-2-core`, cada módulo usa só o próprio schema: `t2_core`, `t2_orcamentos`, `t2_cadastros`, `t2_suprimentos`, `t2_comercial`, `t2_operacoes`. Finanças, quando for evoluída, é o orçamento em `t2_orcamentos`. Indicadores leem os outros módulos pelo código deles, sem schema próprio. O esboço inteiro continua usável no frontend enquanto o schema correspondente ainda não existe.
 
 ### 5.2 Deployments por ambiente
 

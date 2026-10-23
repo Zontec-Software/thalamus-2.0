@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import StatusBadge from '../../../components/StatusBadge.vue'
 import { catalogOf, openPendencies, references } from '../../../domain/catalog'
+import { toolUsers } from '../../../domain/engineering'
 import { useErpStore } from '../../../stores/erp'
 import type { Item } from '../../../types/domain'
 import { LIFE_TONE } from '../shared'
@@ -16,7 +17,14 @@ const pendencies = computed(() => openPendencies(store.state, props.item.id))
 </script>
 
 <template>
-  <h3 class="drawer-title" style="margin-top:0">Estruturas vigentes que usam este item</h3>
+  <template v-if="item.type === 'FE'">
+    <h3 class="drawer-title" style="margin-top:0">Roteiros vigentes que usam este ferramental</h3>
+    <div v-for="user in toolUsers(store.state, item.id)" :key="user.id" class="list-row static">
+      <div><RouterLink :to="`/produtos/item/${user.id}?aba=manufatura`"><strong>{{ user.code }} · {{ user.name }}</strong></RouterLink><span>{{ user.routing!.filter(step => step.toolId === item.id).map(step => step.name).join(', ') }}</span></div>
+    </div>
+    <p v-if="!toolUsers(store.state, item.id).length" class="empty-note">Nenhum roteiro vigente usa este ferramental.</p>
+  </template>
+  <h3 class="drawer-title" :style="item.type === 'FE' ? '' : 'margin-top:0'">Estruturas vigentes que usam este item</h3>
   <table v-if="parents.length" class="dense">
     <thead><tr><th>Item pai</th><th>Quantidade</th><th>Situação do pai</th></tr></thead>
     <tbody>

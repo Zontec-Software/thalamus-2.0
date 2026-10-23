@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 
+defineProps<{ compact?: boolean }>()
 const model = defineModel<number>({ required: true })
 const text = ref('R$ 0,00')
 
@@ -17,5 +18,5 @@ function onInput(event: Event) {
 </script>
 
 <template>
-  <input class="filter" :value="text" inputmode="numeric" autocomplete="off" @input="onInput" />
+  <input :class="compact ? 'cell-input money' : 'filter'" :value="text" inputmode="numeric" autocomplete="off" @input="onInput" />
 </template>

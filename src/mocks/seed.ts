@@ -1,11 +1,11 @@
 import {
   addSyncLog, advanceRequisition, approveInspection, confirmShipment, createMaintenance, finishOperation, invoiceOrder,
-  pauseOperation, pickOp, planOrder, raiseAlert, rejectInspection, reportProduction, setClock, shipOrder,
+  approveFirstPiece, pauseOperation, pickOp, planOrder, raiseAlert, rejectInspection, reportProduction, setClock, shipOrder,
   startOperation, updateNonConformity, type ErpState,
 } from '../domain/engine'
 import { defaultCatalog, ensureClassPath, seedPath, withCheckDigit } from '../domain/catalog'
 import { FUNCTIONALITIES, profileCode, seededProfiles } from '../domain/access'
-import type { Item, SalesOrder } from '../types/domain'
+import type { Item, RouteStep, SalesOrder } from '../types/domain'
 
 const mp = (id: string, code: string, name: string, stock: number, minimum: number, cost: number, supplier: string, leadTimeDays: number): Item =>
   ({ id, code, name, type: 'MP', unit: 'kg', stock, minimum, cost, supplier, leadTimeDays, location: 'Silo / A-01' })
@@ -16,7 +16,16 @@ const cp = (id: string, code: string, name: string, stock: number, minimum: numb
 const se = (id: string, code: string, name: string, stock: number, moldId: string, cycleSeconds: number, cavities: number, resin: string, resinKg: number): Item =>
   ({ id, code, name, type: 'SE', unit: 'un', stock, minimum: 50, cost: 6, moldId, cycleSeconds, cavities, bom: [{ itemId: resin, quantity: resinKg, loss: 3 }], location: 'Supermercado injeção' })
 
-const step = (id: string, name: string, resourceId: string, minutesPerUnit: number, instructions: string[]) => ({ id, name, resourceId, minutesPerUnit, instructions })
+const step = (id: string, name: string, resourceId: string, minutesPerUnit: number, instructions: string[], extra: Partial<RouteStep> = {}): RouteStep => ({ id, name, resourceId, minutesPerUnit, instructions, ...extra })
+
+const fe = (id: string, code: string, name: string, cost: number): Item =>
+  ({ id, code, name, type: 'FE', unit: 'un', stock: 1, minimum: 0, cost, location: 'Ferramentaria' })
+
+/** Roteiro da peça injetada: o tempo por peça sai do ciclo ÷ cavidades ativas do molde. */
+const injection = (toolId: string, resourceId: string, cycleSeconds: number, activeCavities: number, extraSteps: RouteStep[] = []): RouteStep[] => [
+  step('inj', 'Injeção', resourceId, Math.round(cycleSeconds / activeCavities / 60 * 10000) / 10000, ['Montar e aquecer o molde', 'Liberar primeira peça com a qualidade', 'Separar refugo por motivo'], { toolId, setupMinutes: 45, crew: 1, firstPiece: true }),
+  ...extraSteps,
+]
 
 function baseState(): ErpState {
   return {
@@ -30,27 +39,27 @@ function baseState(): ErpState {
       { id: 'c6', name: 'Rede Varejo Prime', city: 'São Paulo, SP', omieCode: 'CL-1501' },
     ],
     resources: [
-      { id: 'inj1', name: 'Injetora 01 · 180 t', kind: 'Injetora', dailyMinutes: 960 },
-      { id: 'inj2', name: 'Injetora 02 · 250 t', kind: 'Injetora', dailyMinutes: 960 },
-      { id: 'inj3', name: 'Injetora 03 · 350 t', kind: 'Injetora', dailyMinutes: 960 },
-      { id: 'mont1', name: 'Montagem · Célula 1', kind: 'Montagem', dailyMinutes: 880 },
-      { id: 'mont2', name: 'Montagem · Célula 2', kind: 'Montagem', dailyMinutes: 880 },
-      { id: 'elet', name: 'Eletrônica e testes', kind: 'Montagem', dailyMinutes: 440 },
+      { id: 'inj1', name: 'Injetora 01 · 180 t', kind: 'Injetora', dailyMinutes: 960, hourlyRate: 95 },
+      { id: 'inj2', name: 'Injetora 02 · 250 t', kind: 'Injetora', dailyMinutes: 960, hourlyRate: 120 },
+      { id: 'inj3', name: 'Injetora 03 · 350 t', kind: 'Injetora', dailyMinutes: 960, hourlyRate: 145 },
+      { id: 'mont1', name: 'Montagem · Célula 1', kind: 'Montagem', dailyMinutes: 880, hourlyRate: 14 },
+      { id: 'mont2', name: 'Montagem · Célula 2', kind: 'Montagem', dailyMinutes: 880, hourlyRate: 14 },
+      { id: 'elet', name: 'Eletrônica e testes', kind: 'Montagem', dailyMinutes: 440, hourlyRate: 22 },
       { id: 'alm', name: 'Almoxarifado', kind: 'Almoxarifado', dailyMinutes: 880 },
       { id: 'qual', name: 'Qualidade', kind: 'Qualidade', dailyMinutes: 440 },
       { id: 'exp', name: 'Expedição', kind: 'Expedição', dailyMinutes: 440 },
     ],
     assets: [
-      { id: 'a-inj1', name: 'Injetora 01 · Haitian 180 t', kind: 'Injetora', resourceId: 'inj1', nextPreventive: '2026-10-28' },
-      { id: 'a-inj2', name: 'Injetora 02 · Romi 250 t', kind: 'Injetora', resourceId: 'inj2', nextPreventive: '2026-11-04' },
-      { id: 'a-inj3', name: 'Injetora 03 · Romi 350 t', kind: 'Injetora', resourceId: 'inj3', nextPreventive: '2026-10-20' },
-      { id: 'mold-a11f', name: 'Molde M-112 · Moldura A11', kind: 'Molde', resourceId: 'inj1', shots: 182400, nextPreventive: '2026-10-25' },
-      { id: 'mold-a11t', name: 'Molde M-113 · Tampa A11', kind: 'Molde', resourceId: 'inj2', shots: 96500, nextPreventive: '2026-11-10' },
-      { id: 'mold-a11b', name: 'Molde M-114 · Bumper A11', kind: 'Molde', resourceId: 'inj3', shots: 64200, nextPreventive: '2026-11-18' },
+      { id: 'a-inj1', name: 'Injetora 01 · Haitian 180 t', kind: 'Injetora', resourceId: 'inj1', nextPreventive: '2026-10-28', acquisitionValue: 820000, usefulLifeYears: 10 },
+      { id: 'a-inj2', name: 'Injetora 02 · Romi 250 t', kind: 'Injetora', resourceId: 'inj2', nextPreventive: '2026-11-04', acquisitionValue: 640000, usefulLifeYears: 10 },
+      { id: 'a-inj3', name: 'Injetora 03 · Romi 350 t', kind: 'Injetora', resourceId: 'inj3', nextPreventive: '2026-10-20', acquisitionValue: 910000, usefulLifeYears: 10 },
+      { id: 'mold-a11f', name: 'Molde M-112 · Moldura A11', kind: 'Molde', resourceId: 'inj1', shots: 182400, nextPreventive: '2026-10-25', acquisitionValue: 148000, usefulLifeYears: 5 },
+      { id: 'mold-a11t', name: 'Molde M-113 · Tampa A11', kind: 'Molde', resourceId: 'inj2', shots: 96500, nextPreventive: '2026-11-10', acquisitionValue: 132000, usefulLifeYears: 5 },
+      { id: 'mold-a11b', name: 'Molde M-114 · Bumper A11', kind: 'Molde', resourceId: 'inj3', shots: 64200, nextPreventive: '2026-11-18', acquisitionValue: 176000, usefulLifeYears: 5 },
       { id: 'mold-s9f', name: 'Molde M-121 · Moldura S9 FE', kind: 'Molde', resourceId: 'inj2', shots: 41800, nextPreventive: '2026-12-01' },
       { id: 'mold-s9t', name: 'Molde M-122 · Tampa S9 FE', kind: 'Molde', resourceId: 'inj1', shots: 39700, nextPreventive: '2026-12-01' },
-      { id: 'mold-lite', name: 'Molde M-090 · Base Mesa Lite', kind: 'Molde', resourceId: 'inj1', shots: 228000, preventiveLimit: 228020, nextPreventive: '2026-10-18' },
-      { id: 'a-teste', name: 'Bancada de teste de estanqueidade', kind: 'Equipamento', resourceId: 'elet', nextPreventive: '2026-11-30' },
+      { id: 'mold-lite', name: 'Molde M-090 · Base Mesa Lite', kind: 'Molde', resourceId: 'inj1', shots: 228000, preventiveLimit: 228020, nextPreventive: '2026-10-18', acquisitionValue: 98000, usefulLifeYears: 5 },
+      { id: 'a-teste', name: 'Bancada de teste de estanqueidade', kind: 'Equipamento', resourceId: 'elet', nextPreventive: '2026-11-30', acquisitionValue: 45000, usefulLifeYears: 10 },
     ],
     items: [
       mp('mp-abs', 'MP-ABS-01', 'ABS preto UV', 420, 150, 18.5, 'Polímeros Minas', 5),
@@ -70,6 +79,13 @@ function baseState(): ErpState {
       se('se-mold-s9', 'SE-MLD-S9', 'Moldura frontal Tab S9 FE', 0, 'mold-s9f', 46, 2, 'mp-abs', 0.13),
       se('se-tampa-s9', 'SE-TMP-S9', 'Tampa traseira Tab S9 FE', 64, 'mold-s9t', 52, 1, 'mp-abs', 0.19),
       se('se-base-lite', 'SE-BAS-LT', 'Base Mesa Lite iPad', 70, 'mold-lite', 38, 1, 'mp-pc', 0.22),
+      fe('fe-m112', 'FE-M112', 'Molde M-112 · Moldura A11', 148000),
+      fe('fe-m113', 'FE-M113', 'Molde M-113 · Tampa A11', 132000),
+      fe('fe-m114', 'FE-M114', 'Molde M-114 · Bumper A11', 176000),
+      fe('fe-m121', 'FE-M121', 'Molde M-121 · Moldura S9 FE', 0),
+      fe('fe-m122', 'FE-M122', 'Molde M-122 · Tampa S9 FE', 0),
+      fe('fe-m090', 'FE-M090', 'Molde M-090 · Base Mesa Lite', 98000),
+      fe('fe-g11', 'FE-G11', 'Gabarito G-11 · montagem Case A11', 4200),
       {
         id: 'pa-a11-ext', code: 'RF-H-A11-EXT', name: 'Case Extreme', variant: 'Samsung Tab A11', family: 'Hard', revision: 'C', type: 'PA', unit: 'un', stock: 0, minimum: 0, cost: 186, location: 'Expedição E-01',
         bom: [{ itemId: 'se-mold-a11', quantity: 1 }, { itemId: 'se-tampa-a11', quantity: 1 }, { itemId: 'se-bump-a11', quantity: 1 }, { itemId: 'cp-cabo', quantity: 1 }, { itemId: 'cp-placa', quantity: 1 }, { itemId: 'cp-pelic', quantity: 1 }, { itemId: 'cp-paraf', quantity: 8 }, { itemId: 'cp-alca', quantity: 1 }, { itemId: 'em-hard', quantity: 1 }],
@@ -142,18 +158,37 @@ function baseState(): ErpState {
       { id: 'u11', name: 'Diego Martins', role: 'Manutenção', sector: 'Manutenção', shift: 'Manhã', pin: '8888' },
     ],
     sectors: [
-      { id: 'sec-dir', name: 'Diretoria industrial', costCenter: 'CC-100' },
-      { id: 'sec-com', name: 'Comercial', managerId: 'u12', parentId: 'sec-dir', costCenter: 'CC-210' },
-      { id: 'sec-eng', name: 'Engenharia', managerId: 'u13', parentId: 'sec-dir', costCenter: 'CC-310' },
-      { id: 'sec-sup', name: 'Suprimentos', managerId: 'u3', parentId: 'sec-dir', costCenter: 'CC-320' },
-      { id: 'sec-pro', name: 'Operações', managerId: 'u5', parentId: 'sec-dir', costCenter: 'CC-400' },
-      { id: 'sec-ser', name: 'Serviços', managerId: 'u11', parentId: 'sec-dir', costCenter: 'CC-500' },
-      { id: 'sec-fin', name: 'Financeiro', managerId: 'u14', parentId: 'sec-dir', costCenter: 'CC-600' },
+      { id: 'sec-dir', name: 'Diretoria industrial', costCenters: { 'tenant-roboflex': 'CC-100', 'tenant-roboflex-sul': 'CC-100' } },
+      { id: 'sec-com', name: 'Comercial', managerId: 'u12', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-210', 'tenant-roboflex-sul': 'CC-210' } },
+      { id: 'sec-eng', name: 'Engenharia', managerId: 'u13', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-310', 'tenant-roboflex-sul': 'CC-310' } },
+      { id: 'sec-sup', name: 'Suprimentos', managerId: 'u3', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-320', 'tenant-roboflex-sul': 'CC-320' } },
+      { id: 'sec-pro', name: 'Operações', managerId: 'u5', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-400', 'tenant-roboflex-sul': 'CC-400' } },
+      { id: 'sec-ser', name: 'Serviços', managerId: 'u11', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-500', 'tenant-roboflex-sul': 'CC-400' } },
+      { id: 'sec-fin', name: 'Financeiro', managerId: 'u14', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-600', 'tenant-roboflex-sul': 'CC-600' } },
+    ],
+    costCenters: [
+      { id: 'cc-rob-100', tenantId: 'tenant-roboflex', code: 'CC-100', name: 'Diretoria industrial', responsibleUserId: 'u1', status: 'Ativo' },
+      { id: 'cc-rob-210', tenantId: 'tenant-roboflex', code: 'CC-210', name: 'Comercial', responsibleUserId: 'u12', status: 'Ativo' },
+      { id: 'cc-rob-310', tenantId: 'tenant-roboflex', code: 'CC-310', name: 'Engenharia de produto', responsibleUserId: 'u13', status: 'Ativo' },
+      { id: 'cc-rob-320', tenantId: 'tenant-roboflex', code: 'CC-320', name: 'Suprimentos', responsibleUserId: 'u3', status: 'Ativo' },
+      { id: 'cc-rob-330', tenantId: 'tenant-roboflex', code: 'CC-330', name: 'Ferramental', responsibleUserId: 'u13', status: 'Ativo' },
+      { id: 'cc-rob-400', tenantId: 'tenant-roboflex', code: 'CC-400', name: 'Operações', responsibleUserId: 'u5', status: 'Ativo' },
+      { id: 'cc-rob-410', tenantId: 'tenant-roboflex', code: 'CC-410', name: 'Injetoras', responsibleUserId: 'u11', status: 'Ativo' },
+      { id: 'cc-rob-500', tenantId: 'tenant-roboflex', code: 'CC-500', name: 'Serviços de campo', responsibleUserId: 'u11', status: 'Ativo' },
+      { id: 'cc-rob-600', tenantId: 'tenant-roboflex', code: 'CC-600', name: 'Financeiro', responsibleUserId: 'u14', status: 'Ativo' },
+      { id: 'cc-rob-700', tenantId: 'tenant-roboflex', code: 'CC-700', name: 'Projetos', responsibleUserId: 'u13', status: 'Ativo' },
+      { id: 'cc-sul-100', tenantId: 'tenant-roboflex-sul', code: 'CC-100', name: 'Diretoria industrial', responsibleUserId: 'u1', status: 'Ativo' },
+      { id: 'cc-sul-210', tenantId: 'tenant-roboflex-sul', code: 'CC-210', name: 'Comercial', responsibleUserId: 'u12', status: 'Ativo' },
+      { id: 'cc-sul-310', tenantId: 'tenant-roboflex-sul', code: 'CC-310', name: 'Engenharia de produto', responsibleUserId: 'u13', status: 'Ativo' },
+      { id: 'cc-sul-320', tenantId: 'tenant-roboflex-sul', code: 'CC-320', name: 'Suprimentos', responsibleUserId: 'u3', status: 'Ativo' },
+      { id: 'cc-sul-400', tenantId: 'tenant-roboflex-sul', code: 'CC-400', name: 'Operações', responsibleUserId: 'u5', status: 'Ativo' },
+      { id: 'cc-sul-500', tenantId: 'tenant-roboflex-sul', code: 'CC-500', name: 'Serviços de campo', responsibleUserId: 'u11', status: 'Ativo' },
+      { id: 'cc-sul-600', tenantId: 'tenant-roboflex-sul', code: 'CC-600', name: 'Financeiro', responsibleUserId: 'u14', status: 'Ativo' },
     ],
     positions: [
       { id: 'pos-com', name: 'Executiva comercial', sectorId: 'sec-com', description: 'CRM, propostas e carteira de clientes' },
       { id: 'pos-eng', name: 'Engenheiro de produto', sectorId: 'sec-eng', description: 'Produto, estrutura, roteiro e revisão' },
-      { id: 'pos-fin', name: 'Analista financeiro', sectorId: 'sec-fin', description: 'Orçamentos e títulos operacionais' },
+      { id: 'pos-fin', name: 'Analista financeiro', sectorId: 'sec-fin', description: 'Orçamentos e centros de custo' },
       { id: 'pos-ast', name: 'Técnico de campo', sectorId: 'sec-ser', description: 'Triagem e execução de assistência' },
       { id: 'pos-op', name: 'Operador industrial', sectorId: 'sec-pro', description: 'Apontamento e autocontrole' },
     ],
@@ -173,6 +208,7 @@ function baseState(): ErpState {
       { id: 'rev-a11-d', itemId: 'pa-a11-ext', code: 'D', status: 'Rascunho', createdAt: '2026-10-13T10:00:00.000Z', checklist: [{ label: 'Cadastro', done: true }, { label: 'Estrutura', done: true }, { label: 'Roteiro', done: false }, { label: 'Fiscal', done: true }], notes: 'Nova vedação para uso portuário.' },
       { id: 'rev-impact-b', itemId: 'pa-a11-imp', code: 'B', status: 'Liberada', createdAt: '2026-07-01T10:00:00.000Z', releasedAt: '2026-07-09T10:00:00.000Z', releasedBy: 'Eduardo Freitas', checklist: [{ label: 'Cadastro', done: true }, { label: 'Estrutura', done: true }, { label: 'Roteiro', done: true }], notes: 'Versão vigente.' },
     ],
+    engineeringChanges: [],
     services: [
       { id: 'sv-mont', code: 'SV-PRO-001', name: 'Montagem mecânica de case', category: 'Produção', unit: 'hora', standardMinutes: 60, cost: 52, price: 0, outsourced: false, status: 'Ativo' },
       { id: 'sv-prev', code: 'SV-MAN-002', name: 'Preventiva em injetora', category: 'Manutenção', unit: 'hora', standardMinutes: 180, cost: 95, price: 0, outsourced: false, status: 'Ativo' },
@@ -207,59 +243,82 @@ function baseState(): ErpState {
       { id: 'PRJ-26-011', name: 'Redução de setup molde A11', kind: 'Melhoria', ownerId: 'u5', memberIds: ['u5', 'u11'], description: 'Reduzir de 55 para 30 minutos a troca do molde do Tab A11 na Injetora 02.', status: 'Planejado', startDate: '2026-10-20', endDate: '2026-11-28', milestones: [{ id: 'm4', title: 'Medição do setup atual', dueDate: '2026-10-22', done: false }, { id: 'm5', title: 'Novo carrinho de troca', dueDate: '2026-11-10', done: false }] },
     ],
     budgetCategories: [
-      { id: 'BC-CMV', code: '03.01', name: 'Custo Mercadoria Vendida', group: '03. Custos', responsibleRole: 'Financeiro', status: 'Ativa', audit: [] },
-      { id: 'BC-CMV-1', code: '03.01.01', name: 'Compras de Matéria Prima', group: '03. Custos', parentId: 'BC-CMV', responsibleRole: 'Compras', status: 'Ativa', audit: [] },
-      { id: 'BC-CMV-2', code: '03.01.02', name: 'Compra de Serviços Terceirizados', group: '03. Custos', parentId: 'BC-CMV', responsibleRole: 'Compras', status: 'Ativa', audit: [] },
-      { id: 'BC-CMV-3', code: '03.01.03', name: 'Compras de Mercadorias para Revenda', group: '03. Custos', parentId: 'BC-CMV', responsibleRole: 'Compras', status: 'Ativa', audit: [] },
-      { id: 'BC-CMV-4', code: '03.01.04', name: 'Embalagens', group: '03. Custos', parentId: 'BC-CMV', responsibleRole: 'Compras', status: 'Ativa', audit: [] },
-      { id: 'BC-CMV-5', code: '03.01.05', name: 'Materiais e Insumos para SaaS', group: '03. Custos', parentId: 'BC-CMV', responsibleRole: 'Financeiro', status: 'Ativa', audit: [] },
-      { id: 'BC-OPER', code: '03.02', name: 'Custo Operacional', group: '03. Custos', responsibleRole: 'PCP', status: 'Ativa', audit: [] },
-      { id: 'BC-DEPREC', code: '03.03', name: 'Custo Máquinas - Depreciação', group: '03. Custos', responsibleRole: 'Financeiro', status: 'Ativa', audit: [] },
-      { id: 'BC-PESSOAL', code: '03.04', name: 'Custo de Pessoal', group: '03. Custos', responsibleRole: 'Financeiro', status: 'Ativa', audit: [] },
-      { id: 'BC-VENDAS', code: '03.05', name: 'Custo com Vendas e Marketing', group: '03. Custos', responsibleRole: 'Comercial', status: 'Ativa', audit: [] },
-      { id: 'BC-PD', code: '03.06', name: 'Custo com Pesquisa e Desenvolvimento', group: '03. Custos', responsibleRole: 'Engenharia', status: 'Ativa', audit: [] },
-      { id: 'BC-MAT-PD', code: '03.07', name: 'Materiais Pesquisa e Desenvolvimento', group: '03. Custos', responsibleRole: 'Engenharia', status: 'Ativa', audit: [] },
-      { id: 'BC-GARANTIA', code: '03.08', name: 'Custo com Garantia e Perdas', group: '03. Custos', responsibleRole: 'Assistência', status: 'Ativa', audit: [] },
-      { id: 'BC-PERDAS', code: '03.09', name: 'Perdas', group: '03. Custos', responsibleRole: 'Qualidade', status: 'Ativa', audit: [] },
-      { id: 'BC-IMPOSTOS', code: '02.01', name: 'Impostos e Taxas', group: '02. Deduções da Receita', responsibleRole: 'Financeiro', status: 'Ativa', audit: [] },
-      { id: 'BC-DEVOL', code: '02.02', name: 'Devoluções e Reembolsos', group: '02. Deduções da Receita', responsibleRole: 'Financeiro', status: 'Ativa', audit: [] },
+      { id: 'BC-ROB', tenantId: 'tenant-roboflex', code: '01.01', name: 'Receita Bruta de Vendas', group: '01. Receita Operacional Bruta', status: 'Ativa', nature: 'Receita', audit: [] },
+      { id: 'BC-CMV', tenantId: 'tenant-roboflex', code: '03.01', name: 'Custo Mercadoria Vendida', group: '03. Custos', status: 'Ativa', audit: [] },
+      { id: 'BC-CMV-1', tenantId: 'tenant-roboflex', code: '03.01.01', name: 'Compras de Matéria Prima', group: '03. Custos', parentId: 'BC-CMV', status: 'Ativa', audit: [] },
+      { id: 'BC-CMV-2', tenantId: 'tenant-roboflex', code: '03.01.02', name: 'Compra de Serviços Terceirizados', group: '03. Custos', parentId: 'BC-CMV', status: 'Ativa', audit: [] },
+      { id: 'BC-CMV-3', tenantId: 'tenant-roboflex', code: '03.01.03', name: 'Compras de Mercadorias para Revenda', group: '03. Custos', parentId: 'BC-CMV', status: 'Ativa', audit: [] },
+      { id: 'BC-CMV-4', tenantId: 'tenant-roboflex', code: '03.01.04', name: 'Embalagens', group: '03. Custos', parentId: 'BC-CMV', status: 'Ativa', audit: [] },
+      { id: 'BC-CMV-5', tenantId: 'tenant-roboflex', code: '03.01.05', name: 'Materiais e Insumos para SaaS', group: '03. Custos', parentId: 'BC-CMV', status: 'Ativa', audit: [] },
+      { id: 'BC-OPER', tenantId: 'tenant-roboflex', code: '03.02', name: 'Custo Operacional', group: '03. Custos', status: 'Ativa', audit: [] },
+      { id: 'BC-DEPREC', tenantId: 'tenant-roboflex', code: '03.03', name: 'Custo Máquinas - Depreciação', group: '03. Custos', status: 'Ativa', audit: [] },
+      { id: 'BC-PESSOAL', tenantId: 'tenant-roboflex', code: '03.04', name: 'Custo de Pessoal', group: '03. Custos', status: 'Ativa', audit: [] },
+      { id: 'BC-VENDAS', tenantId: 'tenant-roboflex', code: '03.05', name: 'Custo com Vendas e Marketing', group: '03. Custos', status: 'Ativa', audit: [] },
+      { id: 'BC-PD', tenantId: 'tenant-roboflex', code: '03.06', name: 'Custo com Pesquisa e Desenvolvimento', group: '03. Custos', status: 'Ativa', audit: [] },
+      { id: 'BC-MAT-PD', tenantId: 'tenant-roboflex', code: '03.07', name: 'Materiais Pesquisa e Desenvolvimento', group: '03. Custos', status: 'Ativa', audit: [] },
+      { id: 'BC-GARANTIA', tenantId: 'tenant-roboflex', code: '03.08', name: 'Custo com Garantia e Perdas', group: '03. Custos', status: 'Ativa', audit: [] },
+      { id: 'BC-PERDAS', tenantId: 'tenant-roboflex', code: '03.09', name: 'Perdas', group: '03. Custos', status: 'Ativa', audit: [] },
+      { id: 'BC-IMPOSTOS', tenantId: 'tenant-roboflex', code: '02.01', name: 'Impostos e Taxas', group: '02. Deduções da Receita', status: 'Ativa', audit: [] },
+      { id: 'BC-DEVOL', tenantId: 'tenant-roboflex', code: '02.02', name: 'Devoluções e Reembolsos', group: '02. Deduções da Receita', status: 'Ativa', audit: [] },
+      { id: 'BC-CAPEX', tenantId: 'tenant-roboflex', code: '09.01', name: 'Máquinas e Moldes', group: '09. Investimentos (CAPEX)', status: 'Ativa', isCapex: true, audit: [] },
+      // Empresa-irmã (tenant-roboflex-sul), árvore mínima só para o planejamento de grupo ter o que combinar.
+      { id: 'BC-ROB-SUL', tenantId: 'tenant-roboflex-sul', code: '01.01', name: 'Receita Bruta de Vendas', group: '01. Receita Operacional Bruta', status: 'Ativa', nature: 'Receita', audit: [] },
+      { id: 'BC-CMV-SUL', tenantId: 'tenant-roboflex-sul', code: '03.01', name: 'Custo Mercadoria Vendida', group: '03. Custos', status: 'Ativa', audit: [] },
     ],
     budgets: [
-      { id: 'ORC-CMV-10', categoryId: 'BC-CMV', period: '2026', amount: 2160000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
-      { id: 'ORC-CMV-1', categoryId: 'BC-CMV-1', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
-      { id: 'ORC-CMV-2', categoryId: 'BC-CMV-2', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
-      { id: 'ORC-CMV-3', categoryId: 'BC-CMV-3', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
-      { id: 'ORC-CMV-4', categoryId: 'BC-CMV-4', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
-      { id: 'ORC-CMV-5', categoryId: 'BC-CMV-5', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
-      { id: 'ORC-OPER-10', categoryId: 'BC-OPER', period: '2026', amount: 384000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
-      { id: 'ORC-PD-10', categoryId: 'BC-PD', period: '2026', amount: 1440000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
-      { id: 'ORC-GAR-10', categoryId: 'BC-GARANTIA', period: '2026', amount: 264000, alertThreshold: 80, blockOnOverrun: false, audit: [] },
-      { id: 'ORC-PERDAS-10', categoryId: 'BC-PERDAS', period: '2026', amount: 144000, alertThreshold: 75, blockOnOverrun: true, audit: [] },
+      { id: 'ORC-ROB-10', tenantId: 'tenant-roboflex', categoryId: 'BC-ROB', period: '2026', amount: 48000000, alertThreshold: 80, blockOnOverrun: false, audit: [] },
+      { id: 'ORC-CMV-10', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV', period: '2026', amount: 2160000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
+      { id: 'ORC-CMV-1', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV-1', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-320', value: 100 }] } },
+      { id: 'ORC-CMV-2', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV-2', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-320', value: 100 }] } },
+      { id: 'ORC-CMV-3', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV-3', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
+      { id: 'ORC-CMV-4', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV-4', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
+      { id: 'ORC-CMV-5', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV-5', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
+      { id: 'ORC-OPER-10', tenantId: 'tenant-roboflex', categoryId: 'BC-OPER', period: '2026', amount: 384000, alertThreshold: 80, blockOnOverrun: true, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-400', value: 60 }, { costCenterId: 'cc-rob-310', value: 25 }, { costCenterId: 'cc-rob-320', value: 15 }] } },
+      { id: 'ORC-PD-10', tenantId: 'tenant-roboflex', categoryId: 'BC-PD', period: '2026', amount: 1440000, alertThreshold: 80, blockOnOverrun: true, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-310', value: 60 }, { costCenterId: 'cc-rob-700', value: 40 }] } },
+      { id: 'ORC-GAR-10', tenantId: 'tenant-roboflex', categoryId: 'BC-GARANTIA', period: '2026', amount: 264000, alertThreshold: 80, blockOnOverrun: false, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-500', value: 100 }] } },
+      { id: 'ORC-PERDAS-10', tenantId: 'tenant-roboflex', categoryId: 'BC-PERDAS', period: '2026', amount: 144000, alertThreshold: 75, blockOnOverrun: true, audit: [] },
+      { id: 'ORC-CAPEX-10', tenantId: 'tenant-roboflex', categoryId: 'BC-CAPEX', period: '2026', amount: 600000, alertThreshold: 80, blockOnOverrun: false, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-410', value: 70 }, { costCenterId: 'cc-rob-330', value: 30 }] } },
+      { id: 'ORC-ROB-SUL-10', tenantId: 'tenant-roboflex-sul', categoryId: 'BC-ROB-SUL', period: '2026', amount: 18000000, alertThreshold: 80, blockOnOverrun: false, audit: [] },
+      { id: 'ORC-CMV-SUL-10', tenantId: 'tenant-roboflex-sul', categoryId: 'BC-CMV-SUL', period: '2026', amount: 820000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
     ],
     budgetEntries: [
-      { id: 'BL-1', kind: 'Previsão', categoryId: 'BC-CMV-1', period: '2026-10', amount: 22000, openAmount: 22000, status: 'Ativo', sourceModule: 'Compras', sourceType: 'Pedido de compra', sourceId: 'PC-7310', description: 'TPU antichoque 85A', costCenter: 'CC-320', createdAt: '2026-10-08T10:00:00.000Z', events: [] },
-      { id: 'BL-9', kind: 'Previsão', categoryId: 'BC-CMV-2', period: '2026-10', amount: 9800, openAmount: 9800, status: 'Ativo', sourceModule: 'Compras', sourceType: 'Pedido de compra', sourceId: 'PC-7314', description: 'Usinagem de insertos', costCenter: 'CC-320', createdAt: '2026-10-08T11:00:00.000Z', events: [] },
-      { id: 'BL-10', kind: 'Previsão', categoryId: 'BC-CMV-3', period: '2026-10', amount: 8400, openAmount: 8400, status: 'Ativo', sourceModule: 'Compras', sourceType: 'Pedido de compra', sourceId: 'PC-7315', description: 'Acessório para revenda', costCenter: 'CC-320', createdAt: '2026-10-08T11:20:00.000Z', events: [] },
-      { id: 'BL-11', kind: 'Previsão', categoryId: 'BC-CMV-4', period: '2026-10', amount: 5000, openAmount: 5000, status: 'Ativo', sourceModule: 'Compras', sourceType: 'Pedido de compra', sourceId: 'PC-7316', description: 'Caixas de embarque', costCenter: 'CC-320', createdAt: '2026-10-08T11:40:00.000Z', events: [] },
-      { id: 'BL-12', kind: 'Previsão', categoryId: 'BC-CMV-5', period: '2026-10', amount: 3000, openAmount: 3000, status: 'Ativo', sourceModule: 'Compras', sourceType: 'Pedido de compra', sourceId: 'PC-7317', description: 'Insumos de identificação', costCenter: 'CC-320', createdAt: '2026-10-08T12:00:00.000Z', events: [] },
-      { id: 'BL-2', kind: 'Realizado pago', categoryId: 'BC-CMV-1', period: '2026-10', amount: 96740, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'PC-7299', externalId: 'PG-7299-1', invoiceNumber: '7299', linkModule: 'Compras', linkId: 'PC-7299', description: 'NF 7299 · matérias-primas', costCenter: 'CC-320', createdAt: '2026-10-09T14:00:00.000Z', events: [] },
-      { id: 'BL-3', kind: 'Previsão', categoryId: 'BC-OPER', period: '2026-10', amount: 6800, openAmount: 6800, status: 'Ativo', sourceModule: 'Manutenção', sourceType: 'Ordem de serviço', sourceId: 'OS-1', description: 'Manutenção industrial', costCenter: 'CC-500', createdAt: '2026-10-10T10:00:00.000Z', events: [] },
-      { id: 'BL-4', kind: 'Realizado pago', categoryId: 'BC-OPER', period: '2026-10', amount: 17450, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'OS-ANT-15', externalId: 'PG-MAN-15', invoiceNumber: '4415', linkModule: 'Manutenção', linkId: 'OS-ANT-15', description: 'NF 4415 · serviços de manutenção', costCenter: 'CC-500', createdAt: '2026-10-12T10:00:00.000Z', events: [] },
-      { id: 'BL-5', kind: 'Previsão', categoryId: 'BC-PD', period: '2026-10', amount: 28500, openAmount: 28500, status: 'Ativo', sourceModule: 'Projetos', sourceType: 'Projeto', sourceId: 'PRJ-26-014', projectId: 'PRJ-26-014', description: 'Protótipos Case Mining S10', costCenter: 'CC-310', createdAt: '2026-10-01T10:00:00.000Z', events: [] },
-      { id: 'BL-7', kind: 'Previsão', categoryId: 'BC-OPER', period: '2026-10', amount: 9500, openAmount: 9500, status: 'Ativo', sourceModule: 'Demandas', sourceType: 'Serviço', sourceId: 'DM-105', description: 'Revisão do cilindro da Injetora 03', costCenter: 'CC-500', createdAt: '2026-10-18T09:00:00.000Z', events: [] },
-      { id: 'BL-13', kind: 'Previsão', categoryId: 'BC-PERDAS', period: '2026-10', amount: 150000, openAmount: 0, heldAmount: 150000, status: 'Retido', sourceModule: 'Demandas', sourceType: 'Material', sourceId: 'DM-106', description: 'Baixa de lote reprovado na inspeção', costCenter: 'CC-500', createdAt: '2026-10-19T09:00:00.000Z', events: [] },
-      { id: 'BL-6', kind: 'Realizado pago', categoryId: 'BC-PD', period: '2026-10', amount: 41600, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'PRJ-26-014', externalId: 'PG-PD-14', invoiceNumber: '4418', linkModule: 'Projetos', linkId: 'PRJ-26-014', projectId: 'PRJ-26-014', description: 'NF 4418 · ferramental e ensaios', costCenter: 'CC-310', createdAt: '2026-10-11T10:00:00.000Z', events: [] },
-      { id: 'BL-8', kind: 'Realizado pago', categoryId: 'BC-GARANTIA', period: '2026-10', amount: 890, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'NF-9012', externalId: 'PG-9012', invoiceNumber: '9012', description: 'NF 9012 · serviço avulso', costCenter: 'CC-500', createdAt: '2026-10-18T16:00:00.000Z', events: [] },
+      { id: 'BL-1', tenantId: 'tenant-roboflex', kind: 'Previsão', categoryId: 'BC-CMV-1', period: '2026-10', amount: 22000, openAmount: 22000, status: 'Ativo', sourceModule: 'Compras', sourceType: 'Pedido de compra', sourceId: 'PC-7310', description: 'TPU antichoque 85A', costCenter: 'CC-320', createdAt: '2026-10-08T10:00:00.000Z', events: [] },
+      { id: 'BL-9', tenantId: 'tenant-roboflex', kind: 'Previsão', categoryId: 'BC-CMV-2', period: '2026-10', amount: 9800, openAmount: 9800, status: 'Ativo', sourceModule: 'Compras', sourceType: 'Pedido de compra', sourceId: 'PC-7314', description: 'Usinagem de insertos', costCenter: 'CC-320', createdAt: '2026-10-08T11:00:00.000Z', events: [] },
+      { id: 'BL-10', tenantId: 'tenant-roboflex', kind: 'Previsão', categoryId: 'BC-CMV-3', period: '2026-10', amount: 8400, openAmount: 8400, status: 'Ativo', sourceModule: 'Compras', sourceType: 'Pedido de compra', sourceId: 'PC-7315', description: 'Acessório para revenda', costCenter: 'CC-320', createdAt: '2026-10-08T11:20:00.000Z', events: [] },
+      { id: 'BL-11', tenantId: 'tenant-roboflex', kind: 'Previsão', categoryId: 'BC-CMV-4', period: '2026-10', amount: 5000, openAmount: 5000, status: 'Ativo', sourceModule: 'Compras', sourceType: 'Pedido de compra', sourceId: 'PC-7316', description: 'Caixas de embarque', costCenter: 'CC-320', createdAt: '2026-10-08T11:40:00.000Z', events: [] },
+      { id: 'BL-12', tenantId: 'tenant-roboflex', kind: 'Previsão', categoryId: 'BC-CMV-5', period: '2026-10', amount: 3000, openAmount: 3000, status: 'Ativo', sourceModule: 'Compras', sourceType: 'Pedido de compra', sourceId: 'PC-7317', description: 'Insumos de identificação', costCenter: 'CC-320', createdAt: '2026-10-08T12:00:00.000Z', events: [] },
+      { id: 'BL-2', tenantId: 'tenant-roboflex', kind: 'Realizado pago', categoryId: 'BC-CMV-1', period: '2026-10', amount: 96740, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'PC-7299', externalId: 'PG-7299-1', invoiceNumber: '7299', linkModule: 'Compras', linkId: 'PC-7299', description: 'NF 7299 · matérias-primas', costCenter: 'CC-320', createdAt: '2026-10-09T14:00:00.000Z', events: [] },
+      { id: 'BL-3', tenantId: 'tenant-roboflex', kind: 'Previsão', categoryId: 'BC-OPER', period: '2026-10', amount: 6800, openAmount: 6800, status: 'Ativo', sourceModule: 'Manutenção', sourceType: 'Ordem de serviço', sourceId: 'OS-1', description: 'Manutenção industrial', costCenter: 'CC-500', createdAt: '2026-10-10T10:00:00.000Z', events: [] },
+      { id: 'BL-4', tenantId: 'tenant-roboflex', kind: 'Realizado pago', categoryId: 'BC-OPER', period: '2026-10', amount: 17450, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'OS-ANT-15', externalId: 'PG-MAN-15', invoiceNumber: '4415', linkModule: 'Manutenção', linkId: 'OS-ANT-15', description: 'NF 4415 · serviços de manutenção', costCenter: 'CC-500', createdAt: '2026-10-12T10:00:00.000Z', events: [] },
+      { id: 'BL-5', tenantId: 'tenant-roboflex', kind: 'Previsão', categoryId: 'BC-PD', period: '2026-10', amount: 28500, openAmount: 28500, status: 'Ativo', sourceModule: 'Projetos', sourceType: 'Projeto', sourceId: 'PRJ-26-014', projectId: 'PRJ-26-014', description: 'Protótipos Case Mining S10', costCenter: 'CC-310', createdAt: '2026-10-01T10:00:00.000Z', events: [] },
+      { id: 'BL-7', tenantId: 'tenant-roboflex', kind: 'Previsão', categoryId: 'BC-OPER', period: '2026-10', amount: 9500, openAmount: 9500, status: 'Ativo', sourceModule: 'Demandas', sourceType: 'Serviço', sourceId: 'DM-105', description: 'Revisão do cilindro da Injetora 03', costCenter: 'CC-500', createdAt: '2026-10-18T09:00:00.000Z', events: [] },
+      { id: 'BL-13', tenantId: 'tenant-roboflex', kind: 'Previsão', categoryId: 'BC-PERDAS', period: '2026-10', amount: 150000, openAmount: 0, heldAmount: 150000, status: 'Retido', sourceModule: 'Demandas', sourceType: 'Material', sourceId: 'DM-106', description: 'Baixa de lote reprovado na inspeção', costCenter: 'CC-500', createdAt: '2026-10-19T09:00:00.000Z', events: [] },
+      { id: 'BL-6', tenantId: 'tenant-roboflex', kind: 'Realizado pago', categoryId: 'BC-PD', period: '2026-10', amount: 41600, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'PRJ-26-014', externalId: 'PG-PD-14', invoiceNumber: '4418', linkModule: 'Projetos', linkId: 'PRJ-26-014', projectId: 'PRJ-26-014', description: 'NF 4418 · ferramental e ensaios', costCenter: 'CC-310', createdAt: '2026-10-11T10:00:00.000Z', events: [] },
+      { id: 'BL-8', tenantId: 'tenant-roboflex', kind: 'Realizado pago', categoryId: 'BC-GARANTIA', period: '2026-10', amount: 890, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'NF-9012', externalId: 'PG-9012', invoiceNumber: '9012', description: 'NF 9012 · serviço avulso', costCenter: 'CC-500', createdAt: '2026-10-18T16:00:00.000Z', events: [] },
+      ...[2900000, 2800000, 3400000, 3500000, 3600000, 3500000, 3600000, 3800000, 3900000, 4000000, 4300000, 4200000].map((amount, index) => {
+        const month = String(index + 1).padStart(2, '0')
+        return {
+          id: `BL-14-${month}`, tenantId: 'tenant-roboflex', kind: 'Realizado recebido' as const, categoryId: 'BC-ROB', period: `2025-${month}`, amount, openAmount: 0, status: 'Liquidado' as const,
+          sourceModule: 'Omie' as const, sourceType: 'Recebimento', sourceId: `FAT-2025-${month}`, externalId: `PG-ROB-2025-${month}`, description: `Faturamento de ${month}/2025 · base do planejamento 2026`, createdAt: `2025-${month}-28T18:00:00.000Z`, events: [],
+        }
+      }),
+      { id: 'BL-15', tenantId: 'tenant-roboflex', kind: 'Realizado pago', categoryId: 'BC-CAPEX', period: '2025', amount: 480000, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'CAPEX-2025', externalId: 'PG-CAPEX-2025', description: 'Investimentos em máquinas e moldes de 2025 · base do planejamento 2026', costCenter: 'CC-410', createdAt: '2025-12-31T18:00:00.000Z', events: [] },
+      { id: 'BL-18', tenantId: 'tenant-roboflex', kind: 'Realizado pago', categoryId: 'BC-OPER', period: '2025', amount: 120000, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'OPER-2025-400', description: 'Custo operacional de 2025 em Operações', costCenter: 'CC-400', createdAt: '2025-12-31T18:00:00.000Z', events: [] },
+      { id: 'BL-19', tenantId: 'tenant-roboflex', kind: 'Realizado pago', categoryId: 'BC-OPER', period: '2025', amount: 50000, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'OPER-2025-310', description: 'Custo operacional de 2025 em Engenharia', costCenter: 'CC-310', createdAt: '2025-12-31T18:00:00.000Z', events: [] },
+      { id: 'BL-20', tenantId: 'tenant-roboflex', kind: 'Realizado pago', categoryId: 'BC-OPER', period: '2025', amount: 30000, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'OPER-2025-320', description: 'Custo operacional de 2025 em Suprimentos', costCenter: 'CC-320', createdAt: '2025-12-31T18:00:00.000Z', events: [] },
+      { id: 'BL-16', tenantId: 'tenant-roboflex-sul', kind: 'Realizado recebido', categoryId: 'BC-ROB-SUL', period: '2025', amount: 16200000, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Recebimento', sourceId: 'FAT-2025-SUL', externalId: 'PG-ROB-SUL-2025', description: 'Faturamento consolidado de 2025 da Roboflex Sul · base do planejamento 2026', createdAt: '2025-12-31T18:00:00.000Z', events: [] },
+      { id: 'BL-17', tenantId: 'tenant-roboflex-sul', kind: 'Realizado pago', categoryId: 'BC-CMV-SUL', period: '2025', amount: 740000, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'CMV-2025-SUL', externalId: 'PG-CMV-SUL-2025', description: 'Custo de mercadoria vendida de 2025 da Roboflex Sul · base do planejamento 2026', createdAt: '2025-12-31T18:00:00.000Z', events: [] },
     ],
     budgetExceptions: [
-      { id: 'BX-1', kind: 'Sem categoria', status: 'Pendente', sourceModule: 'Omie', sourceId: 'PG-SEM-CAT', description: 'NF 8891 sem categoria', amount: 3250, categoryIds: [], period: '2026-10', createdAt: '2026-10-16T10:00:00.000Z' },
-      { id: 'BX-4', kind: 'Sem vínculo', status: 'Pendente', sourceModule: 'Omie', sourceId: 'PG-9012', description: 'NF 9012 entrou no custo de garantia e ainda não aponta para um documento', amount: 890, categoryIds: ['BC-GARANTIA'], period: '2026-10', createdAt: '2026-10-18T16:00:00.000Z' },
-      { id: 'BX-3', kind: 'Saldo excedido', status: 'Pendente', sourceModule: 'Demandas', sourceId: 'DM-106', description: 'Baixa de lote reprovado na inspeção: excede o saldo anual de Perdas em R$ 6.000,00', amount: 150000, categoryIds: ['BC-PERDAS'], period: '2026-10', createdAt: '2026-10-19T09:00:00.000Z' },
-      { id: 'BX-2', kind: 'Saldo excedido', status: 'Autorizada', sourceModule: 'Demandas', sourceId: 'DM-EXC-1', description: 'Compra emergencial autorizada acima do saldo', amount: 14800, categoryIds: ['BC-PERDAS'], period: '2026-10', createdAt: '2026-10-14T10:00:00.000Z', decidedAt: '2026-10-14T11:00:00.000Z', decidedBy: 'Marina Souza', decisionNote: 'Parada de cliente crítico' },
+      { id: 'BX-1', tenantId: 'tenant-roboflex', kind: 'Sem categoria', status: 'Pendente', sourceModule: 'Omie', sourceId: 'PG-SEM-CAT', description: 'NF 8891 sem categoria', amount: 3250, categoryIds: [], period: '2026-10', createdAt: '2026-10-16T10:00:00.000Z' },
+      { id: 'BX-4', tenantId: 'tenant-roboflex', kind: 'Sem vínculo', status: 'Pendente', sourceModule: 'Omie', sourceId: 'PG-9012', description: 'NF 9012 entrou no custo de garantia e ainda não aponta para um documento', amount: 890, categoryIds: ['BC-GARANTIA'], period: '2026-10', createdAt: '2026-10-18T16:00:00.000Z' },
+      { id: 'BX-3', tenantId: 'tenant-roboflex', kind: 'Saldo excedido', status: 'Pendente', sourceModule: 'Demandas', sourceId: 'DM-106', description: 'Baixa de lote reprovado na inspeção: excede o saldo anual de Perdas em R$ 6.000,00', amount: 150000, categoryIds: ['BC-PERDAS'], period: '2026-10', createdAt: '2026-10-19T09:00:00.000Z' },
+      { id: 'BX-2', tenantId: 'tenant-roboflex', kind: 'Saldo excedido', status: 'Autorizada', sourceModule: 'Demandas', sourceId: 'DM-EXC-1', description: 'Compra emergencial autorizada acima do saldo', amount: 14800, categoryIds: ['BC-PERDAS'], period: '2026-10', createdAt: '2026-10-14T10:00:00.000Z', decidedAt: '2026-10-14T11:00:00.000Z', decidedBy: 'Marina Souza', decisionNote: 'Parada de cliente crítico' },
     ],
+    budgetSimulations: [],
     budgetAlerts: [
-      { id: 'BAL-1', categoryId: 'BC-CMV', period: '2026-10', kind: 'Alerta', threshold: 80, use: 80.52, message: 'Custo Mercadoria Vendida 2026-10 atingiu 80,52% (limiar 80%)', notifiedRoles: ['Financeiro'], status: 'Aberto', at: '2026-10-18T14:05:00.000Z' },
-      { id: 'BAL-2', categoryId: 'BC-PERDAS', period: '2026-10', kind: 'Bloqueio', threshold: 100, use: 0, message: 'DM-106 retido: baixa de lote reprovado excede o saldo anual de Perdas em R$ 6.000,00', notifiedRoles: ['Qualidade', 'Financeiro', 'Gestor'], status: 'Aberto', at: '2026-10-19T09:00:00.000Z', sourceId: 'DM-106' },
+      { id: 'BAL-1', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV', period: '2026-10', kind: 'Alerta', threshold: 80, use: 80.52, message: 'Custo Mercadoria Vendida 2026-10 atingiu 80,52% (limiar 80%)', notifiedRoles: ['Compras', 'Financeiro'], notifiedUserIds: ['u3', 'u14'], status: 'Aberto', at: '2026-10-18T14:05:00.000Z' },
+      { id: 'BAL-2', tenantId: 'tenant-roboflex', categoryId: 'BC-PERDAS', period: '2026-10', kind: 'Bloqueio', threshold: 100, use: 0, message: 'DM-106 retido: baixa de lote reprovado excede o saldo anual de Perdas em R$ 6.000,00', notifiedRoles: ['Financeiro', 'Gestor'], notifiedUserIds: ['u14'], status: 'Aberto', at: '2026-10-19T09:00:00.000Z', sourceId: 'DM-106' },
     ],
     omieCategoryInbox: [
       { omieId: 'OMIE-04.01', code: '04.01', name: 'Frete sobre vendas', group: '04. Despesas Variáveis' },
@@ -267,16 +326,10 @@ function baseState(): ErpState {
     omiePayments: [
       { id: 'PG-SEM-CAT', invoiceNumber: '8891', sourceId: 'NF-8891', description: 'NF 8891 sem categoria', amount: 3250, paidAt: '2026-10-16T09:30:00.000Z', categoryIds: [], event: 'Pagamento' },
       { id: 'PG-9012', invoiceNumber: '9012', sourceId: 'NF-9012', description: 'NF 9012 · serviço avulso', amount: 890, paidAt: '2026-10-18T16:00:00.000Z', categoryIds: ['BC-GARANTIA'], event: 'Pagamento' },
-      { id: 'PG-PARCIAL-7310', titleId: 'AP-7308', sourceId: 'PC-7310', amount: 11240, paidAt: '2026-10-18T14:00:00.000Z', categoryIds: ['BC-CMV'], event: 'Pagamento' },
-      { id: 'PG-ESTORNO-7310', titleId: 'AP-7308', sourceId: 'PC-7310', amount: 1240, paidAt: '2026-10-19T09:00:00.000Z', categoryIds: ['BC-CMV'], event: 'Estorno' },
+      { id: 'PG-PARCIAL-7310', sourceId: 'PC-7310', amount: 11240, paidAt: '2026-10-18T14:00:00.000Z', categoryIds: ['BC-CMV'], event: 'Pagamento' },
+      { id: 'PG-ESTORNO-7310', sourceId: 'PC-7310', amount: 1240, paidAt: '2026-10-19T09:00:00.000Z', categoryIds: ['BC-CMV'], event: 'Estorno' },
       { id: 'PG-MULTI-1', sourceId: 'NF-8892', amount: 2400, paidAt: '2026-10-19T10:00:00.000Z', categoryIds: ['BC-CMV', 'BC-OPER'], event: 'Pagamento' },
       { id: 'PG-ERRO-1', sourceId: 'PC-7000', amount: 1800, paidAt: '2026-10-18T15:00:00.000Z', categoryIds: ['BC-CMV'], event: 'Pagamento', error: 'Pagamento sem documento de origem conciliável' },
-    ],
-    financialTitles: [
-      { id: 'AR-18420', kind: 'Receber', partnerId: 'c2', description: 'NF-e 18420 · Cases Extreme', reference: 'PV-2026-1033', origin: 'Venda', costCenter: 'CC-210', amount: 18600, dueDate: '2026-11-13', status: 'Aberto', createdAt: '2026-10-14T15:00:00.000Z' },
-      { id: 'AR-18402', kind: 'Receber', partnerId: 'c4', description: 'NF-e 18402 · Mesa Lite', reference: 'PV-2026-1028', origin: 'Venda', costCenter: 'CC-210', amount: 7380, dueDate: '2026-10-12', status: 'Aberto', createdAt: '2026-09-12T15:00:00.000Z' },
-      { id: 'AP-7308', kind: 'Pagar', partnerId: 'f1', description: 'Resina ABS · PC-7308', reference: 'PC-7308', origin: 'Compra', budgetId: 'ORC-CMV-10', budgetCategoryId: 'BC-CMV', budgetPeriod: '2026-10', costCenter: 'CC-320', amount: 22480, dueDate: '2026-10-20', status: 'Aberto', createdAt: '2026-10-08T11:00:00.000Z' },
-      { id: 'AP-7299', kind: 'Pagar', partnerId: 'f3', description: 'Placas pogo pin · PC-7299', reference: 'PC-7299', origin: 'Compra', budgetId: 'ORC-CMV-10', budgetCategoryId: 'BC-CMV', budgetPeriod: '2026-10', costCenter: 'CC-320', amount: 8700, dueDate: '2026-10-10', status: 'Baixado', paidAt: '2026-10-09T14:00:00.000Z', createdAt: '2026-09-25T11:00:00.000Z' },
     ],
     salesOrders: [],
     omieQueue: [],
@@ -306,9 +359,16 @@ function baseState(): ErpState {
       { id: 'MF-8', operation: 'Remessa para conserto', originUf: 'MG', destUf: '*', ncmPrefix: '', cfop: '6915', cst: '50', icms: 0, ipi: 0, pis: 0, cofins: 0 },
     ],
     functionalities: FUNCTIONALITIES,
-    tenants: [{ id: 'tenant-roboflex', legalName: 'Roboflex', tradeName: 'Roboflex', document: '00.000.000/0001-91', city: 'Minas Gerais', status: 'Ativa' }],
-    economicGroups: [],
-    omieConnections: [{ tenantId: 'tenant-roboflex', appKey: 'demo-roboflex', secretDefined: true, status: 'Simulada', accountLabel: 'Conta de demonstração' }],
+    tenants: [
+      { id: 'tenant-roboflex', legalName: 'Roboflex', tradeName: 'Roboflex', document: '00.000.000/0001-91', city: 'Minas Gerais', status: 'Ativa', groupId: 'group-roboflex' },
+      // Empresa-irmã só para demonstrar o planejamento de grupo em Orçamentos (meta combinada, gravação por empresa). Sem usuários/perfis próprios ainda: não é navegável como empresa completa.
+      { id: 'tenant-roboflex-sul', legalName: 'Roboflex Sul Indústria Ltda', tradeName: 'Roboflex Sul', document: '00.000.000/0002-72', city: 'Caxias do Sul, RS', status: 'Ativa', groupId: 'group-roboflex' },
+    ],
+    economicGroups: [{ id: 'group-roboflex', name: 'Grupo Roboflex', description: 'Unidades Roboflex. O planejamento é combinado; cada empresa grava e mantém o próprio orçamento.' }],
+    omieConnections: [
+      { tenantId: 'tenant-roboflex', appKey: 'demo-roboflex', secretDefined: true, status: 'Simulada', accountLabel: 'Conta de demonstração' },
+      { tenantId: 'tenant-roboflex-sul', appKey: '', secretDefined: false, status: 'Não configurada', accountLabel: '' },
+    ],
     accessProfiles: seededProfiles(),
     userProfileAssignments: [],
     counters: { OP: 24030, RC: 5100, NC: 310, OS: 880, EV: 0, SY: 0, MV: 0, DT: 0, AL: 0, PC: 7310, NF: 18420, DM: 104, AP: 7308, AR: 18420, PV: 1056, OM: 98510, MF: 8, TP: 3 },
@@ -334,7 +394,14 @@ export function createSeedState(): ErpState {
     for (const operation of op.operations) {
       if (operation.status === 'Concluída') continue
       startOperation(s, opId, operation.id, operator)
-      reportProduction(s, opId, operation.id, operation.name === 'Retrabalho' ? 2 : op.quantity, 0, '', operator)
+      const quantity = operation.name === 'Retrabalho' ? 2 : op.quantity
+      if (operation.firstPiece && !operation.firstPieceAt) {
+        reportProduction(s, opId, operation.id, 1, 0, '', operator)
+        approveFirstPiece(s, opId, operation.id, 'Fernanda Rocha')
+        if (quantity > 1) reportProduction(s, opId, operation.id, quantity - 1, 0, '', operator)
+      } else {
+        reportProduction(s, opId, operation.id, quantity, 0, '', operator)
+      }
       finishOperation(s, opId, operation.id, operator)
     }
   }
@@ -399,11 +466,14 @@ export function createSeedState(): ErpState {
     at(0, 6, 50); pickOp(s, injS9Frame.id, 'Carlos Lima'); pickOp(s, injS9Cover.id, 'Carlos Lima')
     at(0, 7, 5)
     startOperation(s, injS9Frame.id, injS9Frame.operations[0].id, 'João Pereira')
-    reportProduction(s, injS9Frame.id, injS9Frame.operations[0].id, 40, 2, 'Rebarba excessiva', 'João Pereira')
+    reportProduction(s, injS9Frame.id, injS9Frame.operations[0].id, 1, 0, '', 'João Pereira')
+    at(0, 7, 20); approveFirstPiece(s, injS9Frame.id, injS9Frame.operations[0].id, 'Fernanda Rocha')
+    reportProduction(s, injS9Frame.id, injS9Frame.operations[0].id, 39, 2, 'Rebarba excessiva', 'João Pereira')
     at(0, 8, 30); reportProduction(s, injS9Frame.id, injS9Frame.operations[0].id, 30, 1, 'Bolha / chupagem', 'João Pereira')
+    // Primeira peça da tampa aguardando a qualidade no tablet
     at(0, 7, 15); startOperation(s, injS9Cover.id, injS9Cover.operations[0].id, 'Lucas Ferreira')
-    reportProduction(s, injS9Cover.id, injS9Cover.operations[0].id, 20, 0, '', 'Lucas Ferreira')
-    at(0, 8, 40); pauseOperation(s, injS9Cover.id, injS9Cover.operations[0].id, 'Ajuste de processo', 'Lucas Ferreira')
+    reportProduction(s, injS9Cover.id, injS9Cover.operations[0].id, 1, 0, '', 'Lucas Ferreira')
+    at(0, 8, 40); pauseOperation(s, injS9Cover.id, injS9Cover.operations[0].id, 'Aguardando qualidade', 'Lucas Ferreira')
 
     // Pedido aguardando materiais: TPU e placas em compra
     at(-2, 11); planOrder(s, 'PV-2026-1051', 'Paulo Mendes')
@@ -443,6 +513,26 @@ function prepareCatalog(s: ErpState) {
   }
   ensureClassPath(s, ['Componentes', 'Elétricos', 'Baterias'])
   ensureClassPath(s, ['Serviços', 'Engenharia'])
+  const gabarito = s.items.find(item => item.id === 'fe-g11')!
+  gabarito.catalog!.classId = ensureClassPath(s, ['Ferramental', 'Gabaritos de montagem'])
+
+  const injectionRouting: Record<string, RouteStep[]> = {
+    'se-mold-a11': injection('fe-m112', 'inj1', 42, 2),
+    'se-tampa-a11': injection('fe-m113', 'inj2', 48, 1),
+    'se-bump-a11': injection('fe-m114', 'inj3', 55, 2, [step('reb', 'Rebarbação', 'mont2', 0.3, ['Retirar rebarba do ponto de injeção', 'Conferir encaixe no calibre'], { crew: 1 })]),
+    'se-mold-s9': injection('fe-m121', 'inj2', 46, 2),
+    'se-tampa-s9': injection('fe-m122', 'inj1', 52, 1),
+    'se-base-lite': injection('fe-m090', 'inj1', 38, 1),
+  }
+  for (const [id, routing] of Object.entries(injectionRouting)) s.items.find(item => item.id === id)!.routing = routing
+  for (const item of s.items.filter(entry => entry.type === 'PA' || entry.type === 'KF')) {
+    for (const entry of item.routing ?? []) {
+      entry.crew ??= 1
+      entry.setupMinutes ??= entry.name.startsWith('Teste') ? 10 : 15
+    }
+  }
+  const extMec = s.items.find(item => item.id === 'pa-a11-ext')!.routing!.find(entry => entry.id === 'mec')!
+  Object.assign(extMec, { toolId: 'fe-g11', firstPiece: true })
 
   const ext = s.items.find(item => item.id === 'pa-a11-ext')!
   const lines = (id: string) => (s.items.find(item => item.id === id)!.bom ?? []).map(line => ({ ...line }))
@@ -476,6 +566,17 @@ function prepareCatalog(s: ErpState) {
     item.currentRevisionId = current.id
     item.revision = current.code
   }
+  for (const revision of s.productRevisions) {
+    const owner = s.items.find(item => item.id === revision.itemId)
+    if (owner?.routing?.length) revision.routing ??= owner.routing.map(entry => ({ ...entry, instructions: [...entry.instructions] }))
+  }
+  if (draftD?.routing) {
+    draftD.changeId = 'ECO-0001'
+    const sealing = draftD.routing.findIndex(entry => entry.id === 'tst')
+    draftD.routing.splice(sealing, 0, step('vpt', 'Vedação portuária', 'mont1', 3, ['Aplicar junta de EPDM no perímetro', 'Conferir assentamento com calibre de folga'], { crew: 1, setupMinutes: 10 }))
+  }
+  const revCLinked = s.productRevisions.find(entry => entry.id === 'rev-a11-c')
+  if (revCLinked) revCLinked.changeId = 'ECO-0003'
 
   for (const item of s.items.filter(entry => (entry.catalog?.lot || entry.catalog?.expiry) && entry.stock > 0)) {
     if (item.id === 'mp-tpu') continue
@@ -588,4 +689,104 @@ function prepareExtendedLayers(s: ErpState) {
   })
   s.counters.GR = 1
   Object.assign(catalogOf('pa-a11-imp'), { modelId: 'GR-1', attributes: { Cor: 'Preto' } })
+
+  prepareEngineering(s)
+}
+
+/** Atributos por classe, ferramental, embalagem logística, mudanças de engenharia e fiscal em mão dupla. */
+function prepareEngineering(s: ErpState) {
+  const catalogOf = (id: string) => s.items.find(item => item.id === id)!.catalog!
+  const node = (path: string[]) => s.itemClasses.find(entry => entry.id === ensureClassPath(s, path))!
+
+  node(['Produtos acabados']).attributes = [
+    { key: 'Linha', label: 'Linha', kind: 'Lista', options: ['Hard', 'Lite'], required: true },
+    { key: 'Modelo de device', label: 'Modelo de device', kind: 'Texto', required: true },
+    { key: 'Fixação', label: 'Fixação', kind: 'Lista', options: ['Mão', 'Veicular', 'Mesa', 'Parede'], required: false },
+    { key: 'Cor', label: 'Cor', kind: 'Lista', options: ['Preto', 'Laranja segurança', 'Azul petróleo'], required: true, variantAxis: true },
+  ]
+  node(['Produtos acabados', 'Linha Hard', 'Cases']).attributes = [
+    { key: 'Grau de proteção', label: 'Grau de proteção', kind: 'Lista', options: ['IP54', 'IP65', 'IP67'], required: true },
+    { key: 'Altura de queda', label: 'Altura de queda', kind: 'Número', unit: 'm', required: false },
+  ]
+  node(['Peças injetadas']).attributes = [
+    { key: 'Peso da peça', label: 'Peso da peça', kind: 'Número', unit: 'g', required: true },
+    { key: 'Acabamento', label: 'Acabamento', kind: 'Lista', options: ['Texturizado', 'Liso', 'Brilhante'], required: false },
+  ]
+  const values: Record<string, Record<string, string>> = {
+    'pa-a11-ext': { Linha: 'Hard', 'Modelo de device': 'Samsung Galaxy Tab A11', Fixação: 'Mão', Cor: 'Preto', 'Grau de proteção': 'IP65', 'Altura de queda': '1,8' },
+    'pa-a11-imp': { Linha: 'Hard', 'Modelo de device': 'Samsung Galaxy Tab A11', Fixação: 'Mão', Cor: 'Preto', 'Grau de proteção': 'IP54', 'Altura de queda': '1,2' },
+    'pa-s9-min': { Linha: 'Hard', 'Modelo de device': 'Samsung Galaxy Tab S9 FE', Cor: 'Preto' },
+    'pa-lite-ipad': { Linha: 'Lite', 'Modelo de device': 'Apple iPad 10ª geração', Fixação: 'Mesa', Cor: 'Preto' },
+    'se-mold-a11': { 'Peso da peça': '107', Acabamento: 'Texturizado' },
+    'se-tampa-a11': { 'Peso da peça': '155', Acabamento: 'Texturizado' },
+    'se-bump-a11': { 'Peso da peça': '78' },
+    'se-mold-s9': { 'Peso da peça': '126' },
+    'se-tampa-s9': { 'Peso da peça': '184' },
+    'se-base-lite': { 'Peso da peça': '214', Acabamento: 'Brilhante' },
+  }
+  for (const [id, entry] of Object.entries(values)) catalogOf(id).attributes = { ...catalogOf(id).attributes, ...entry }
+
+  const molds: [string, string, number, number, number, number, string[], 'Roboflex' | 'Cliente', number, string?][] = [
+    ['fe-m112', 'mold-a11f', 2, 2, 42, 228, ['inj1', 'inj2'], 'Roboflex', 1_000_000],
+    ['fe-m113', 'mold-a11t', 1, 1, 48, 163, ['inj2'], 'Roboflex', 800_000],
+    ['fe-m114', 'mold-a11b', 4, 2, 55, 166, ['inj3'], 'Roboflex', 600_000],
+    ['fe-m121', 'mold-s9f', 2, 2, 46, 266, ['inj2', 'inj3'], 'Cliente', 500_000, 'Mineradora Horizonte'],
+    ['fe-m122', 'mold-s9t', 1, 1, 52, 196, ['inj1'], 'Cliente', 500_000, 'Mineradora Horizonte'],
+    ['fe-m090', 'mold-lite', 1, 1, 38, 226, ['inj1'], 'Roboflex', 250_000],
+  ]
+  for (const [id, assetId, cavities, activeCavities, cycleSeconds, shotWeightG, compatibleResourceIds, owner, lifeShots, ownerName] of molds) {
+    const value = s.items.find(item => item.id === id)!.cost
+    catalogOf(id).tooling = { kind: 'Molde', cavities, activeCavities, cycleSeconds, shotWeightG, compatibleResourceIds, owner, ownerName, assetId, lifeShots, value }
+  }
+  catalogOf('fe-g11').tooling = { kind: 'Gabarito', cavities: 1, activeCavities: 1, cycleSeconds: 0, shotWeightG: 0, compatibleResourceIds: ['mont1', 'mont2'], owner: 'Roboflex', lifeShots: 0, value: 4200 }
+  catalogOf('fe-m114').media = [
+    { id: 'MD-6', kind: 'Desenho', name: 'M-114-cavidades-3-4-bloqueadas.pdf', size: 220000, order: 1, main: false, uploadedBy: 'Diego Martins', uploadedAt: '2026-09-28T10:00:00.000Z' },
+  ]
+
+  const ext = catalogOf('pa-a11-ext')
+  ext.packaging = [
+    { level: 'Unidade', units: 1, packageItemId: 'em-hard', gtin: ext.gtin, weightKg: 0.86, lengthCm: 36, widthCm: 28, heightCm: 9 },
+    { level: 'Caixa', units: 10, gtin: ext.barcodes.find(entry => entry.kind === 'DUN-14')?.code, weightKg: 9.4, lengthCm: 58, widthCm: 38, heightCm: 46 },
+    { level: 'Palete', units: 400, weightKg: 395, lengthCm: 120, widthCm: 100, heightCm: 150 },
+  ]
+  catalogOf('pa-a11-imp').packaging = [
+    { level: 'Unidade', units: 1, packageItemId: 'em-hard', weightKg: 0.62, lengthCm: 36, widthCm: 28, heightCm: 9 },
+    { level: 'Caixa', units: 12, weightKg: 8, lengthCm: 58, widthCm: 38, heightCm: 52 },
+  ]
+  for (const media of ext.media) if (media.kind !== 'Foto') Object.assign(media, { revisionCode: 'C', sendToOp: media.kind === 'Desenho' })
+
+  s.engineeringChanges = [
+    {
+      id: 'ECO-0001', title: 'Vedação portuária no Case Extreme', reason: 'Porto Leste relatou entrada de maresia pelo perímetro da moldura. Incluir junta de EPDM e reforçar fixação com 10 parafusos.',
+      priority: 'Urgente', stage: 'Em análise', itemIds: ['pa-a11-ext'], disposition: 'Usar até acabar', effectiveDate: '2026-11-03',
+      requestedBy: 'Camila Nunes', requestedAt: '2026-10-12T15:00:00.000Z',
+      history: [
+        { at: '2026-10-13T10:00:00.000Z', actor: 'Eduardo Freitas', text: 'Versão D de RF-H-A11-EXT vinculada' },
+        { at: '2026-10-13T09:40:00.000Z', actor: 'Eduardo Freitas', text: 'Solicitada → Em análise' },
+        { at: '2026-10-12T15:00:00.000Z', actor: 'Camila Nunes', text: 'Mudança solicitada' },
+      ],
+    },
+    {
+      id: 'ECO-0002', title: 'Voltar o molde M-114 para 4 cavidades', reason: 'Cavidades 3 e 4 bloqueadas desde setembro por rebarba. Ferramentaria propõe recuperar os insertos e dobrar a produção do bumper.',
+      priority: 'Normal', stage: 'Solicitada', itemIds: ['fe-m114', 'se-bump-a11'], disposition: 'Sem estoque', effectiveDate: '2026-11-20',
+      requestedBy: 'Diego Martins', requestedAt: '2026-10-15T11:00:00.000Z',
+      history: [{ at: '2026-10-15T11:00:00.000Z', actor: 'Diego Martins', text: 'Mudança solicitada' }],
+    },
+    {
+      id: 'ECO-0003', title: 'Reforço do alojamento do conector', reason: 'Quebra do alojamento em queda de 1,5 m. Reforço com nervura e alça incluída na caixa.',
+      priority: 'Normal', stage: 'Implementada', itemIds: ['pa-a11-ext'], disposition: 'Retrabalhar', effectiveDate: '2026-08-10',
+      requestedBy: 'André Silva', requestedAt: '2026-07-20T10:00:00.000Z', approvedBy: 'Eduardo Freitas', approvedAt: '2026-08-05T10:00:00.000Z', implementedAt: '2026-08-10T14:00:00.000Z',
+      history: [
+        { at: '2026-08-10T14:00:00.000Z', actor: 'Eduardo Freitas', text: 'Aprovada → Implementada' },
+        { at: '2026-08-05T10:00:00.000Z', actor: 'Eduardo Freitas', text: 'Em análise → Aprovada' },
+        { at: '2026-07-20T10:00:00.000Z', actor: 'André Silva', text: 'Mudança solicitada' },
+      ],
+    },
+  ]
+  s.counters.ECO = 3
+
+  const at = '2026-10-18T09:00:00.000Z'
+  catalogOf('pa-a11-imp').fiscalSync = { status: 'Enviar ao Omie', at, by: 'Patrícia Melo' }
+  const board = catalogOf('cp-placa')
+  board.fiscalSync = { status: 'Conflito', at, by: 'Omie', remote: { ncm: board.ncm, cest: board.cest, origin: '1', exTipi: '02', cClassTrib: board.cClassTrib } }
 }

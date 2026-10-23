@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { BriefcaseBusiness, Building2, CheckCircle2, Plus, Search, Users } from 'lucide-vue-next'
 import StatusBadge from '../components/StatusBadge.vue'
+import { sectorCostCenter } from '../domain/budget'
 import { sectorOf } from '../domain/enterprise'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
@@ -33,18 +34,18 @@ const positionName = (id?: string) => store.state.positions.find(entry => entry.
     <article class="metric"><div class="metric-head">Pessoas <Users :size="17" /></div><strong>{{ store.state.users.length }}</strong><small>{{ store.state.users.filter(entry => entry.role === 'Operador').length }} operadores no tablet</small></article>
     <article class="metric"><div class="metric-head">Acessos ativos <CheckCircle2 :size="17" /></div><strong>{{ store.state.users.filter(entry => entry.active !== false).length }}</strong><small>{{ store.state.users.filter(entry => entry.active === false).length }} desativado(s)</small></article>
     <article class="metric"><div class="metric-head">Cargos <BriefcaseBusiness :size="17" /></div><strong>{{ store.state.positions.length }}</strong><small>Com responsabilidades descritas</small></article>
-    <article class="metric"><div class="metric-head">Setores <Building2 :size="17" /></div><strong>{{ store.state.sectors.length }}</strong><small>Cada um com centro de custo</small></article>
+    <article class="metric"><div class="metric-head">Setores <Building2 :size="17" /></div><strong>{{ store.state.sectors.length }}</strong><small>Cada um aponta um centro padrão</small></article>
   </section>
 
   <article class="card org-chart" data-tour="org-chart">
     <div class="section-head"><div><h2>Organograma</h2><p>Clique em um setor para filtrar as pessoas.</p></div></div>
     <div v-if="root" class="org-root">
       <button class="org-node root" :class="{ active: sector === root.name }" @click="sector = sector === root.name ? '' : root.name">
-        <b>{{ root.name }}</b><span>{{ store.userName(root.managerId) !== '—' ? store.userName(root.managerId) : 'Marina Souza' }}</span><small>{{ root.costCenter }}</small>
+        <b>{{ root.name }}</b><span>{{ store.userName(root.managerId) !== '—' ? store.userName(root.managerId) : 'Marina Souza' }}</span><small>{{ sectorCostCenter(root, ui.activeTenantId) || 'sem centro' }}</small>
       </button>
       <div class="org-children">
         <button v-for="entry in children" :key="entry.id" class="org-node" :class="{ active: sector === entry.name }" @click="sector = sector === entry.name ? '' : entry.name">
-          <b>{{ entry.name }}</b><span>{{ store.userName(entry.managerId) }}</span><small>{{ entry.costCenter }} · {{ members(entry.name).length }} pessoa(s)</small>
+          <b>{{ entry.name }}</b><span>{{ store.userName(entry.managerId) }}</span><small>{{ sectorCostCenter(entry, ui.activeTenantId) || 'sem centro' }} · {{ members(entry.name).length }} pessoa(s)</small>
         </button>
       </div>
     </div>

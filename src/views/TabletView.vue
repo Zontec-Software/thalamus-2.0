@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import {
-  ArrowLeft, BellRing, Check, CheckCircle2, ClipboardList, Delete, LogOut, Pause, Play, Plus, ScanLine, ShieldCheck,
+  ArrowLeft, BellRing, Check, CheckCircle2, ClipboardList, Delete, FileText, LogOut, Pause, Play, Plus, ScanLine, ShieldCheck,
   ShieldX, Truck, Wrench,
 } from 'lucide-vue-next'
-import { elapsedMs, openCorrective, PAUSE_REASONS, SCRAP_REASONS } from '../domain/engine'
+import { elapsedMs, injectionSetup, openCorrective, PAUSE_REASONS, SCRAP_REASONS } from '../domain/engine'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 import type { Operation, ProductionOrder, Resource, Role, User } from '../types/domain'
@@ -140,9 +140,30 @@ const limit = computed(() => {
   const previous = op.operations[op.operations.indexOf(operation) - 1]
   return previous ? previous.good : Math.ceil(op.quantity * 1.05)
 })
-const remaining = computed(() => Math.max(0, limit.value - (current.value?.operation.good ?? 0)))
+const firstPiecePending = computed(() => !!current.value?.operation.firstPiece && !current.value.operation.firstPieceAt)
+const remaining = computed(() => {
+  const done = current.value?.operation.good ?? 0
+  return Math.max(0, firstPiecePending.value ? 1 - done : limit.value - done)
+})
 const part = computed(() => current.value ? store.item(current.value.op.itemId) : undefined)
 const revisionCode = (revisionId?: string) => store.state.productRevisions.find(revision => revision.id === revisionId)?.code
+const toolSummary = computed(() => {
+  if (!current.value?.operation.toolId || !part.value) return ''
+  const tool = store.state.items.find(item => item.id === current.value!.operation.toolId)
+  if (current.value.op.kind !== 'Injeção') return tool?.name ?? ''
+  const setup = injectionSetup(store.state, part.value)
+  return `${tool?.name ?? ''} · ciclo ${setup.cycleSeconds} s · ${setup.cavities} cav.`
+})
+/** Documentos marcados para a OP, da versão com que a OP nasceu ou sem versão. */
+const opDocuments = computed(() => {
+  if (!current.value || !part.value) return []
+  const code = revisionCode(current.value.op.revisionId)
+  return (part.value.catalog?.media ?? []).filter(media => media.sendToOp && (!media.revisionCode || media.revisionCode === code))
+})
+
+function callQuality() {
+  if (current.value && store.raiseAlert(stationId.value, operator(), `Primeira peça de ${current.value.op.id} aguardando liberação`)) flash('Qualidade chamada')
+}
 
 function openOperation(op: ProductionOrder, operation: Operation) {
   selected.value = { opId: op.id, operationId: operation.id }
@@ -206,6 +227,9 @@ function deliverKit() {
 
 /* ---------- Qualidade ---------- */
 const inspections = computed(() => store.state.productionOrders.filter(op => op.status === 'Inspeção'))
+const firstPieces = computed(() => store.state.productionOrders.flatMap(op => op.operations
+  .filter(operation => operation.firstPiece && !operation.firstPieceAt && operation.good >= 1)
+  .map(operation => ({ op, operation }))))
 const inspectionOp = computed(() => store.state.productionOrders.find(op => op.id === focusId.value && op.status === 'Inspeção'))
 
 function openInspection(op: ProductionOrder) {
@@ -364,7 +388,7 @@ const openAlerts = computed(() => store.state.alerts.filter(alert => !alert.reso
               <div>
                 <small>{{ current.op.id }} · pedido {{ current.op.salesOrderId }}</small>
                 <h2>{{ current.operation.name }}</h2>
-                <small>{{ store.itemLabel(current.op.itemId) }}<template v-if="current.op.revisionId"> · revisão {{ revisionCode(current.op.revisionId) }}</template><template v-if="part?.cycleSeconds"> · ciclo {{ part.cycleSeconds }} s · {{ part.cavities }} cav.</template></small>
+                <small>{{ store.itemLabel(current.op.itemId) }}<template v-if="current.op.revisionId"> · revisão {{ revisionCode(current.op.revisionId) }}</template><template v-if="toolSummary"> · {{ toolSummary }}</template></small>
               </div>
               <div class="t-timer">{{ fmtDuration(elapsedMs(current.operation, ui.tick)) }}<small>{{ blocked ? 'Máquina em manutenção' : current.operation.status === 'Pausada' ? `Parada: ${current.operation.pauseReason}` : current.operation.status === 'Em execução' ? 'Em execução' : 'Pronta para iniciar' }}</small></div>
             </div>
@@ -382,9 +406,20 @@ const openAlerts = computed(() => store.state.alerts.filter(alert => !alert.reso
               <button class="t-btn" @click="openReport"><Plus :size="22" /> Apontar peças</button>
               <button class="t-btn finish" @click="finish"><CheckCircle2 :size="22" /> Concluir</button>
             </div>
+            <div v-if="current.operation.firstPiece" class="t-first-piece" :class="{ ok: !firstPiecePending }">
+              <template v-if="firstPiecePending">
+                <div><strong>Primeira peça</strong><span>{{ current.operation.good ? 'Aguardando a qualidade liberar. Depois disso o apontamento segue normal.' : 'Aponte 1 peça boa e chame a qualidade para liberar.' }}</span></div>
+                <button v-if="current.operation.good" class="t-btn light small" @click="callQuality"><ShieldCheck :size="18" /> Chamar qualidade</button>
+              </template>
+              <div v-else><strong>Primeira peça liberada</strong><span>{{ current.operation.firstPieceBy }} · {{ fmtTime(current.operation.firstPieceAt!) }}</span></div>
+            </div>
             <div class="instr">
               <b><ClipboardList :size="14" style="vertical-align:-2px" /> Instruções de trabalho</b>
               <ol><li v-for="line in current.operation.instructions" :key="line">{{ line }}</li></ol>
+            </div>
+            <div v-if="opDocuments.length" class="instr">
+              <b><FileText :size="14" style="vertical-align:-2px" /> Documentos da OP</b>
+              <ul><li v-for="media in opDocuments" :key="media.id">{{ media.kind }} · {{ media.name }}<template v-if="media.revisionCode"> · versão {{ media.revisionCode }}</template></li></ul>
             </div>
             <button class="t-btn light small" style="width:100%; margin-top:12px" @click="sheet = 'alert'"><BellRing :size="18" /> Chamar líder</button>
           </template>
@@ -423,7 +458,15 @@ const openAlerts = computed(() => store.state.alerts.filter(alert => !alert.reso
 
           <!-- Qualidade -->
           <template v-else-if="step === 'queue' && stationKind === 'Qualidade'">
-            <p class="t-title">Lotes para inspecionar</p>
+            <template v-if="firstPieces.length">
+              <p class="t-title">Primeiras peças</p>
+              <p class="t-sub">A produção espera a liberação para seguir</p>
+              <div v-for="entry in firstPieces" :key="entry.operation.id" class="t-list-item">
+                <div><strong>{{ entry.operation.name }} · {{ store.itemLabel(entry.op.itemId) }}</strong><span>{{ entry.op.id }} · {{ store.resourceName(entry.operation.resourceId) }} · feita por {{ entry.operation.operator }}</span></div>
+                <button class="t-btn small start" @click="store.approveFirstPiece(entry.op.id, entry.operation.id, operator())"><ShieldCheck :size="18" /> Liberar</button>
+              </div>
+            </template>
+            <p class="t-title" :style="firstPieces.length ? 'margin-top:16px' : ''">Lotes para inspecionar</p>
             <p class="t-sub">{{ inspections.length }} lote(s) aguardando</p>
             <button v-for="op in inspections" :key="op.id" class="t-list-item" @click="openInspection(op)">
               <div><strong>{{ op.id }} · {{ store.itemLabel(op.itemId) }}</strong><span>{{ op.quantity }} un. · pedido {{ op.salesOrderId }}</span></div>

@@ -35,7 +35,7 @@ const badge = (id: string) => {
   if (id === 'suprimentos') return { value: s.requisitions.filter(req => req.status !== 'Recebida').length, label: 'compras abertas' }
   if (id === 'operacoes') return { value: s.productionOrders.filter(op => op.status === 'Em produção').length, label: 'OPs rodando' }
   if (id === 'servicos') return { value: s.maintenanceOrders.filter(entry => entry.status !== 'Concluída').length + s.technicalServiceOrders.filter(entry => !['Concluída', 'Cancelada'].includes(entry.status)).length, label: 'OS abertas' }
-  if (id === 'financas') return { value: s.financialTitles.filter(entry => entry.status === 'Aberto' && entry.dueDate < '2026-10-15').length, label: 'títulos vencidos' }
+  if (id === 'financas') return { value: s.budgetAlerts.filter(entry => entry.status === 'Aberto').length, label: 'alertas de orçamento' }
   return { value: s.projects.filter(entry => entry.status === 'Em andamento').length, label: 'projetos ativos' }
 }
 

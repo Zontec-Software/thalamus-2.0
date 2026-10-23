@@ -25,8 +25,6 @@ const proposals = computed(() => store.state.proposals.filter(entry => entry.opp
 const salesOrders = computed(() => proposals.value.filter(entry => entry.salesOrderId).map(entry => store.state.salesOrders.find(order => order.id === entry.salesOrderId)).filter(Boolean))
 const projects = computed(() => store.state.projects.filter(entry => entry.opportunityId === props.id))
 const clientOrders = computed(() => opportunity.value ? store.state.salesOrders.filter(entry => entry.customerId === opportunity.value!.partnerId).slice(0, 5) : [])
-const clientOpenTitles = computed(() => opportunity.value ? store.state.financialTitles.filter(entry => entry.kind === 'Receber' && entry.status === 'Aberto' && entry.partnerId === opportunity.value!.partnerId) : [])
-const clientOverdue = computed(() => clientOpenTitles.value.filter(entry => entry.dueDate < today()))
 const clientTechnical = computed(() => opportunity.value ? store.state.technicalServiceOrders.filter(entry => entry.partnerId === opportunity.value!.partnerId) : [])
 const sortedActivities = computed(() => [...(opportunity.value?.activities ?? [])].sort((a, b) => Number(a.done) - Number(b.done) || a.at.localeCompare(b.at)))
 
@@ -136,8 +134,6 @@ function openOrder(id: string) {
         <div class="mini-stat"><strong :class="{ 'risk-text': !closed && opportunity.expectedClose < today() }">{{ fmtDate(opportunity.expectedClose) }}</strong><span>fechamento</span></div>
       </div>
 
-      <div v-if="clientOverdue.length" class="notice warning">Cliente com {{ clientOverdue.length }} título(s) vencido(s): {{ fmtCurrency(clientOverdue.reduce((sum, entry) => sum + entry.amount, 0)) }}. Avalie condição de pagamento antes de fechar.</div>
-
       <div v-if="!closed" class="drawer-actions" data-tour="opp-actions">
         <button class="button" @click="newProposal"><FilePlus2 :size="15" /> Criar proposta</button>
         <button class="button secondary" @click="ui.openRecord('project', 'new', { opportunityId: opportunity.id, partnerId: opportunity.partnerId, name: opportunity.title })"><FolderPlus :size="15" /> Projeto de desenvolvimento</button>
@@ -205,7 +201,6 @@ function openOrder(id: string) {
       <h3 class="drawer-title">Histórico do cliente</h3>
       <div class="mini-stats">
         <div class="mini-stat"><strong>{{ clientOrders.length }}</strong><span>pedidos recentes</span></div>
-        <div class="mini-stat"><strong>{{ fmtCurrency(clientOpenTitles.reduce((sum, entry) => sum + entry.amount, 0)) }}</strong><span>a receber</span></div>
         <div class="mini-stat"><strong>{{ clientTechnical.length }}</strong><span>chamados de assistência</span></div>
       </div>
       <button v-for="order in clientOrders" :key="order.id" class="list-row" @click="openOrder(order.id)">

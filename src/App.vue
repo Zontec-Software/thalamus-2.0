@@ -12,7 +12,7 @@ import { allocationOf } from './domain/budget'
 import { AREAS, areaOf, moduleFeature, moduleOf, owns } from './navigation'
 import { useErpStore } from './stores/erp'
 import { useUiStore } from './stores/ui'
-import { PAGE_TOURS, WELCOME_KEY, WELCOME_TOUR } from './tour/steps'
+import { PAGE_TOURS, WELCOME_KEY, WELCOME_TOUR, tourKey } from './tour/steps'
 import type { BudgetAlert } from './types/domain'
 import { fmtCurrency, fmtTime } from './utils/format'
 
@@ -41,10 +41,11 @@ const navigation = computed(() => (currentArea.value?.groups ?? [])
   .filter(group => group.items.length))
 
 const openAlerts = computed(() => store.state.alerts.filter(alert => !alert.resolved))
-const budgetDecisions = computed(() => store.state.budgetExceptions.filter(entry => entry.status === 'Pendente' && entry.kind === 'Saldo excedido' && store.can('orcamentos.liberar_saldo')))
+const budgetDecisions = computed(() => store.state.budgetExceptions.filter(entry => entry.tenantId === ui.activeTenantId && entry.status === 'Pendente' && entry.kind === 'Saldo excedido' && store.can('orcamentos.liberar_saldo')))
 const budgetNotices = computed(() => store.state.budgetAlerts.filter(entry => {
+  if (entry.tenantId !== ui.activeTenantId) return false
   if (entry.status !== 'Aberto') return false
-  if (!store.can('orcamentos.gerir') && !entry.notifiedRoles.includes(ui.role)) return false
+  if (!store.can('orcamentos.gerir') && !(entry.notifiedUserIds ?? []).includes(ui.sessionUserId)) return false
   if (entry.kind === 'Bloqueio' && budgetDecisions.value.some(item => item.sourceId === entry.sourceId)) return false
   return true
 }))
@@ -86,7 +87,6 @@ const results = computed(() => {
     ...store.state.purchaseOrders.filter(entry => has(entry.id, store.partnerName(entry.supplierId))).map(entry => ({ key: entry.id, type: 'Pedido de compra', title: entry.id, text: `${store.partnerName(entry.supplierId)} · ${entry.status}`, open: () => ui.openRecord('purchase', entry.id) })),
     ...store.state.technicalServiceOrders.filter(entry => has(entry.id, entry.description, store.partnerName(entry.partnerId), entry.assetSerial ?? '')).map(entry => ({ key: entry.id, type: 'Assistência', title: entry.id, text: `${entry.description} · ${entry.status}`, open: () => ui.openRecord('technical', entry.id) })),
     ...store.state.projects.filter(entry => has(entry.id, entry.name)).map(entry => ({ key: entry.id, type: 'Projeto', title: entry.id, text: `${entry.name} · ${entry.status}`, open: () => ui.openRecord('project', entry.id) })),
-    ...store.state.financialTitles.filter(entry => has(entry.id, entry.reference, entry.description)).map(entry => ({ key: entry.id, type: entry.kind, title: entry.id, text: `${entry.description} · ${entry.status}`, open: () => ui.openRecord('title', entry.id) })),
     ...store.state.users.filter(entry => has(entry.name)).map(entry => ({ key: entry.id, type: 'Pessoa', title: entry.name, text: `${entry.role} · ${entry.sector}`, open: () => ui.openRecord('person', entry.id) })),
     ...store.state.assets.filter(entry => has(entry.name, entry.serial ?? '')).map(entry => ({ key: entry.id, type: 'Ativo', title: entry.name, text: entry.kind, open: () => ui.openRecord('asset', entry.id) })),
   ].slice(0, 8)
@@ -111,8 +111,9 @@ function changeProfile(profileId: string) {
 
 function pageTour() {
   helpOpen.value = false
-  const steps = PAGE_TOURS[route.path]
-  if (steps) ui.startTour(route.path, steps)
+  const key = tourKey(route.path)
+  const steps = PAGE_TOURS[key]
+  if (steps) ui.startTour(key, steps)
   else ui.notify('info', 'Esta tela não possui guia específico')
 }
 
@@ -135,8 +136,9 @@ function maybeStartTour() {
       if (route.path === '/') ui.startTour(WELCOME_KEY, WELCOME_TOUR)
       return
     }
-    const steps = PAGE_TOURS[route.path]
-    if (steps && !ui.seenTours.includes(route.path)) ui.startTour(route.path, steps)
+    const key = tourKey(route.path)
+    const steps = PAGE_TOURS[key]
+    if (steps && !ui.seenTours.includes(key)) ui.startTour(key, steps)
   }, 700)
 }
 

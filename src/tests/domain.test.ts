@@ -15,14 +15,16 @@ import {
 import {
   addTechnicalPart, advanceProposal, advancePurchaseOrder, advanceTechnicalOrder, attendDemandFromStock, cancelPurchaseOrder, completeDemand,
   contractService, createDemand, createOpportunity, createProject, createProposal, createPurchaseOrder, createTechnicalOrder, deliveryLead, loseOpportunity,
-  moveOpportunity, releaseRevision, settleTitle, toggleMilestone, undoPick, updateProposal,
+  moveOpportunity, releaseRevision, tasksForRole, toggleMilestone, undoPick, updateProposal,
 } from '../domain/enterprise'
-import { absorbOmieCategories, acknowledgeAlert, applyOmiePayment, applyRemoteCategories, budgetSummary, createBudgetCategory, decideBudgetException, linkBudgetInvoice, setBudget, setGroupBudget, updateBudgetCategory, upsertForecast } from '../domain/budget'
+import { absorbOmieCategories, acknowledgeAlert, applyBudgetSimulation, applyCategorySuggestion, applyOmiePayment, applyPriorSeasonality, applyRemoteCategories, budgetSummary, categoryOf, costCenterAmounts, createBudgetCategory, createCostCenter, decideBudgetException, financeSnapshot, linkBudgetInvoice, notifiedUsers, rangeSummary, saveBudgetSimulation, sectorCostCenter, setBudget, setCostCenterSplit, setGroupBudget, setSectorDefaultCostCenter, suggestCategoryCenters, suggestCostCenterShare, updateBudgetCategory, updateCostCenter, upsertForecast, viewerCenterScope } from '../domain/budget'
+import { assetDepreciation, dreReading, dreStatement, periodLabel, superaEstimate } from '../domain/dre'
 import { createSeedState } from '../mocks/seed'
 import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import { FUNCTIONALITIES, profileCan } from '../domain/access'
 import { provisionCompany, saveEconomicGroup, saveOmieConnection } from '../domain/platform'
 
+const TENANT = 'tenant-roboflex'
 const stageOf = (state: ErpState, id: string) => orderStage(state, state.salesOrders.find(order => order.id === id)!)
 const opsOf = (state: ErpState, id: string) => state.productionOrders.filter(op => op.salesOrderId === id)
 
@@ -176,13 +178,13 @@ describe('ERP integrado', () => {
     for (const [id, stock] of before) expect(state.items.find(item => item.id === id)!.stock).toBe(stock)
   })
 
-  it('recebe pedido parcialmente e gera conta a pagar no saldo final', () => {
+  it('recebe pedido parcialmente e conclui a demanda no saldo final, sem criar título no Thalamus', () => {
     const state = createSeedState()
     const order = state.purchaseOrders[0]
     advancePurchaseOrder(state, order.id, 'Teste', true)
     expect(['Recebido parcial', 'Recebido']).toContain(order.status)
     if (order.status !== 'Recebido') advancePurchaseOrder(state, order.id, 'Teste')
-    expect(state.financialTitles.some(title => title.kind === 'Pagar' && title.reference === order.id)).toBe(true)
+    expect('financialTitles' in state).toBe(false)
     expect(state.demands.find(demand => demand.id === order.demandIds[0])!.status).toBe('Atendida')
   })
 
@@ -196,11 +198,12 @@ describe('ERP integrado', () => {
     expect(state.salesOrders[0].lines!.length).toBeGreaterThan(1)
   })
 
-  it('conclui assistência cobrável e abre conta a receber', () => {
+  it('conclui assistência cobrável e envia a cobrança ao Omie', () => {
     const state = createSeedState()
     const order = state.technicalServiceOrders.find(entry => entry.chargeable)!
     while (order.status !== 'Concluída') advanceTechnicalOrder(state, order.id, 'Técnico')
-    expect(state.financialTitles.some(title => title.kind === 'Receber' && title.reference === order.id)).toBe(true)
+    expect(order.chargeAmount).toBeGreaterThan(0)
+    expect(state.syncLogs.some(entry => entry.entity === 'Cobrança de assistência' && entry.reference === order.id && entry.direction === 'Thalamus → Omie')).toBe(true)
   })
 
   it('libera revisão somente com checklist completo', () => {
@@ -213,15 +216,11 @@ describe('ERP integrado', () => {
     expect(state.items.find(item => item.id === revision.itemId)!.revision).toBe(revision.code)
   })
 
-  it('conclui projeto pelos marcos e baixa um título operacional', () => {
+  it('conclui projeto pelos marcos', () => {
     const state = createSeedState()
     const project = state.projects[1]
     project.milestones.forEach(milestone => toggleMilestone(state, project.id, milestone.id, 'Gestor'))
     expect(project.status).toBe('Concluído')
-    const title = state.financialTitles.find(entry => entry.status === 'Aberto')!
-    settleTitle(state, title.id, 'Financeiro')
-    expect(title.status).toBe('Baixado')
-    expect(title.paidAt).toBeTruthy()
   })
 })
 
@@ -246,15 +245,13 @@ describe('demandas, compras e orçamento', () => {
     const state = createSeedState()
     const demand = materialDemand(state, 'mp-abs', 10)
     const order = createPurchaseOrder(state, demand.id, 'f1', 'Compras')
-    const budget = state.budgets.find(entry => entry.id === order.budgetId)!
     const forecast = state.budgetEntries.find(entry => entry.sourceId === demand.id && entry.kind === 'Previsão')!
     advancePurchaseOrder(state, order.id, 'Gestor')
     expect(forecast.openAmount).toBeGreaterThan(0)
     advancePurchaseOrder(state, order.id, 'Almoxarifado')
     expect(demand.status).toBe('Atendida')
-    expect(state.financialTitles[0]).toMatchObject({ kind: 'Pagar', reference: order.id, origin: 'Compra', budgetId: budget.id })
     expect(state.budgetEntries.some(entry => entry.kind === 'Realizado pago' && entry.sourceId === order.id)).toBe(false)
-    settleTitle(state, state.financialTitles[0].id, 'Financeiro')
+    applyOmiePayment(state, categoryOf(state, forecast.categoryId).tenantId, { id: `PG-${order.id}`, sourceId: order.id, invoiceNumber: '5001', link: { module: 'Compras', id: order.id }, amount: order.quantity * order.unitPrice, paidAt: '2026-10-20T10:00:00.000Z', categoryIds: [forecast.categoryId], event: 'Pagamento' })
     expect(state.budgetEntries.some(entry => entry.kind === 'Realizado pago' && entry.sourceId === order.id)).toBe(true)
     expect(state.events.some(event => event.ref === demand.id)).toBe(true)
   })
@@ -273,9 +270,10 @@ describe('demandas, compras e orçamento', () => {
     expect(demand.projectId).toBe('PRJ-26-014')
     contractService(state, demand.id, 'f3', 'Compras')
     completeDemand(state, demand.id, 'Compras')
-    expect(state.financialTitles[0]).toMatchObject({ kind: 'Pagar', partnerId: 'f3', projectId: 'PRJ-26-014' })
     expect(state.budgetEntries.some(entry => entry.kind === 'Realizado pago' && entry.sourceId === demand.id)).toBe(false)
-    settleTitle(state, state.financialTitles[0].id, 'Financeiro')
+    const forecast = state.budgetEntries.find(entry => entry.sourceId === demand.id && entry.kind === 'Previsão')
+    const categoryId = forecast?.categoryId ?? 'BC-PD'
+    applyOmiePayment(state, categoryOf(state, categoryId).tenantId, { id: `PG-${demand.id}`, sourceId: demand.id, invoiceNumber: '5002', link: { module: 'Projetos', id: 'PRJ-26-014' }, amount: 1000, paidAt: '2026-10-20T10:00:00.000Z', categoryIds: [categoryId], event: 'Pagamento' })
     expect(state.budgetEntries.some(entry => entry.kind === 'Realizado pago' && entry.sourceId === demand.id)).toBe(true)
   })
 })
@@ -283,7 +281,7 @@ describe('demandas, compras e orçamento', () => {
 describe('orçamento integrado por categoria e período', () => {
   it('audita alteração e retém previsão acima do saldo até o Gestor liberar', () => {
     const state = createSeedState()
-    const allocation = setBudget(state, 'BC-OPER', '2026', 100, 'Teste de limite', 'Financeiro', 'Financeiro')
+    const allocation = setBudget(state, TENANT, 'BC-OPER', '2026', 100, 'Teste de limite', 'Financeiro', 'Financeiro')
     expect(allocation.audit[0]).toMatchObject({ field: 'Valor informado', reason: 'Teste de limite' })
     const input = { categoryId: 'BC-OPER', period: '2026-10', amount: 100000, sourceModule: 'Manutenção' as const, sourceType: 'OS', sourceId: 'OS-TESTE', description: 'Teste sem saldo' }
     const heldBefore = budgetSummary(state, 'BC-OPER', '2026-10').held
@@ -293,8 +291,8 @@ describe('orçamento integrado por categoria e período', () => {
     expect(state.budgetAlerts.some(entry => entry.kind === 'Bloqueio' && entry.sourceId === 'OS-TESTE')).toBe(true)
     const exception = state.budgetExceptions.find(entry => entry.sourceId === 'OS-TESTE')!
     expect(exception.status).toBe('Pendente')
-    expect(() => decideBudgetException(state, exception.id, true, 'Eu mesmo planejei', 'Financeiro', 'Financeiro')).toThrow('Somente o Gestor')
-    decideBudgetException(state, exception.id, true, 'Emergência operacional', 'Gestor', 'Gestor')
+    expect(() => decideBudgetException(state, TENANT, exception.id, true, 'Eu mesmo planejei', 'Financeiro', 'Financeiro')).toThrow('Somente o Gestor')
+    decideBudgetException(state, TENANT, exception.id, true, 'Emergência operacional', 'Gestor', 'Gestor')
     expect(held).toMatchObject({ status: 'Ativo', openAmount: 100000, heldAmount: undefined })
   })
 
@@ -304,49 +302,52 @@ describe('orçamento integrado por categoria e período', () => {
     const administrator = state.accessProfiles.find(entry => entry.system)!
     expect(administrator.functionalityIds).toContain('modulo.injecao.consultar')
     expect(state.userProfileAssignments.some(entry => entry.userId === 'u16' && entry.profileId === administrator.id)).toBe(true)
-    expect(setBudget(state, 'BC-OPER', '2027', 1000, 'Planejamento inicial', 'Lucas Lima', 'Administrador').amount).toBe(1000)
+    expect(setBudget(state, TENANT, 'BC-OPER', '2027', 1000, 'Planejamento inicial', 'Lucas Lima', 'Administrador').amount).toBe(1000)
     const exception = state.budgetExceptions.find(entry => entry.kind === 'Saldo excedido' && entry.status === 'Pendente')!
-    decideBudgetException(state, exception.id, true, 'Acesso total', 'Lucas Lima', 'Administrador')
+    decideBudgetException(state, TENANT, exception.id, true, 'Acesso total', 'Lucas Lima', 'Administrador')
     expect(exception.status).toBe('Autorizada')
-    expect(() => setBudget(state, 'BC-OPER', '2028', 1000, 'Planejamento inicial', 'Marina Souza', 'Gestor')).toThrow('Somente o Financeiro')
-    expect(() => decideBudgetException(state, state.budgetExceptions.find(entry => entry.kind === 'Sem categoria' && entry.status === 'Pendente')!.id, false, 'Não', 'Marina Souza', 'Gestor')).toThrow('Somente o Financeiro')
+    expect(() => setBudget(state, TENANT, 'BC-OPER', '2028', 1000, 'Planejamento inicial', 'Marina Souza', 'Gestor')).toThrow('Somente o Financeiro')
+    expect(() => decideBudgetException(state, TENANT, state.budgetExceptions.find(entry => entry.kind === 'Sem categoria' && entry.status === 'Pendente')!.id, false, 'Não', 'Marina Souza', 'Gestor')).toThrow('Somente o Financeiro')
   })
 
   it('separa quem define orçamento de quem libera exceção e exige valor no ano', () => {
     const state = createSeedState()
-    expect(() => setBudget(state, 'BC-OPER', '2027', 5000, 'Planejamento inicial', 'Gestor', 'Gestor')).toThrow('Somente o Financeiro')
-    expect(() => setBudget(state, 'BC-OPER', '2027', 0, 'Planejamento inicial', 'Financeiro', 'Financeiro')).toThrow('maior que zero')
-    expect(setBudget(state, 'BC-OPER', '2027', 5000, '', 'Financeiro', 'Financeiro').amount).toBe(5000)
-    expect(() => setBudget(state, 'BC-OPER', '2026-10', 5000, 'Planejamento inicial', 'Financeiro', 'Financeiro')).toThrow('AAAA')
+    expect(() => setBudget(state, TENANT, 'BC-OPER', '2027', 5000, 'Planejamento inicial', 'Gestor', 'Gestor')).toThrow('Somente o Financeiro')
+    expect(() => setBudget(state, TENANT, 'BC-OPER', '2027', 0, 'Planejamento inicial', 'Financeiro', 'Financeiro')).toThrow('maior que zero')
+    expect(setBudget(state, TENANT, 'BC-OPER', '2027', 5000, '', 'Financeiro', 'Financeiro').amount).toBe(5000)
+    expect(() => setBudget(state, TENANT, 'BC-OPER', '2026-10', 5000, 'Planejamento inicial', 'Financeiro', 'Financeiro')).toThrow('AAAA')
+    expect(() => setBudget(state, TENANT, 'BC-DEPREC', '2026', 1000, 'Teste', 'Financeiro', 'Financeiro')).toThrow('ativos')
+    expect(() => setCostCenterSplit(state, TENANT, 'BC-ROB', '2026', 'percent', [{ costCenterId: 'cc-rob-210', value: 100 }], 'Patrícia', 'Financeiro')).toThrow('custo, despesa e investimento')
+    expect(() => setCostCenterSplit(state, TENANT, 'BC-DEPREC', '2026', 'percent', [{ costCenterId: 'cc-rob-410', value: 100 }], 'Patrícia', 'Financeiro')).toThrow('custo, despesa e investimento')
   })
 
   it('conciliia categorias com o Omie nos dois sentidos sem duplicar', () => {
     const state = createSeedState()
     expect(state.budgetCategories.every(entry => entry.omieId)).toBe(true)
     expect(state.omieCategoryInbox).toHaveLength(1)
-    const received = absorbOmieCategories(state)
+    const received = absorbOmieCategories(state, TENANT)
     expect(received).toMatchObject({ created: 1, updated: 0 })
     expect(state.omieCategoryInbox).toHaveLength(0)
     expect(state.budgetCategories.find(entry => entry.code === '04.01')).toMatchObject({ name: 'Frete sobre vendas', omieId: 'OMIE-04.01' })
-    const created = createBudgetCategory(state, { name: 'Energia da fábrica', group: '03. Custos', responsibleRole: 'PCP' }, 'Financeiro', 'Financeiro')
+    const created = createBudgetCategory(state, TENANT, { name: 'Energia da fábrica', group: '03. Custos' }, 'Financeiro', 'Financeiro')
     expect(created.omieId).toBe('OMIE-03.10')
     expect(state.syncLogs.some(entry => entry.entity === 'Categoria' && entry.direction === 'Thalamus → Omie' && entry.reference === created.code && entry.status === 'sincronizado')).toBe(true)
-    updateBudgetCategory(state, created.id, { name: created.name, responsibleRole: created.responsibleRole, status: 'Inativa' }, 'Situação enviada ao Omie', 'Financeiro', 'Financeiro')
+    updateBudgetCategory(state, TENANT, created.id, { name: created.name, status: 'Inativa' }, 'Situação enviada ao Omie', 'Financeiro', 'Financeiro')
     expect(state.syncLogs[0]?.message).toContain('conta_inativa')
-    expect(applyRemoteCategories(state, [{ omieId: 'OMIE-04.01', code: '04.01', name: 'Fretes e carretos', group: '04. Despesas Variáveis' }])).toMatchObject({ created: 0, updated: 1 })
+    expect(applyRemoteCategories(state, TENANT, [{ omieId: 'OMIE-04.01', code: '04.01', name: 'Fretes e carretos', group: '04. Despesas Variáveis' }])).toMatchObject({ created: 0, updated: 1 })
     expect(state.budgetCategories.filter(entry => entry.omieId === 'OMIE-04.01')).toHaveLength(1)
     expect(state.budgetCategories.find(entry => entry.code === '04.01')?.name).toBe('Fretes e carretos')
-    expect(applyRemoteCategories(state, [{ omieId: 'OMIE-99', code: '99.01', name: 'Fora da árvore', group: '99. Inexistente' }])).toMatchObject({ created: 0, updated: 0 })
+    expect(applyRemoteCategories(state, TENANT, [{ omieId: 'OMIE-99', code: '99.01', name: 'Fora da árvore', group: '99. Inexistente' }])).toMatchObject({ created: 0, updated: 0 })
     expect(state.syncLogs.some(entry => entry.reference === '99.01' && entry.status === 'erro')).toBe(true)
   })
 
   it('cria subcategoria com código gerado e soma na categoria pai', () => {
     const state = createSeedState()
-    expect(() => createBudgetCategory(state, { name: 'X', group: 'Livre', responsibleRole: 'Financeiro' }, 'Financeiro', 'Financeiro')).toThrow('grupo confirmado')
-    const child = createBudgetCategory(state, { name: 'Resinas', group: '03. Custos', parentId: 'BC-CMV', responsibleRole: 'Compras' }, 'Financeiro', 'Financeiro')
+    expect(() => createBudgetCategory(state, TENANT, { name: 'X', group: 'Livre' }, 'Financeiro', 'Financeiro')).toThrow('grupo confirmado')
+    const child = createBudgetCategory(state, TENANT, { name: 'Resinas', group: '03. Custos', parentId: 'BC-CMV' }, 'Financeiro', 'Financeiro')
     expect(child).toMatchObject({ code: '03.01.06', group: '03. Custos', parentId: 'BC-CMV', omieId: 'OMIE-03.01.06' })
-    expect(createBudgetCategory(state, { name: 'Nova', group: '03. Custos', responsibleRole: 'PCP' }, 'Financeiro', 'Financeiro').code).toBe('03.10')
-    setBudget(state, child.id, '2026', 1000, 'Planejamento inicial', 'Financeiro', 'Financeiro')
+    expect(createBudgetCategory(state, TENANT, { name: 'Nova', group: '03. Custos' }, 'Financeiro', 'Financeiro').code).toBe('03.10')
+    setBudget(state, TENANT, child.id, '2026', 1000, 'Planejamento inicial', 'Financeiro', 'Financeiro')
     expect(budgetSummary(state, child.id, '2026').amount).toBe(1000)
     expect(budgetSummary(state, 'BC-CMV', '2026').amount).toBe(2161000)
     const before = budgetSummary(state, 'BC-CMV', '2026-10').forecast
@@ -356,20 +357,134 @@ describe('orçamento integrado por categoria e período', () => {
 
   it('divide o total do grupo ou da categoria e deixa cada parte editável', () => {
     const state = createSeedState()
-    const first = createBudgetCategory(state, { name: 'Energia', group: '03. Custos', parentId: 'BC-OPER', responsibleRole: 'PCP' }, 'Financeiro', 'Financeiro')
+    const first = createBudgetCategory(state, TENANT, { name: 'Energia', group: '03. Custos', parentId: 'BC-OPER' }, 'Financeiro', 'Financeiro')
     expect(budgetSummary(state, 'BC-OPER', '2026').amount).toBe(384000)
     expect(budgetSummary(state, first.id, '2026').amount).toBe(384000)
-    const second = createBudgetCategory(state, { name: 'Água', group: '03. Custos', parentId: 'BC-OPER', responsibleRole: 'PCP' }, 'Financeiro', 'Financeiro')
-    setBudget(state, 'BC-OPER', '2026', 1000, 'Revisão da previsão', 'Financeiro', 'Financeiro')
+    const second = createBudgetCategory(state, TENANT, { name: 'Água', group: '03. Custos', parentId: 'BC-OPER' }, 'Financeiro', 'Financeiro')
+    setBudget(state, TENANT, 'BC-OPER', '2026', 1000, 'Revisão da previsão', 'Financeiro', 'Financeiro')
     expect(budgetSummary(state, first.id, '2026').amount).toBe(500)
     expect(budgetSummary(state, second.id, '2026').amount).toBe(500)
     expect(budgetSummary(state, 'BC-OPER', '2026').amount).toBe(1000)
-    setBudget(state, second.id, '2026', 200, 'Correção de valor informado', 'Financeiro', 'Financeiro')
+    setBudget(state, TENANT, second.id, '2026', 200, 'Correção de valor informado', 'Financeiro', 'Financeiro')
     expect(budgetSummary(state, 'BC-OPER', '2026').amount).toBe(700)
-    setGroupBudget(state, '02. Deduções da Receita', '2026', 1000, 'Planejamento inicial', 'Financeiro', 'Financeiro')
+    setGroupBudget(state, TENANT, '02. Deduções da Receita', '2026', 1000, 'Planejamento inicial', 'Financeiro', 'Financeiro')
     expect(budgetSummary(state, 'BC-IMPOSTOS', '2026').amount).toBe(500)
     expect(budgetSummary(state, 'BC-DEVOL', '2026').amount).toBe(500)
-    expect(() => setGroupBudget(state, '05. Despesas Fixas', '2026', 1000, 'Planejamento inicial', 'Financeiro', 'Financeiro')).toThrow('Não há categoria')
+    expect(() => setGroupBudget(state, TENANT, '05. Despesas Fixas', '2026', 1000, 'Planejamento inicial', 'Financeiro', 'Financeiro')).toThrow('Não há categoria')
+  })
+
+  it('distribui o orçamento da categoria entre centros de custo por porcentagem ou por valor', () => {
+    const state = createSeedState()
+    const seeded = state.budgets.find(entry => entry.id === 'ORC-OPER-10')!
+    expect(costCenterAmounts(seeded.amount, seeded.costCenterSplit)).toEqual([
+      { costCenterId: 'cc-rob-400', percent: 60, amount: 230400 },
+      { costCenterId: 'cc-rob-310', percent: 25, amount: 96000 },
+      { costCenterId: 'cc-rob-320', percent: 15, amount: 57600 },
+    ])
+    const capex = state.budgets.find(entry => entry.id === 'ORC-CAPEX-10')!
+    expect(costCenterAmounts(capex.amount, capex.costCenterSplit)).toEqual([
+      { costCenterId: 'cc-rob-410', percent: 70, amount: 420000 },
+      { costCenterId: 'cc-rob-330', percent: 30, amount: 180000 },
+    ])
+    expect(state.sectors.some(entry => ['CC-410', 'CC-330'].includes(sectorCostCenter(entry, TENANT)))).toBe(false)
+    const partial = setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'percent', [{ costCenterId: 'cc-rob-400', value: 40 }], 'Financeiro', 'Financeiro')
+    expect(partial.costCenterSplit?.lines).toEqual([{ costCenterId: 'cc-rob-400', value: 40 }])
+    expect(() => setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'percent', [{ costCenterId: 'cc-rob-400', value: 110 }], 'Financeiro', 'Financeiro')).toThrow('não pode passar')
+    expect(setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'amount', [{ costCenterId: 'cc-rob-400', value: 1000 }], 'Financeiro', 'Financeiro').costCenterSplit?.lines).toEqual([{ costCenterId: 'cc-rob-400', value: 1000 }])
+    expect(() => setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'amount', [{ costCenterId: 'cc-rob-400', value: 999999 }], 'Financeiro', 'Financeiro')).toThrow('não pode passar')
+    expect(() => setCostCenterSplit(state, TENANT, 'BC-CMV', '2026', 'percent', [{ costCenterId: 'cc-rob-400', value: 100 }], 'Financeiro', 'Financeiro')).toThrow('categoria que recebe o valor')
+    expect(() => setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'percent', [{ costCenterId: 'cc-sul-400', value: 100 }], 'Financeiro', 'Financeiro')).toThrow('não encontrado nesta empresa')
+    updateCostCenter(state, TENANT, 'cc-rob-410', { name: 'Injetoras', status: 'Inativo', responsibleUserId: 'u11' }, 'Patrícia', 'Financeiro')
+    expect(() => setCostCenterSplit(state, TENANT, 'BC-CAPEX', '2026', 'percent', [{ costCenterId: 'cc-rob-410', value: 100 }], 'Financeiro', 'Financeiro')).toThrow('inativo')
+    const saved = setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'amount', [
+      { costCenterId: 'cc-rob-400', value: 200000 },
+      { costCenterId: 'cc-rob-600', value: 184000 },
+      { costCenterId: 'cc-rob-310', value: 0 },
+    ], 'Financeiro', 'Financeiro')
+    expect(saved.costCenterSplit).toEqual({ mode: 'amount', lines: [{ costCenterId: 'cc-rob-400', value: 200000 }, { costCenterId: 'cc-rob-600', value: 184000 }] })
+    setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'percent', [], 'Financeiro', 'Financeiro')
+    expect(state.budgets.find(entry => entry.id === 'ORC-OPER-10')?.costCenterSplit).toBeUndefined()
+    const created = createCostCenter(state, TENANT, { code: 'cc-810', name: 'Expedição', responsibleUserId: 'u10' }, 'Patrícia', 'Financeiro')
+    expect(created).toMatchObject({ code: 'CC-810', name: 'Expedição', status: 'Ativo', tenantId: TENANT, responsibleUserId: 'u10' })
+    expect(() => createCostCenter(state, TENANT, { code: 'CC-810', name: 'Outro', responsibleUserId: 'u10' }, 'Patrícia', 'Financeiro')).toThrow('Já existe')
+    expect(() => createCostCenter(state, TENANT, { code: 'CC-811', name: 'Sem dono', responsibleUserId: 'ninguem' }, 'Patrícia', 'Financeiro')).toThrow('responsável do centro de custo')
+    expect(updateCostCenter(state, TENANT, created.id, { name: 'Expedição', status: 'Ativo', responsibleUserId: 'u5' }, 'Patrícia', 'Financeiro').responsibleUserId).toBe('u5')
+    expect(() => updateCostCenter(state, 'tenant-roboflex-sul', created.id, { name: 'Expedição', status: 'Ativo', responsibleUserId: 'u5' }, 'Patrícia', 'Financeiro')).toThrow('não encontrado nesta empresa')
+  })
+
+  it('propõe os centros da conta pelo realizado do ano anterior, no mesmo lugar do valor', () => {
+    const state = createSeedState()
+    expect(suggestCostCenterShare(state, TENANT, 'BC-OPER', '2026', 'cc-rob-400')).toMatchObject({ percent: 60, priorRealized: 120000, priorTotal: 200000 })
+    expect(suggestCategoryCenters(state, TENANT, 'BC-OPER', '2026').map(entry => [entry.costCenterId, entry.percent])).toEqual([['cc-rob-400', 60], ['cc-rob-310', 25], ['cc-rob-320', 15]])
+    setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'percent', [{ costCenterId: 'cc-rob-600', value: 100 }], 'Patrícia', 'Financeiro')
+    const split = applyCategorySuggestion(state, TENANT, 'BC-OPER', '2026', 'Patrícia', 'Financeiro').costCenterSplit!
+    expect(split).toEqual({ mode: 'percent', lines: [{ costCenterId: 'cc-rob-400', value: 60 }, { costCenterId: 'cc-rob-310', value: 25 }, { costCenterId: 'cc-rob-320', value: 15 }] })
+    expect(applyCategorySuggestion(state, TENANT, 'BC-CAPEX', '2026', 'Patrícia', 'Financeiro').costCenterSplit!.lines).toEqual([{ costCenterId: 'cc-rob-410', value: 100 }])
+    expect(() => applyCategorySuggestion(state, TENANT, 'BC-PERDAS', '2026', 'Patrícia', 'Financeiro')).toThrow('realizado com centro')
+    expect(() => applyCategorySuggestion(state, TENANT, 'BC-OPER', '2026', 'Compras', 'Compras')).toThrow('Somente o Financeiro')
+    expect(viewerCenterScope(state, TENANT, 'u3', 'Compras').centerIds).toEqual(['cc-rob-320'])
+    expect(viewerCenterScope(state, TENANT, 'u16', 'Administrador').limited).toBe(false)
+  })
+
+  it('guarda a simulação sem alterar o ano e aplica quando pedido', () => {
+    const state = createSeedState()
+    const before = state.budgets.find(entry => entry.id === 'ORC-OPER-10')!.amount
+    const saved = saveBudgetSimulation(state, TENANT, '2026', 'Patrícia', 'Financeiro')
+    expect(saved.lines.some(line => line.categoryId === 'BC-OPER' && line.amount === before)).toBe(true)
+    expect(state.budgets.find(entry => entry.id === 'ORC-OPER-10')!.amount).toBe(before)
+    saved.lines.find(line => line.categoryId === 'BC-OPER')!.amount = before + 1000
+    applyBudgetSimulation(state, TENANT, '2026', 'Patrícia', 'Financeiro')
+    expect(state.budgets.find(entry => entry.id === 'ORC-OPER-10')!.amount).toBe(before + 1000)
+    expect(() => applyBudgetSimulation(state, 'tenant-roboflex-sul', '2026', 'Patrícia', 'Financeiro')).toThrow('Não há simulação')
+  })
+
+  it('monta o DRE com depreciação dos ativos e premiação estimada', () => {
+    const state = createSeedState()
+    const depreciation = assetDepreciation(state, TENANT)
+    expect(depreciation.total).toBeCloseTo(82000 + 64000 + 91000 + 148000 / 5 + 132000 / 5 + 176000 / 5 + 98000 / 5 + 4500, 2)
+    expect(assetDepreciation(state, 'tenant-roboflex-sul').total).toBe(0)
+    const dre = dreStatement(state, [TENANT], { year: '2026', fromMonth: 1, toMonth: 12 })
+    expect(dre.lines.find(line => line.id === 'rob')?.budget).toBe(48_000_000)
+    expect(dre.lines.find(line => line.id === 'dep')?.budget).toBe(depreciation.total)
+    expect(dre.lines.find(line => line.id === 'dep')?.realized).toBe(0)
+    expect(dre.lines.find(line => line.id === 'liquido')?.realized).toBeCloseTo(dre.lines.find(line => line.id === 'ebitda')!.realized, 2)
+    expect(dre.lines.find(line => line.id === 'capex')?.inResult).toBe(false)
+    const ebitda = dre.lines.find(line => line.id === 'ebitda')!.budget
+    expect(superaEstimate(ebitda, 79)).toBe(0)
+    expect(superaEstimate(ebitda, 80)).toBeCloseTo(ebitda * 0.008, 2)
+    expect(dreReading(dre.lines, { year: '2026', fromMonth: 1, toMonth: 12 }).join(' ')).toContain('EBITDA')
+  })
+
+  it('lê o DRE entre dois meses e soma o grupo sem misturar a empresa', () => {
+    const state = createSeedState()
+    const october = dreStatement(state, [TENANT], { year: '2026', fromMonth: 10, toMonth: 10 })
+    expect(october.lines.find(line => line.id === 'rob')?.budget).toBe(4_000_000)
+    expect(october.lines.find(line => line.id === 'dep')?.budget).toBeCloseTo(assetDepreciation(state, TENANT).total / 12, 1)
+    expect(october.lines.find(line => line.id === 'custos')?.realized).toBe(96740 + 17450 + 41600 + 890)
+    const january = dreStatement(state, [TENANT], { year: '2026', fromMonth: 1, toMonth: 1 })
+    expect(january.lines.find(line => line.id === 'custos')?.realized).toBe(0)
+    const group = dreStatement(state, [TENANT, 'tenant-roboflex-sul'], { year: '2026', fromMonth: 1, toMonth: 12 })
+    expect(group.lines.find(line => line.id === 'rob')?.budget).toBe(66_000_000)
+    expect(() => dreStatement(state, [TENANT], { year: '2026', fromMonth: 9, toMonth: 2 })).toThrow('período')
+    expect(periodLabel({ year: '2026', fromMonth: 3, toMonth: 5 })).toBe('março a maio de 2026')
+  })
+
+  it('lê o orçamento e o centro de custo do período sem misturar empresas', () => {
+    const state = createSeedState()
+    const year = financeSnapshot(state, [TENANT], '2026', 1, 12)
+    expect(year.receita.budget).toBe(48_000_000)
+    expect(year.realizedPaid).toBe(96740 + 17450 + 41600 + 890)
+    expect(year.centers[0]).toMatchObject({ code: 'CC-320', name: 'Suprimentos', amount: 96740, company: 'Roboflex' })
+    expect(year.resultado.budget).toBeCloseTo(year.liquida.budget - year.custos.budget - year.despesas.budget, 2)
+    expect(year.lines.join(' ')).toContain('CC-320')
+    expect(year.lines.join(' ')).toContain('fora dessa conta')
+    const october = financeSnapshot(state, [TENANT], '2026', 10, 10)
+    expect(october.realizedPaid).toBe(year.realizedPaid)
+    expect(financeSnapshot(state, [TENANT], '2026', 1, 1).realizedPaid).toBe(0)
+    const group = financeSnapshot(state, [TENANT, 'tenant-roboflex-sul'], '2026', 1, 12)
+    expect(group.centers.filter(entry => entry.code === 'CC-320')).toEqual([year.centers[0]])
+    expect(group.receita.budget).toBeGreaterThan(year.receita.budget)
+    expect(() => financeSnapshot(state, [TENANT], '2026', 8, 3)).toThrow('período')
   })
 
   it('mostra a fatia do mês, do trimestre e do semestre sem mudar o ano', () => {
@@ -380,38 +495,91 @@ describe('orçamento integrado por categoria e período', () => {
     expect(budgetSummary(state, 'BC-CMV', '2026-S2').amount).toBe(1080000)
     expect(budgetSummary(state, 'BC-CMV', '2026-Q1').forecast).toBe(0)
     expect(budgetSummary(state, 'BC-CMV', '2026-10').forecast).toBe(budgetSummary(state, 'BC-CMV', '2026').forecast)
+    expect(rangeSummary(state, 'BC-CMV', '2026', 10, 12).amount).toBe(540000)
+    expect(rangeSummary(state, 'BC-CMV', '2026', 1, 9)).toMatchObject({ amount: 1620000, forecast: 0, realized: 0 })
+    expect(rangeSummary(state, 'BC-CMV', '2026', 1, 12).realized).toBe(budgetSummary(state, 'BC-CMV', '2026').realized)
   })
 
   it('reclassifica pagamento retido e lança no realizado', () => {
     const state = createSeedState()
-    applyOmiePayment(state, state.omiePayments.find(entry => entry.id === 'PG-SEM-CAT')!)
+    applyOmiePayment(state, TENANT, state.omiePayments.find(entry => entry.id === 'PG-SEM-CAT')!)
     const exception = state.budgetExceptions.find(entry => entry.sourceId === 'PG-SEM-CAT')!
     const before = budgetSummary(state, 'BC-OPER', '2026-10').realized
-    expect(() => decideBudgetException(state, exception.id, true, 'NF de manutenção', 'Gestor', 'Gestor')).toThrow('Financeiro')
-    decideBudgetException(state, exception.id, true, 'NF de manutenção', 'Financeiro', 'Financeiro', 'BC-OPER')
+    expect(() => decideBudgetException(state, TENANT, exception.id, true, 'NF de manutenção', 'Gestor', 'Gestor')).toThrow('Financeiro')
+    decideBudgetException(state, TENANT, exception.id, true, 'NF de manutenção', 'Financeiro', 'Financeiro', 'BC-OPER')
     expect(exception.status).toBe('Resolvida')
     expect(budgetSummary(state, 'BC-OPER', '2026-10').realized).toBe(before + 3250)
   })
 
-  it('registra ocorrência de alerta para o responsável da categoria', () => {
+  it('avisa o responsável de cada centro com fatia; a parte sem centro fica com o Financeiro', () => {
     const state = createSeedState()
     upsertForecast(state, { categoryId: 'BC-OPER', period: '2026-10', amount: 3500, sourceModule: 'Manutenção', sourceType: 'OS', sourceId: 'OS-ALERTA', description: 'Reparo' }, 'Manutenção')
     const alert = state.budgetAlerts.find(entry => entry.categoryId === 'BC-OPER' && entry.kind === 'Alerta')!
-    expect(alert.notifiedRoles).toEqual(expect.arrayContaining(['PCP', 'Financeiro']))
-    expect(() => acknowledgeAlert(state, alert.id, 'Comercial', 'Comercial')).toThrow()
-    expect(acknowledgeAlert(state, alert.id, 'PCP', 'PCP').status).toBe('Ciente')
+    expect(alert.notifiedUserIds).toEqual(['u5', 'u13', 'u3'])
+    expect(alert.notifiedRoles).toEqual(expect.arrayContaining(['Líder de produção', 'Engenharia', 'Compras', 'Financeiro']))
+    expect(() => acknowledgeAlert(state, alert.id, 'u12', 'Comercial', 'Comercial')).toThrow('outro responsável')
+    expect(tasksForRole(state, 'Líder de produção', 'u5').some(task => task.id === alert.id)).toBe(true)
+    expect(tasksForRole(state, 'Comercial', 'u12').some(task => task.id === alert.id)).toBe(false)
+    expect(acknowledgeAlert(state, alert.id, 'u5', 'Bruno Alves', 'Líder de produção').status).toBe('Ciente')
+    expect(notifiedUsers(state, 'BC-PERDAS', '2026-10')).toEqual(['u14'])
+    expect(notifiedUsers(state, 'BC-CMV', '2026-10')).toEqual(['u3', 'u14'])
+    setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'percent', [{ costCenterId: 'cc-rob-400', value: 40 }], 'Patrícia', 'Financeiro')
+    expect(notifiedUsers(state, 'BC-OPER', '2026-10')).toEqual(['u5', 'u14'])
+  })
+
+  it('o Financeiro dá ciente em qualquer alerta da empresa', () => {
+    const state = createSeedState()
+    upsertForecast(state, { categoryId: 'BC-OPER', period: '2026-10', amount: 3500, sourceModule: 'Manutenção', sourceType: 'OS', sourceId: 'OS-ALERTA', description: 'Reparo' }, 'Manutenção')
+    const alert = state.budgetAlerts.find(entry => entry.categoryId === 'BC-OPER' && entry.kind === 'Alerta')!
+    expect(acknowledgeAlert(state, alert.id, 'u14', 'Financeiro', 'Financeiro').status).toBe('Ciente')
+  })
+
+  it('repete a sazonalidade do ano anterior em cada conta com base', () => {
+    const state = createSeedState()
+    const leaf = state.budgetEntries.find(entry => entry.tenantId === TENANT && entry.kind.startsWith('Realizado') && /^2025-\d{2}$/.test(entry.period))
+    expect(leaf).toBeTruthy()
+    const id = leaf!.categoryId
+    setBudget(state, TENANT, id, '2026', 120000, 'Teste', 'Financeiro', 'Financeiro')
+    const prior = Array.from({ length: 12 }, (_, month) => budgetSummary(state, id, `2025-${String(month + 1).padStart(2, '0')}`).realized)
+    const base = prior.reduce((sum, value) => sum + value, 0)
+    expect(() => applyPriorSeasonality(state, TENANT, [id], '2026', 'Comercial', 'Comercial')).toThrow()
+    expect(applyPriorSeasonality(state, TENANT, [id], '2026', 'Financeiro', 'Financeiro')).toEqual([id])
+    const months = state.budgets.find(entry => entry.categoryId === id && entry.period === '2026')!.monthlyAmounts!
+    expect(months.reduce((sum, value) => sum + value, 0)).toBeCloseTo(120000, 2)
+    const peak = prior.indexOf(Math.max(...prior))
+    expect(months[peak]).toBeCloseTo(120000 * prior[peak] / base, 0)
+    expect(() => applyPriorSeasonality(state, TENANT, [id], '2026', 'Financeiro', 'Financeiro')).not.toThrow()
+    expect(() => applyPriorSeasonality(state, 'tenant-roboflex-sul', [id], '2026', 'Financeiro', 'Financeiro')).toThrow()
+  })
+
+  it('não repete sazonalidade em conta sem realizado no ano anterior', () => {
+    const state = createSeedState()
+    const empty = state.budgetCategories.find(entry => entry.tenantId === TENANT && entry.status !== 'Inativa' && !state.budgetCategories.some(child => child.parentId === entry.id)
+      && !state.budgetEntries.some(item => item.categoryId === entry.id && item.period.startsWith('2025') && item.kind.startsWith('Realizado')))!
+    expect(() => applyPriorSeasonality(state, TENANT, [empty.id], '2026', 'Financeiro', 'Financeiro')).toThrow('sazonalidade')
+  })
+
+  it('guarda o centro padrão do setor por empresa', () => {
+    const state = createSeedState()
+    const sector = state.sectors.find(entry => entry.id === 'sec-ser')!
+    expect(sectorCostCenter(sector, TENANT)).toBe('CC-500')
+    expect(sectorCostCenter(sector, 'tenant-roboflex-sul')).toBe('CC-400')
+    setSectorDefaultCostCenter(state, TENANT, sector.id, 'cc-700', 'Financeiro', 'Financeiro')
+    expect(sectorCostCenter(sector, TENANT)).toBe('CC-700')
+    expect(sectorCostCenter(sector, 'tenant-roboflex-sul')).toBe('CC-400')
+    expect(() => setSectorDefaultCostCenter(state, 'tenant-roboflex-sul', sector.id, 'CC-700', 'Financeiro', 'Financeiro')).toThrow('nesta empresa')
   })
 
   it('concilia parcial, estorno e idempotência sem dupla contagem', () => {
     const state = createSeedState()
-    setBudget(state, 'BC-OPER', '2026', 200000, 'Teste', 'Financeiro', 'Financeiro')
+    setBudget(state, TENANT, 'BC-OPER', '2026', 200000, 'Teste', 'Financeiro', 'Financeiro')
     upsertForecast(state, { categoryId: 'BC-OPER', period: '2026-10', amount: 1000, sourceModule: 'Manutenção', sourceType: 'OS', sourceId: 'OS-PAG', description: 'Reparo' }, 'Manutenção')
     const first = { id: 'PG-PARCIAL-1', sourceId: 'OS-PAG', amount: 400, paidAt: '2026-10-19T10:00:00.000Z', categoryIds: ['BC-OPER'], event: 'Pagamento' as const }
-    applyOmiePayment(state, first)
-    applyOmiePayment(state, first)
+    applyOmiePayment(state, TENANT, first)
+    applyOmiePayment(state, TENANT, first)
     expect(state.budgetEntries.filter(entry => entry.externalId === first.id)).toHaveLength(1)
     expect(state.budgetEntries.find(entry => entry.sourceId === 'OS-PAG' && entry.kind === 'Previsão')?.openAmount).toBe(600)
-    applyOmiePayment(state, { ...first, id: 'PG-ESTORNO-1', amount: 100, event: 'Estorno' })
+    applyOmiePayment(state, TENANT, { ...first, id: 'PG-ESTORNO-1', amount: 100, event: 'Estorno' })
     expect(state.budgetEntries.find(entry => entry.sourceId === 'OS-PAG' && entry.kind === 'Previsão')?.openAmount).toBe(700)
     expect(budgetSummary(state, 'BC-OPER', '2026-10').realized).toBeGreaterThanOrEqual(300)
   })
@@ -419,27 +587,27 @@ describe('orçamento integrado por categoria e período', () => {
   it('lança a nota do Omie no custo e deixa o vínculo manual quando ela chega solta', () => {
     const state = createSeedState()
     const before = budgetSummary(state, 'BC-GARANTIA', '2026-10').realized
-    const posted = applyOmiePayment(state, { id: 'PG-NF-1', invoiceNumber: '9100', sourceId: 'NF-9100', amount: 500, paidAt: '2026-10-19T10:00:00.000Z', categoryIds: ['BC-GARANTIA'], event: 'Pagamento', description: 'Frete avulso' })
+    const posted = applyOmiePayment(state, TENANT, { id: 'PG-NF-1', invoiceNumber: '9100', sourceId: 'NF-9100', amount: 500, paidAt: '2026-10-19T10:00:00.000Z', categoryIds: ['BC-GARANTIA'], event: 'Pagamento', description: 'Frete avulso' })
     expect(posted).toMatchObject({ kind: 'Realizado pago', invoiceNumber: '9100', amount: 500 })
     expect(posted?.linkId).toBeUndefined()
     expect(budgetSummary(state, 'BC-GARANTIA', '2026-10').realized).toBe(before + 500)
     const exception = state.budgetExceptions.find(entry => entry.sourceId === 'PG-NF-1' && entry.kind === 'Sem vínculo')!
     expect(exception.status).toBe('Pendente')
-    expect(() => linkBudgetInvoice(state, exception.id, 'Compras', 'PC-7310', 'Gestor', 'Gestor')).toThrow('Somente o Financeiro')
-    expect(() => linkBudgetInvoice(state, exception.id, 'Compras', 'PC-NAO-EXISTE', 'Financeiro', 'Financeiro')).toThrow('Documento não encontrado')
-    linkBudgetInvoice(state, exception.id, 'Compras', 'PC-7310', 'Financeiro', 'Financeiro')
+    expect(() => linkBudgetInvoice(state, TENANT, exception.id, 'Compras', 'PC-7310', 'Gestor', 'Gestor')).toThrow('Somente o Financeiro')
+    expect(() => linkBudgetInvoice(state, TENANT, exception.id, 'Compras', 'PC-NAO-EXISTE', 'Financeiro', 'Financeiro')).toThrow('Documento não encontrado')
+    linkBudgetInvoice(state, TENANT, exception.id, 'Compras', 'PC-7310', 'Financeiro', 'Financeiro')
     expect(exception.status).toBe('Resolvida')
     expect(posted).toMatchObject({ linkModule: 'Compras', linkId: 'PC-7310', linkMode: 'manual' })
     expect(budgetSummary(state, 'BC-GARANTIA', '2026-10').realized).toBe(before + 500)
-    applyOmiePayment(state, { id: 'PG-NF-2', invoiceNumber: '9101', sourceId: 'NF-9101', amount: 100, paidAt: '2026-10-19T11:00:00.000Z', categoryIds: ['BC-GARANTIA'], event: 'Pagamento', link: { module: 'Projetos', id: 'PRJ-26-014' } })
+    applyOmiePayment(state, TENANT, { id: 'PG-NF-2', invoiceNumber: '9101', sourceId: 'NF-9101', amount: 100, paidAt: '2026-10-19T11:00:00.000Z', categoryIds: ['BC-GARANTIA'], event: 'Pagamento', link: { module: 'Projetos', id: 'PRJ-26-014' } })
     expect(state.budgetExceptions.some(entry => entry.sourceId === 'PG-NF-2')).toBe(false)
     expect(state.budgetEntries.find(entry => entry.externalId === 'PG-NF-2')).toMatchObject({ linkModule: 'Projetos', linkId: 'PRJ-26-014' })
   })
 
   it('retém pagamentos inválidos na fila de exceção', () => {
     const state = createSeedState()
-    applyOmiePayment(state, { id: 'PG-SEM-CAT', sourceId: 'NF-X', amount: 100, paidAt: '2026-10-19T10:00:00.000Z', categoryIds: [], event: 'Pagamento' })
-    applyOmiePayment(state, { id: 'PG-ERRO', sourceId: 'NF-Y', amount: 100, paidAt: '2026-10-19T10:00:00.000Z', categoryIds: ['BC-CMV'], event: 'Pagamento', error: 'NF não localizada' })
+    applyOmiePayment(state, TENANT, { id: 'PG-SEM-CAT', sourceId: 'NF-X', amount: 100, paidAt: '2026-10-19T10:00:00.000Z', categoryIds: [], event: 'Pagamento' })
+    applyOmiePayment(state, TENANT, { id: 'PG-ERRO', sourceId: 'NF-Y', amount: 100, paidAt: '2026-10-19T10:00:00.000Z', categoryIds: ['BC-CMV'], event: 'Pagamento', error: 'NF não localizada' })
     expect(state.budgetExceptions).toEqual(expect.arrayContaining([
       expect.objectContaining({ sourceId: 'PG-SEM-CAT', kind: 'Sem categoria' }),
       expect.objectContaining({ sourceId: 'PG-ERRO', kind: 'Erro de sincronização' }),

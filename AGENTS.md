@@ -18,6 +18,18 @@ Fases:
 
 O objetivo é o que há de melhor no mercado, **ajustado à realidade da Roboflex**. É normal implementar algo completo no mockup e recortar depois.
 
+## Leis do redesenho
+
+Toda tela, regra e módulo do Thalamus 2.0 é avaliado contra estas sete leis:
+
+1. **Conquistar o usuário.** Clareza à primeira vista; sem texto sobrando nem botão que ninguém entende.
+2. **Economia de tempo.** Menos cliques e digitação; o sistema propõe e a pessoa confirma.
+3. **Automação de processos.** O que pode ser calculado ou disparado pelo sistema não é feito à mão.
+4. **Gestão à vista.** Desvio, alerta e responsável aparecem sem procurar.
+5. **Papéis claros.** Cada ação tem um dono; a tela mostra quem faz e quem decide.
+6. **Módulos definidos.** Fronteira clara por módulo, sem função duplicada.
+7. **Multitenant.** Todo dado pertence a uma empresa; o grupo é leitura autorizada, nunca mistura.
+
 ## Multitenancy e grupos econômicos
 
 - O Thalamus 2.0 é multitenant: cada empresa é um tenant e todo dado de negócio pertence a exatamente um tenant.
@@ -74,4 +86,4 @@ npx vitest run
 npm run build
 ```
 
-Conferir também no navegador (`npm run dev`, http://localhost:5173) as telas afetadas.
+Conferir também no navegador (`npm run serve`, http://localhost:8080) as telas afetadas. A porta é fixa: se a 8080 estiver ocupada, o servidor avisa em vez de subir em outra.

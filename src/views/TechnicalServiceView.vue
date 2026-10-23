@@ -33,7 +33,7 @@ const billed = computed(() => store.state.technicalServiceOrders.reduce((sum, en
     <article class="metric"><div class="metric-head">Chamados ativos <Headset :size="17" /></div><strong>{{ active.length }}</strong><small>{{ active.filter(entry => entry.status === 'Aguardando peça').length }} aguardando peça</small></article>
     <article class="metric"><div class="metric-head">Em garantia <CheckCircle2 :size="17" /></div><strong>{{ active.filter(entry => entry.warranty).length }}</strong><small>Geram NC para a Qualidade</small></article>
     <article class="metric"><div class="metric-head">Agenda de hoje e amanhã <CalendarClock :size="17" /></div><strong>{{ active.filter(entry => entry.scheduledFor && entry.scheduledFor <= new Date(Date.now() + 86400000).toISOString().slice(0, 10)).length }}</strong><small>Visitas e bancadas</small></article>
-    <article class="metric"><div class="metric-head">Cobrado <CircleDollarSign :size="17" /></div><strong>{{ fmtCurrency(billed) }}</strong><small>Gera contas a receber</small></article>
+    <article class="metric"><div class="metric-head">Cobrado <CircleDollarSign :size="17" /></div><strong>{{ fmtCurrency(billed) }}</strong><small>Enviado ao Omie para faturar</small></article>
   </section>
 
   <div class="filter-row chips-line">

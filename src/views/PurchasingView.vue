@@ -48,7 +48,7 @@ function create() {
   </div>
 
   <article v-if="store.state.purchaseOrders.length" class="card flush" data-tour="purchase-orders" style="margin-bottom:16px">
-    <div class="section-head"><div><h2>Pedidos de compra</h2><p>Compromissos aprovados, recebimento parcial e geração automática do contas a pagar</p></div></div>
+    <div class="section-head"><div><h2>Pedidos de compra</h2><p>Compromissos aprovados e recebimento parcial. O contas a pagar fica no Omie</p></div></div>
     <table><thead><tr><th>Pedido</th><th>Fornecedor</th><th>Item</th><th>Quantidade</th><th>Entrega</th><th>Valor</th><th>Status</th><th></th></tr></thead>
       <tbody><tr v-for="order in store.state.purchaseOrders" :key="order.id" class="clickable" @click="ui.openRecord('purchase', order.id)"><td><b>{{ order.id }}</b><small class="cell-sub">{{ order.demandIds.join(', ') }}</small></td><td>{{ store.partnerName(order.supplierId) }}</td><td>{{ store.itemLabel(order.itemId) }}</td><td>{{ order.received }}/{{ order.quantity }} {{ store.item(order.itemId).unit }}</td><td>{{ fmtDate(order.promisedDate) }}</td><td>{{ fmtCurrency(order.quantity * order.unitPrice) }}</td><td><StatusBadge :value="order.status" /></td><td @click.stop><div class="action-row"><button v-if="order.status === 'Aguardando aprovação'" class="button small" @click="store.advancePurchaseOrder(order.id)">Aprovar</button><button v-else-if="order.status === 'Aprovado'" class="button secondary small" @click="store.advancePurchaseOrder(order.id, true)">Receber parcial</button><button v-if="order.status === 'Aprovado' || order.status === 'Recebido parcial'" class="button small" @click="store.advancePurchaseOrder(order.id)">Receber saldo</button></div></td></tr></tbody>
     </table>

@@ -82,7 +82,7 @@ const topAbc = computed(() => abc.value.filter(entry => entry.value > 0).slice(0
     <MetricCard label="Pipeline comercial" :value="fmtCurrency(store.state.opportunities.filter(entry => !['Ganha', 'Perdida'].includes(entry.stage)).reduce((sum, entry) => sum + entry.value, 0))" detail="Oportunidades abertas" :icon="Target" />
     <MetricCard label="Demandas abertas" :value="store.state.demands.filter(entry => entry.status === 'Aberta').length" detail="Todas as origens" :icon="ShoppingCart" />
     <MetricCard label="Assistências em curso" :value="store.state.technicalServiceOrders.filter(entry => !['Concluída', 'Cancelada'].includes(entry.status)).length" detail="Garantia e cobráveis" :icon="Wrench" />
-    <MetricCard label="Orçamento consumido" :value="fmtCurrency(store.state.budgetEntries.filter(entry => entry.kind === 'Realizado pago' && entry.status !== 'Cancelado').reduce((sum, entry) => sum + entry.amount, 0))" detail="Realizado pago confirmado pelo Omie" :icon="Clock" />
+    <MetricCard label="Orçamento consumido" :value="fmtCurrency(store.state.budgetEntries.filter(entry => entry.tenantId === ui.activeTenantId && entry.kind === 'Realizado pago' && entry.status !== 'Cancelado').reduce((sum, entry) => sum + entry.amount, 0))" detail="Realizado pago confirmado pelo Omie" :icon="Clock" />
   </section>
 
   <section class="grid-2">

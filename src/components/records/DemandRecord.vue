@@ -103,7 +103,7 @@ function openOrigin() {
       <div v-else-if="form.kind === 'Serviço'" class="field">
         <label>Serviço do catálogo</label>
         <select v-model="form.serviceId"><option v-for="entry in store.state.services" :key="entry.id" :value="entry.id">{{ entry.code }} · {{ entry.name }}</option></select>
-        <small>{{ store.state.services.find(entry => entry.id === form.serviceId)?.outsourced ? 'Executado por terceiro: gera contas a pagar' : 'Execução interna' }}</small>
+        <small>{{ store.state.services.find(entry => entry.id === form.serviceId)?.outsourced ? 'Executado por terceiro: o pagamento fica no Omie' : 'Execução interna' }}</small>
       </div>
       <div class="field"><label>Descrição</label><input v-model="form.description" :placeholder="form.kind === 'Ativo' ? 'Ex.: Paquímetro digital para a qualidade' : 'Deixe em branco para usar o nome do cadastro'" /></div>
       <div class="form-grid">

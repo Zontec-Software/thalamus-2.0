@@ -57,7 +57,6 @@ const order = computed(() => store.state.salesOrders.find(entry => entry.id === 
 const op = computed(() => store.state.productionOrders.find(entry => entry.id === technical.value?.productionOrderId))
 const nc = computed(() => store.state.nonConformities.find(entry => entry.id === technical.value?.nonConformityId))
 const demands = computed(() => store.state.demands.filter(entry => entry.originId === props.id))
-const titles = computed(() => store.state.financialTitles.filter(entry => entry.reference === props.id))
 const estimate = computed(() => {
   if (!technical.value || !record.chargeable) return 0
   const visit = store.state.services.find(entry => entry.category === 'Assistência')?.price ?? 480
@@ -186,9 +185,6 @@ function openOp(id: string) {
       </button>
       <button v-for="demand in demands" :key="demand.id" class="list-row" @click="ui.openRecord('demand', demand.id)">
         <div><strong>{{ demand.id }} · {{ demand.description }}</strong><span>{{ demand.quantity }} · {{ demand.assigneeRole }}</span></div><StatusBadge :value="demand.status" />
-      </button>
-      <button v-for="title in titles" :key="title.id" class="list-row" @click="ui.openRecord('title', title.id)">
-        <div><strong>{{ title.id }} · contas a receber</strong><span>{{ fmtCurrency(title.amount) }} · vence {{ fmtDate(title.dueDate) }}</span></div><StatusBadge :value="title.status" />
       </button>
       </div>
 
