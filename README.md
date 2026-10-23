@@ -13,6 +13,10 @@ npm run dev
 
 Na primeira vez, um **tour de boas-vindas** apresenta o sistema, e cada tela tem um guia próprio na primeira visita. Os guias podem ser reabertos pelo botão de ajuda (?) no topo ou pela **Central de ajuda**.
 
+## Demonstração publicada
+
+Cada push na `main` publica este mockup em <https://zontec-software.github.io/thalamus-2.0/>. É o mesmo protótipo, sem backend: os dados ficam no navegador de quem abre. O `npm run dev` local continua em http://localhost:8080. No GitHub, a origem das Pages precisa ser **GitHub Actions**.
+
 Os dados são fictícios e ficam salvos no navegador. Para voltar ao cenário inicial, use **Integração Omie → Restaurar demonstração**.
 
 ## Áreas

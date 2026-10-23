@@ -19,11 +19,12 @@ const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
 const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
 const firstName = computed(() => ui.userName.split(' ')[0])
 
+const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
 const HERO_IMAGES = [
-  // '/roboflex/montagem-cases.jpg',
-  // '/roboflex/montagem-eletronicos.jpg',
-  '/roboflex/pecas-prensa.jpg',
-  // '/roboflex/pecas-bancada.jpg',
+  // asset('roboflex/montagem-cases.jpg'),
+  // asset('roboflex/montagem-eletronicos.jpg'),
+  asset('roboflex/pecas-prensa.jpg'),
+  // asset('roboflex/pecas-bancada.jpg'),
 ]
 const dayNumber = Math.floor((Date.now() - new Date().getTimezoneOffset() * 60_000) / 86_400_000)
 const heroImage = `url('${HERO_IMAGES[dayNumber % HERO_IMAGES.length]}')`
@@ -76,7 +77,7 @@ function openTodo(event: MouseEvent, record?: { kind: RecordKind; id: string }) 
   <div class="home">
     <section class="home-hero" :style="{ '--hero-image': heroImage }">
       <div class="hero-copy">
-        <img src="/roboflex/logo.png" alt="Roboflex" class="hero-logo" />
+        <img :src="asset('roboflex/logo.png')" alt="Roboflex" class="hero-logo" />
         <span class="hero-date">{{ today }}</span>
         <h1>{{ greeting }}, {{ firstName }}!</h1>
         <p>Em que vamos trabalhar hoje? Escolha uma área abaixo. Cada uma tem só as telas daquele trabalho.</p>
@@ -153,7 +154,7 @@ function openTodo(event: MouseEvent, record?: { kind: RecordKind; id: string }) 
         </ol>
       </article>
       <article class="home-card product-card">
-        <img src="/roboflex/linha-cases.jpg" alt="Cases, suportes e ventosas da Roboflex" />
+        <img :src="asset('roboflex/linha-cases.jpg')" alt="Cases, suportes e ventosas da Roboflex" />
         <div class="product-copy">
           <span>Roboflex</span>
           <h2>Cases robustos para tablets</h2>

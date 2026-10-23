@@ -187,10 +187,11 @@ Se o produto for vendido para outras empresas, a mesma separação evolui para i
 | Local | `docker compose` no repositório da API (MySQL, Redis, MinIO, Mailpit) | `localhost` | Seed | Simulado |
 | Homologação | Namespace `thalamus2-hml` | `erp-homologacao.thalamus.ind.br` e `api-erp-homologacao.thalamus.ind.br` | Seed | Conta Omie de testes |
 | Produção | Namespace `thalamus2-prd` | `erp.thalamus.ind.br` e `api-erp.thalamus.ind.br` | Reais | Conta Omie da Roboflex |
+| Demonstração | GitHub Pages do repositório `thalamus-2.0` | `zontec-software.github.io/thalamus-2.0` | localStorage do navegador | Simulado |
 
 Os nomes de domínio ainda estão em aberto (seção 14). A autenticação é a do próprio 2.0.
 
-Nada do 2.0 é publicado antes de o login e as permissões existirem. O mockup segue só na máquina de desenvolvimento até o Core estar no ar.
+Homologação e produção esperam o login e as permissões. O mockup navegável sai à parte: o workflow `.github/workflows/pages.yml` publica o build estático a cada push na `main`. Essa demonstração não tem banco, login nem Omie real.
 
 ---
 

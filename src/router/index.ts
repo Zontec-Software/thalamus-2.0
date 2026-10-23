@@ -4,7 +4,7 @@ import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 
 export const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/', component: () => import('../views/HomeView.vue'), meta: { title: 'Início', eyebrow: 'Thalamus' } },
     { path: '/painel', component: () => import('../views/DashboardView.vue'), meta: { title: 'Painel da operação', eyebrow: 'Operações' } },

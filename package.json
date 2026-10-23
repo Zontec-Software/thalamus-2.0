@@ -19,7 +19,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
-    "@rolldown/binding-win32-x64-msvc": "^1.2.14",
     "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/test-utils": "^2.5.1",
@@ -32,5 +31,8 @@
     "vite": "^8.3.0",
     "vitest": "^4.1.11",
     "vue-tsc": "^3.3.11"
+  },
+  "optionalDependencies": {
+    "@rolldown/binding-win32-x64-msvc": "^1.2.14"
   }
 }
