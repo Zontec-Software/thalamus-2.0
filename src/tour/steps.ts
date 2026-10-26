@@ -83,7 +83,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('changes-new', 'Solicitar mudança', 'Descreva o problema, escolha os itens, o destino do estoque atual e a data de efetividade. O impacto (saldo, OPs, pedidos e compras) é calculado na hora.'),
   ],
   '/produtos/ferramental': [
-    t('tooling-list', 'Moldes e gabaritos', 'Cavidades ativas, ciclo, máquinas compatíveis, vida útil e dono. A barra fica vermelha acima de 85% da vida. O contador de golpes vem do ativo na manutenção.'),
+    t('tooling-list', 'Moldes e gabaritos', 'Cavidades ativas, ciclo, postos compatíveis, vida útil e dono. O ativo de manutenção é opcional: sem ele, o contador de golpes fica em zero. A barra fica vermelha acima de 85% da vida quando o ativo está vinculado.'),
   ],
   '/produtos/homologacao': [
     t('product-life', 'Filas em vez de quadro', 'Cada fila mostra um tipo de trabalho: o que espera a sua aprovação, rascunhos, exceções de campo-chave, ativos com cadastro incompleto, bloqueados e obsoletos com saldo.'),
@@ -99,7 +99,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('partner-list', 'Perfis depois de abrir', 'Clique em um parceiro para abrir a página dele, com as abas Cadastro, Contatos e endereços, Cliente, Fornecedor e Histórico. A aba Cliente mostra a base de vendas e a classe ABC. O do fornecedor mostra os recebimentos e o retrato da homologação. Ticket médio e nota não têm fórmula definida, então o número não é publicado.'),
   ],
   '/pessoas': [
-    t('org-chart', 'Organograma', 'Cada setor tem gestor e o código do centro padrão. O cadastro do centro fica em Finanças. Clique em um setor para filtrar as pessoas dele.', 'close'),
+    t('org-chart', 'Organograma', 'Cada setor tem gestor e o código do centro padrão, usado na demanda e na compra. O orçamento acompanha pelo setor utilizador. Clique em um setor para filtrar as pessoas dele.', 'close'),
     t('record-list', 'A lista abre a ficha', 'Clique em uma pessoa para abrir a ficha à direita. O guia entra nela agora.', 'close'),
     t('new-record', 'Nova pessoa', 'O cadastro gera o PIN do tablet e aplica as permissões do papel escolhido.', 'close'),
     t('person-role', 'Papel, setor e acesso', 'O papel define o que a pessoa vê no sistema. Desativar o acesso tira a pessoa do tablet e das telas, sem apagar o histórico.', 'person'),

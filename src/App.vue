@@ -161,7 +161,7 @@ watch(() => ui.tourSteps.length, length => { if (length === 0) maybeStartTour() 
         <div class="topbar-left">
           <RouterLink to="/" class="brand topbar-brand" title="Voltar ao início">
             <BrandMark />
-            <div><strong>Thalamus</strong><span>{{ store.isPlatformMaster() ? 'Plataforma' : `ERP de produção · ${store.state.tenants.find(entry => entry.id === ui.activeTenantId)?.tradeName ?? 'Empresa'}` }}</span></div>
+            <div><strong>Thalamus</strong><span>{{ store.isPlatformMaster() ? 'Plataforma' : (store.state.tenants.find(entry => entry.id === ui.activeTenantId)?.tradeName ?? 'Empresa') }}</span></div>
           </RouterLink>
           <div v-if="!isHome" class="title-block">
           <button class="area-switch" @click.stop="areaOpen = !areaOpen; helpOpen = false; bellOpen = false">

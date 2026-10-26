@@ -112,3 +112,13 @@ export const owns = (to: string, path: string) => path === to || path.startsWith
 export const areaOf = (path: string) => AREAS.find(area => area.groups.some(group => group.items.some(item => owns(item.to, path))))
 
 export const moduleOf = (path: string) => NAVIGATION.flatMap(group => group.items).find(item => owns(item.to, path))?.module
+
+/** Rótulo curto da tela ativa, para a guia do navegador. Na raiz do módulo usa o nome da barra. */
+export function screenLabel(path: string, metaTitle?: string): string | undefined {
+  if (path === '/' || path === '') return undefined
+  const nav = NAVIGATION.flatMap(group => group.items)
+    .filter(entry => owns(entry.to, path))
+    .sort((a, b) => b.to.length - a.to.length)[0]
+  if (nav && (path === nav.to || path === `${nav.to}/`)) return nav.label
+  return metaTitle || nav?.label
+}

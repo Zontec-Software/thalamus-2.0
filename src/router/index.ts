@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { moduleFeature, moduleOf } from '../navigation'
+import { moduleFeature, moduleOf, screenLabel } from '../navigation'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 
@@ -62,7 +62,15 @@ export const router = createRouter({
   ],
 })
 
+function applyDocumentTitle(path: string, metaTitle: unknown) {
+  const itemId = path.match(/^\/produtos\/item\/([^/]+)/)?.[1]
+  const code = itemId ? useErpStore().state.items.find(entry => entry.id === decodeURIComponent(itemId))?.code : undefined
+  const label = code ?? screenLabel(path, typeof metaTitle === 'string' ? metaTitle : undefined)
+  document.title = label || 'Thalamus'
+}
+
 router.afterEach((to, from) => {
+  applyDocumentTitle(to.path, to.meta.title)
   if (to.path !== from.path) useUiStore().closeRecord()
 })
 

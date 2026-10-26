@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, type Component } from 'vue'
+import { computed, ref, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ChevronRight, RotateCcw, Trash2 } from 'lucide-vue-next'
 import StatusBadge from '../../components/StatusBadge.vue'
@@ -127,8 +127,6 @@ const kpis = computed<Kpi[]>(() => {
   list.push({ label: 'Mudanças', value: String(openChanges.value.length), hint: openChanges.value.length ? 'em aberto' : 'nenhuma em aberto', target: 'mudancas', tone: openChanges.value.some(change => change.priority === 'Urgente') ? 'warning' : undefined })
   return list
 })
-
-watch(item, value => { if (value) document.title = `${value.code} · Thalamus` }, { immediate: true })
 
 function remove(reason: string) {
   const id = item.value!.id
