@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, type Component } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ChevronRight, RotateCcw, Trash2 } from 'lucide-vue-next'
+import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw, Trash2 } from 'lucide-vue-next'
 import StatusBadge from '../../components/StatusBadge.vue'
 import { ITEM_TYPE_LABEL, catalogOf, classLabel, hasRouting, itemFlags, layersOf, missingAttributes, references } from '../../domain/catalog'
 import { hasFullAccess } from '../../domain/access'
@@ -92,6 +92,40 @@ const section = computed<Section>({
   set: value => { router.replace({ query: { ...route.query, aba: value === 'nucleo' ? undefined : value } }) },
 })
 const sectionLabel = computed(() => allLinks.value.find(entry => entry.id === section.value)?.label ?? '')
+const tabStrip = ref<HTMLElement | null>(null)
+const canLeft = ref(false)
+const canRight = ref(false)
+const overflowTabs = computed(() => canLeft.value || canRight.value)
+let measuringTabs = false
+function measureTabs() {
+  const el = tabStrip.value
+  if (!el || measuringTabs) return
+  const left = el.scrollLeft > 2
+  const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 2
+  if (left === canLeft.value && right === canRight.value) return
+  canLeft.value = left
+  canRight.value = right
+  measuringTabs = true
+  nextTick(() => { measuringTabs = false; measureTabs() })
+}
+function revealTab() {
+  const el = tabStrip.value
+  const active = el?.querySelector('button.on') as HTMLElement | null
+  if (!el || !active) return
+  const left = active.offsetLeft
+  const right = left + active.offsetWidth
+  if (left < el.scrollLeft) el.scrollTo({ left: Math.max(0, left - 12), behavior: 'smooth' })
+  else if (right > el.scrollLeft + el.clientWidth) el.scrollTo({ left: right - el.clientWidth + 12, behavior: 'smooth' })
+}
+function nudgeTabs(direction: -1 | 1) {
+  tabStrip.value?.scrollBy({ left: direction * 240, behavior: 'smooth' })
+}
+onMounted(() => {
+  nextTick(measureTabs)
+  window.addEventListener('resize', measureTabs)
+})
+onBeforeUnmount(() => window.removeEventListener('resize', measureTabs))
+watch([allLinks, section], () => nextTick(() => { revealTab(); measureTabs() }))
 
 const flags = computed(() => item.value ? itemFlags(store.state, item.value) : [])
 const photo = computed(() => item.value ? mainPhoto(item.value) : undefined)
@@ -186,11 +220,15 @@ function remove(reason: string) {
     </article>
 
     <div class="object-page">
-      <nav class="orc-tabs" data-tour="product-layers">
-        <button v-for="entry in allLinks" :key="entry.id" type="button" :class="{ on: section === entry.id }" @click="section = entry.id">
-          {{ entry.label }}<b v-if="entry.alert && entry.count">{{ entry.count }}</b>
-        </button>
-      </nav>
+      <div class="tab-scroll" data-tour="product-layers">
+        <button v-show="overflowTabs" type="button" class="tab-scroll-arrow" :disabled="!canLeft" aria-label="Seções anteriores" @click="nudgeTabs(-1)"><ChevronLeft :size="16" /></button>
+        <nav ref="tabStrip" class="orc-tabs" @scroll="measureTabs">
+          <button v-for="entry in allLinks" :key="entry.id" type="button" :class="{ on: section === entry.id }" @click="section = entry.id">
+            {{ entry.label }}<b v-if="entry.alert && entry.count">{{ entry.count }}</b>
+          </button>
+        </nav>
+        <button v-show="overflowTabs" type="button" class="tab-scroll-arrow" :disabled="!canRight" aria-label="Próximas seções" @click="nudgeTabs(1)"><ChevronRight :size="16" /></button>
+      </div>
       <article class="card section-body">
         <h3 class="section-title">{{ sectionLabel }}</h3>
         <component :is="SECTION_COMPONENT[section]" :item="item" />
