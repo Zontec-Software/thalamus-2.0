@@ -66,14 +66,14 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('plan-btn', 'Planejar com um clique', 'O sistema olha a estrutura: peça injetada em falta vira OP de injeção; componente comprado em falta vira requisição; o case vira a OP de montagem.'),
   ],
   '/produtos': [
-    t('product-side', 'O menu é do módulo', 'Produtos tem o próprio menu à esquerda: itens, classificação, estruturas, mudanças, fiscal e a análise do cadastro. Ferramental e estoque ficam na página do item. Ao abrir um item, este menu some e fica o da ficha.'),
+    t('product-side', 'As abas do módulo', 'Itens, classificação, estruturas, mudanças, fiscal e a análise do cadastro ficam na faixa do topo. O número marca o que pede ação. Ferramental e estoque ficam na página do item. Ao abrir um item, estas abas somem e as seções da ficha entram na mesma faixa.'),
     t('product-list', 'Lista feita para milhares de itens', 'A faixa acima da tabela filtra o tipo: todos, produto acabado, matéria-prima e os demais. Busque por código, descrição, EAN ou NCM e refine situação, classificação ou pendência. Marque vários itens para agir em lote.'),
     t('new-record', 'Um código por item', 'O item nasce em rascunho, com código sequencial e sem significado. O sistema avisa se já existe descrição parecida. Rascunho não entra em pedido, compra nem produção.'),
   ],
   '/produtos/item': [
     t('product-header', 'A ficha do item', 'Foto, código, tipo, classificação e versão vigente. As etiquetas abaixo apontam pendências, como atributo obrigatório vazio ou fiscal em conflito com o Omie.'),
     t('product-kpis', 'Indicadores clicáveis', 'Custo, saldo, lead time, roteiro, onde é usado e mudanças abertas. Cada indicador leva à seção que explica o número. No ferramental, mostram cavidades, ciclo e vida útil.'),
-    t('product-layers', 'Seções por assunto', 'Identificação, engenharia, logística, comercial e fiscal, documentos e governança. Só aparecem as seções que o tipo do item usa; o número ao lado indica o que há dentro.'),
+    t('product-layers', 'Seções na faixa do topo', 'Geral, engenharia, logística, comercial, documentos e governança ficam na mesma faixa horizontal do orçamento. Só aparecem as seções que o tipo do item usa. O número marca o que pede ação.'),
     t('product-attributes', 'Atributos herdados', 'Os atributos vêm da classificação. Os marcados com asterisco são obrigatórios para homologar.'),
   ],
   '/produtos/classificacao': [
@@ -160,7 +160,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('project-costs', 'Orçamento do projeto', 'A previsão mostra custos ainda abertos. O realizado só aparece quando o Omie confirma o pagamento.', 'project'),
   ],
   '/orcamentos': [
-    t('budget-tabs', 'O menu é do módulo', 'À esquerda: Visão geral acompanha, Ações decide, Categorias define o valor e os setores, Planejamento monta o ano. O guia passa por uma de cada vez.', 'close'),
+    t('budget-tabs', 'Quatro abas, na ordem do trabalho', 'Visão geral acompanha. Ações decide. Categorias define o valor, o responsável e os setores. Planejamento monta o ano. O guia passa por uma de cada vez.', 'close'),
     t('period-scope', 'Período e empresa', 'Escolha o ano e o intervalo de meses. Quem tem a consulta consolidada também escolhe a empresa do grupo ou a soma do grupo, só para leitura.', 'close'),
     t('record-list', 'Visão geral', 'Custo, despesa e investimento no período: orçado, realizado, previsão, desvio e uso, com a cor da situação. Financeiro e Administrador veem todas as contas, inclusive sem movimento. Os demais veem só as categorias em que são o responsável. Clique numa conta para ver o valor e o percentual de cada setor utilizador. Clique num setor para filtrar as origens, da maior para a menor.', 'close'),
     t('budget-detail', 'A ficha da conta', 'O realizado é a nota do Omie. A linha diz a compra, o projeto ou a ordem. Sem esse vínculo, a ação aparece para o setor executor.', 'budget'),

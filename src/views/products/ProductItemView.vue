@@ -186,13 +186,10 @@ function remove(reason: string) {
     </article>
 
     <div class="object-page">
-      <nav class="section-rail" data-tour="product-layers">
-        <section v-for="group in groups" :key="group.label" class="rail-group">
-          <h4>{{ group.label }}</h4>
-          <button v-for="entry in group.links" :key="entry.id" type="button" :class="{ active: section === entry.id }" @click="section = entry.id">
-            {{ entry.label }}<b v-if="entry.count" :class="{ alert: entry.alert }">{{ entry.count }}</b>
-          </button>
-        </section>
+      <nav class="orc-tabs" data-tour="product-layers">
+        <button v-for="entry in allLinks" :key="entry.id" type="button" :class="{ on: section === entry.id }" @click="section = entry.id">
+          {{ entry.label }}<b v-if="entry.alert && entry.count">{{ entry.count }}</b>
+        </button>
       </nav>
       <article class="card section-body">
         <h3 class="section-title">{{ sectionLabel }}</h3>
