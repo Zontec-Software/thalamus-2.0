@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { Tablet } from 'lucide-vue-next'
 import StatusBadge from '../components/StatusBadge.vue'
 import { opProgress } from '../domain/engine'
+import { showOnFloor } from '../domain/resources'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 import { fmtDate } from '../utils/format'
@@ -12,7 +13,7 @@ const ui = useUiStore()
 const STEPS = ['Montagem mecânica', 'Montagem do suporte', 'Vedação IP65', 'Instalação elétrica', 'Teste funcional', 'Teste de estanqueidade', 'Embalagem', 'Retrabalho']
 
 const ops = computed(() => store.state.productionOrders.filter(op => op.kind === 'Montagem' && op.status !== 'Concluída').sort((a, b) => a.dueDate.localeCompare(b.dueDate)))
-const cells = computed(() => store.state.resources.filter(resource => resource.kind === 'Montagem').map(resource => {
+const cells = computed(() => store.state.resources.filter(resource => resource.tenantId === ui.activeTenantId && resource.kind === 'Montagem' && showOnFloor(store.state, resource)).map(resource => {
   const operations = store.state.productionOrders.flatMap(op => op.operations.map(operation => ({ op, operation }))).filter(entry => entry.operation.resourceId === resource.id && entry.op.status !== 'Concluída')
   return {
     resource,

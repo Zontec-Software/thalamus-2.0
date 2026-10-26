@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addDays, advanceRequisition, applyDueRevisions, approveInspection, assertUsable, availableQty, consumeStock, finishOperation, lineNeed, machineState, orderStage,
-  pauseOperation, pickOp, planOrder, purchaseLot, receiveOmieOrders, rejectInspection, reportProduction, shipOrder, startOperation, today, type ErpState,
+  pauseOperation, pickOp, planOrder, purchaseLot, receiveOmieOrders, rejectInspection, reportProduction, scheduleOp, shipOrder, startOperation, today, type ErpState,
 } from '../domain/engine'
 import {
   DEFAULT_PRICE_TABLE, addConversion, approvalIssues, approveItem, blockItem, convertQuantity, createItem, currentPrice, decideKeyChange, deleteItem,
@@ -23,7 +23,9 @@ import { createSeedState } from '../mocks/seed'
 import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import { FUNCTIONALITIES, profileCan } from '../domain/access'
 import { provisionCompany, saveEconomicGroup, saveOmieConnection } from '../domain/platform'
-import { clientSalesBase, createPartner, decideAbcSuggestion, inactivateRole, registerAnnualBilling } from '../domain/partners'
+import { addRole, assertShipmentCarrier, carrierChoices, clientSalesBase, createPartner, decideAbcSuggestion, inactivateRole, registerAnnualBilling } from '../domain/partners'
+import { saveTooling } from '../domain/engineering'
+import { createResource, inactivateResource, removeResource, updateResource } from '../domain/resources'
 
 const TENANT = 'tenant-roboflex'
 const stageOf = (state: ErpState, id: string) => orderStage(state, state.salesOrders.find(order => order.id === id)!)
@@ -991,7 +993,7 @@ describe('cadastro completo: camadas estendidas', () => {
     saveRoutingStep(state, item.id, { name: 'Montagem', resourceId: 'mont1', minutesPerUnit: 4, instructions: ['Fixar moldura'] }, 'Eduardo', 'Engenharia')
     expect(item.routing).toHaveLength(1)
     expect(item.catalog!.audit[0].field).toMatch(/Roteiro/)
-    expect(() => saveRoutingStep(state, item.id, { name: 'Sem recurso', resourceId: 'x', minutesPerUnit: 1, instructions: [] }, 'Eduardo', 'Engenharia')).toThrow(/recurso/)
+    expect(() => saveRoutingStep(state, item.id, { name: 'Sem recurso', resourceId: 'x', minutesPerUnit: 1, instructions: [] }, 'Eduardo', 'Engenharia')).toThrow(/posto/)
   })
 
   it('prazo de entrega soma a fabricação ao maior lead time de compra dos componentes', () => {
@@ -1012,6 +1014,21 @@ describe('parceiros', () => {
     contacts: [{ name: 'Helena', duty: 'Comercial', phone: '', email: 'helena@oficinanorte.com.br' }],
     addresses: [{ purpose: 'Sede' as const, line: 'Rua 1', city: 'Sabará', state: 'MG' }],
   }
+
+  it('o papel transportadora entra na expedição e sai quando é inativado', () => {
+    const state = createSeedState()
+    expect(carrierChoices(state)).toEqual(expect.arrayContaining(['Translog Brasil', 'Rodonaves', 'Braspress', 'Retirada pelo cliente']))
+    const created = createPartner(state, {
+      ...input, document: '10.200.300/0001-55', legalName: 'Carga Rápida Ltda', tradeName: 'Carga Rápida', roles: ['Transportadora'],
+    }, 'Marina')
+    expect(carrierChoices(state)).toContain('Carga Rápida')
+    inactivateRole(state, created.id, 'Transportadora', 'Sem contrato', 'Marina')
+    expect(carrierChoices(state)).not.toContain('Carga Rápida')
+    expect(() => assertShipmentCarrier(state, 'Carga Rápida')).toThrow(/papel ativo/)
+    expect(() => assertShipmentCarrier(state, 'Retirada pelo cliente')).not.toThrow()
+    addRole(state, created.id, 'Transportadora', 'Marina')
+    expect(carrierChoices(state)).toContain('Carga Rápida')
+  })
 
   it('recusa documento repetido e aceita quando a pessoa confirma', () => {
     const state = createSeedState()
@@ -1060,5 +1077,45 @@ describe('parceiros', () => {
     decideAbcSuggestion(state, 'c2', suggestion.id, false, 'Comercial', 'Camila')
     expect(suggestion.status).toBe('Recusada')
     expect(() => decideAbcSuggestion(state, 'c1', 'ABC-2026', true, 'Compras', 'Juliana')).toThrow(/Coordenador/)
+  })
+})
+
+describe('postos', () => {
+  it('cadastra na empresa, recusa nome repetido e só exclui posto sem uso', () => {
+    const state = createSeedState()
+    expect(() => createResource(state, { tenantId: TENANT, name: 'Injetora 01 · 180 t', kind: 'Injetora', dailyMinutes: 960 }, 'PCP')).toThrow(/nome/)
+    const created = createResource(state, { tenantId: TENANT, name: 'Célula 3', kind: 'Montagem', dailyMinutes: 440, hourlyRate: 14 }, 'PCP')
+    expect(created.status).toBe('Ativo')
+    expect(created.tenantId).toBe(TENANT)
+    expect(() => removeResource(state, 'inj1', 'PCP')).toThrow(/Inative/)
+    removeResource(state, created.id, 'PCP')
+    expect(state.resources.some(entry => entry.id === created.id)).toBe(false)
+    expect(() => updateResource(state, 'inj1', { name: 'Injetora 01 · 180 t', kind: 'Montagem', dailyMinutes: 960, hourlyRate: 95 }, 'PCP')).toThrow(/tipo/)
+  })
+
+  it('posto inativo sai das escolhas novas e a ordem que já está nele continua', () => {
+    const state = createSeedState()
+    const item = createItem(state, { name: 'Case de prova', type: 'PA', unit: 'un', classId: state.itemClasses[0].id }, 'Eduardo', 'Engenharia')
+    saveRoutingStep(state, item.id, { name: 'Montagem', resourceId: 'mont1', minutesPerUnit: 4, instructions: ['Fixar'] }, 'Eduardo', 'Engenharia')
+    const step = item.routing![0]
+    inactivateResource(state, 'mont1', 'PCP')
+    saveRoutingStep(state, item.id, { id: step.id, name: 'Montagem', resourceId: 'mont1', minutesPerUnit: 5, instructions: ['Fixar'] }, 'Eduardo', 'Engenharia')
+    expect(step.resourceId).toBe('mont1')
+    expect(step.minutesPerUnit).toBe(5)
+    expect(() => saveRoutingStep(state, item.id, { name: 'Outra', resourceId: 'mont1', minutesPerUnit: 1, instructions: [] }, 'Eduardo', 'Engenharia')).toThrow(/inativo/)
+
+    const op = state.productionOrders.find(entry => entry.resourceId === 'inj2' && entry.status !== 'Concluída')!
+    inactivateResource(state, 'inj2', 'PCP')
+    scheduleOp(state, op.id, 'inj2', op.scheduledDate, 'PCP')
+    expect(op.resourceId).toBe('inj2')
+    expect(() => scheduleOp(state, op.id, 'inj4', op.scheduledDate, 'PCP')).toThrow(/inativo/)
+    scheduleOp(state, op.id, 'inj1', op.scheduledDate, 'PCP')
+    expect(op.resourceId).toBe('inj1')
+
+    const tooling = catalogOf(state.items.find(entry => entry.id === 'fe-m112')!).tooling!
+    expect(() => saveTooling(state, 'fe-m112', { ...tooling, compatibleResourceIds: [...tooling.compatibleResourceIds, 'inj4'] }, 'Eduardo', 'Engenharia')).toThrow(/inativo/)
+    inactivateResource(state, 'inj1', 'PCP')
+    saveTooling(state, 'fe-m112', { ...tooling, shotWeightG: tooling.shotWeightG + 1 }, 'Eduardo', 'Engenharia')
+    expect(catalogOf(state.items.find(entry => entry.id === 'fe-m112')!).tooling!.compatibleResourceIds).toContain('inj1')
   })
 })

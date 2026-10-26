@@ -31,14 +31,16 @@ export const ORDER_DRAWER_TOUR: TourStep[] = [
 
 /** Chave do guia para a rota: telas com id na URL compartilham um guia. */
 export function tourKey(path: string): string {
-  return path.startsWith('/produtos/item/') ? '/produtos/item' : path
+  if (path.startsWith('/produtos/item/')) return '/produtos/item'
+  if (path.startsWith('/postos')) return '/postos'
+  return path
 }
 
 export const PAGE_TOURS: Record<string, TourStep[]> = {
   '/': [
     t('home-blocks', 'As áreas do sistema', 'Entre em uma área por vez. O menu lateral acompanha a área em que você está.'),
     t('home-producao', 'Produção', 'Painel, fluxo, planejamento, injeção, montagem e tablet ficam juntos neste bloco.'),
-    t('home-cadastros', 'Cadastros', 'Produtos, estruturas e pessoas. Separado da operação do dia.'),
+    t('home-cadastros', 'Cadastros', 'Produtos, postos, pessoas e ativos. Separado da operação do dia.'),
   ],
   '/painel': [
     t('kpis', 'Indicadores do dia', 'Visão rápida de pedidos em carteira, riscos, eficiência e materiais críticos. Os números são calculados a partir das operações reais registradas.'),
@@ -62,7 +64,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('plan-btn', 'Planejar com um clique', 'O sistema olha a estrutura: peça injetada em falta vira OP de injeção; componente comprado em falta vira requisição; o case vira a OP de montagem.'),
   ],
   '/produtos': [
-    t('product-side', 'O menu é do módulo', 'Esta faixa é o menu de Produtos: itens, classificação, estruturas e roteiros, mudanças, ferramental, estoque, fiscal e a análise do cadastro. O número ao lado mostra o que espera ação.'),
+    t('product-side', 'O menu é do módulo', 'Produtos tem o próprio menu à esquerda: itens, classificação, estruturas, mudanças, ferramental, estoque, fiscal e a análise do cadastro. Ao abrir um item, este menu some e fica o da ficha.'),
     t('product-list', 'Lista feita para milhares de itens', 'A faixa acima da tabela filtra o tipo: todos, produto acabado, matéria-prima e os demais. Busque por código, descrição, EAN ou NCM e refine situação, classificação ou pendência. Marque vários itens para agir em lote.'),
     t('new-record', 'Um código por item', 'O item nasce em rascunho, com código sequencial e sem significado. O sistema avisa se já existe descrição parecida. Rascunho não entra em pedido, compra nem produção.'),
   ],
@@ -93,8 +95,8 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
   ],
   '/parceiros': [
     t('partner-idea', 'Um cadastro, dois papéis', 'Cliente e fornecedor não são fichas separadas. O parceiro guarda os dados gerais uma vez. Cada papel tem o próprio perfil e a própria situação.'),
-    t('new-partner', 'Novo parceiro', 'O documento repetido é avisado antes de criar outro registro. Sem papel, o cadastro fica em cadastro.', 'close'),
-    t('partner-list', 'Perfis depois de abrir', 'Abra um parceiro. O perfil do cliente mostra a base de vendas e a classe ABC. O do fornecedor mostra os recebimentos e o retrato da homologação. Ticket médio e nota não têm fórmula definida, então o número não é publicado.'),
+    t('new-partner', 'Novo parceiro', 'Escolha Cliente, Fornecedor, Transportadora ou mais de um. O documento repetido é avisado antes de criar outro registro. Sem papel, o cadastro fica em cadastro.', 'close'),
+    t('partner-list', 'Perfis depois de abrir', 'Clique em um parceiro para abrir a página dele, com as abas Cadastro, Contatos e endereços, Cliente, Fornecedor e Histórico. A aba Cliente mostra a base de vendas e a classe ABC. O do fornecedor mostra os recebimentos e o retrato da homologação. Ticket médio e nota não têm fórmula definida, então o número não é publicado.'),
   ],
   '/pessoas': [
     t('org-chart', 'Organograma', 'Cada setor tem gestor e o código do centro padrão. O cadastro do centro fica em Finanças. Clique em um setor para filtrar as pessoas dele.', 'close'),
@@ -109,6 +111,12 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('new-record', 'Novo serviço', 'Defina custo, preço e se a execução é de terceiro. Terceiro vira contratação com fornecedor e conta a pagar.', 'close'),
     t('service-form', 'Custo, preço e execução', 'Preço zero significa que o serviço não é vendido. Marcado como terceiro, a demanda pede um fornecedor, cria a previsão orçamentária e gera a conta a pagar na conclusão.', 'service'),
     t('service-usage', 'Onde este serviço aparece', 'Propostas, demandas e chamados que usam o serviço. Cada linha abre o registro correspondente.', 'service'),
+  ],
+  '/postos': [
+    t('post-idea', 'A vaga da fábrica', 'O posto é onde a ordem entra e o que o operador escolhe no tablet. A máquina física continua em Ativos e aponta para este posto.'),
+    t('new-post', 'Novo posto', 'Nome, tipo, minutos por dia e custo-hora. Ele já nasce ativo e pode entrar no roteiro, no ferramental e na programação.'),
+    t('post-list', 'A lista fica inteira', 'Clique num posto para abrir a ficha por cima da lista. Inativar tira das escolhas novas. Excluir só existe enquanto nada aponta para o posto.'),
+    t('post-form', 'A ficha do posto', 'Nome, tipo, minutos e custo-hora ficam nesta janela. Abaixo aparecem os ativos ligados. O vínculo é feito na ficha do ativo. Molde só aceita posto do tipo Injetora.'),
   ],
   '/ativos': [
     t('record-list', 'Ativos e capacidade', 'Cada cartão mostra ciclos, preventiva e OS abertas. Clique abre a ficha, e o guia entra nela agora.', 'close'),
@@ -199,7 +207,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('nc-table', 'Não conformidades', 'Registro de problemas com causa e ação corretiva, ligado à OP e ao pedido.'),
   ],
   '/expedicao': [
-    t('shipping-list', 'Conferência e expedição', 'Confira volumes e transportadora e expeça a carga. O Omie emite a NF-e e o pedido é marcado como faturado automaticamente.'),
+    t('shipping-list', 'Conferência e expedição', 'Confira os volumes e escolha a transportadora. A lista traz os parceiros com esse papel ativo, mais a retirada pelo cliente. O Omie emite a NF-e e o pedido é marcado como faturado automaticamente.'),
   ],
   '/manutencao': [
     t('maintenance-list', 'Ordens e previsão', 'Corretivas e preventivas mostram custo estimado, categoria e mês. Esses dados criam a previsão orçamentária. A máquina fica bloqueada para produção até a liberação.'),

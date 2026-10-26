@@ -5,6 +5,7 @@ import * as budgetDomain from './budget'
 import type { ErpState } from './engine'
 import { addDays, addSyncLog, applyDueRevisions, assertUsable, availableQty, consumeStock, DomainError, getItem, getOp, log, nextId, now, receiveStock, today } from './engine'
 import { assertClientOpen, assertPurchaseAllowed, assertSupplierOpen } from './partners'
+import { assertResourceChoice } from './resources'
 import type {
   Asset, Budget, CrmActivity, Demand, Item, Opportunity, Project, Proposal, ProposalLine,
   PurchaseOrder, Role, ServiceCatalogItem, TechnicalServiceOrder, User,
@@ -790,6 +791,7 @@ export function updateService(state: ErpState, id: string, patch: Partial<Omit<S
 
 export function createAsset(state: ErpState, input: Omit<Asset, 'id' | 'shots'>, actor: string) {
   if (!input.name.trim()) throw new DomainError('Informe o nome do ativo')
+  if (input.resourceId) assertResourceChoice(state, input.resourceId)
   const asset: Asset = { id: `at-${String(state.counters.ATV = (state.counters.ATV ?? 0) + 1)}`, shots: input.kind === 'Molde' ? 0 : undefined, status: 'Operando', ...input }
   state.assets.push(asset)
   log(state, 'Ativos', actor, `${asset.name} cadastrado`, undefined, asset.id)
@@ -798,6 +800,7 @@ export function createAsset(state: ErpState, input: Omit<Asset, 'id' | 'shots'>,
 
 export function updateAsset(state: ErpState, id: string, patch: Partial<Omit<Asset, 'id'>>, actor: string) {
   const asset = find(state.assets, id, 'Ativo')
+  if (patch.resourceId && patch.resourceId !== asset.resourceId) assertResourceChoice(state, patch.resourceId)
   Object.assign(asset, patch)
   log(state, 'Ativos', actor, 'Cadastro do ativo atualizado', undefined, id)
   return asset

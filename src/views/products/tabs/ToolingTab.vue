@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
 import { catalogOf, toolingIssues } from '../../../domain/catalog'
+import { resourceOffered } from '../../../domain/resources'
 import { moldMinutesPerPiece, toolLife, toolUsers } from '../../../domain/engineering'
 import { useErpStore } from '../../../stores/erp'
 import { useUiStore } from '../../../stores/ui'
@@ -20,7 +21,10 @@ watch(() => [props.item.id, catalog.value.version], () => {
   Object.assign(form, blank(), catalog.value.tooling ? { ...catalog.value.tooling, compatibleResourceIds: [...catalog.value.tooling.compatibleResourceIds], ownerName: catalog.value.tooling.ownerName ?? '', assetId: catalog.value.tooling.assetId ?? '' } : {})
 }, { immediate: true })
 
-const resources = computed(() => store.state.resources.filter(resource => form.kind === 'Molde' ? resource.kind === 'Injetora' : resource.kind !== 'Injetora'))
+const resources = computed(() => store.state.resources.filter(resource => {
+  const kindOk = form.kind === 'Molde' ? resource.kind === 'Injetora' : resource.kind !== 'Injetora'
+  return kindOk && resourceOffered(resource, ui.activeTenantId, form.compatibleResourceIds)
+}))
 const assets = computed(() => store.state.assets.filter(asset => asset.kind === (form.kind === 'Molde' ? 'Molde' : 'Equipamento') || asset.id === form.assetId))
 const issues = computed(() => toolingIssues(catalog.value.tooling))
 const life = computed(() => toolLife(store.state, props.item))
@@ -65,7 +69,7 @@ function save() {
       <div class="field">
         <label>{{ form.kind === 'Molde' ? 'Injetoras compatíveis' : 'Postos compatíveis' }}</label>
         <div class="chip-row">
-          <button v-for="resource in resources" :key="resource.id" type="button" class="chip" :class="{ active: form.compatibleResourceIds.includes(resource.id) }" @click="toggle(resource.id)">{{ resource.name }}</button>
+          <button v-for="resource in resources" :key="resource.id" type="button" class="chip" :class="{ active: form.compatibleResourceIds.includes(resource.id) }" @click="toggle(resource.id)">{{ resource.name }}{{ resource.status === 'Inativo' ? ' · inativo' : '' }}</button>
         </div>
       </div>
       <button class="button" type="submit">Salvar ferramental</button>

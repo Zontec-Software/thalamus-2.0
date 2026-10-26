@@ -2,7 +2,7 @@ import type { Component } from 'vue'
 export { moduleFeature } from './domain/access'
 import {
   ArrowDownToLine, ArrowUpFromLine, BadgeDollarSign, BarChart3, Boxes, BriefcaseBusiness, Building2, CalendarRange, CircleDollarSign, Handshake, Landmark,
-  ClipboardCheck, Factory, FolderKanban, Gauge, HandCoins, Headset, LifeBuoy, ListChecks, PackageCheck,
+  ClipboardCheck, Cog, Factory, FolderKanban, Gauge, HandCoins, Headset, LifeBuoy, ListChecks, PackageCheck,
   PackageSearch, ShoppingCart, Tablet, Truck, Unplug, UserRoundCog, Users, Warehouse, Workflow, Wrench,
 } from 'lucide-vue-next'
 
@@ -30,10 +30,10 @@ export interface Area {
 /** Áreas do sistema; fonte única para menus, permissões e seletor de área. */
 export const AREAS: Area[] = [
   {
-    id: 'cadastros', label: 'Cadastros', description: 'Produtos, pessoas, serviços e patrimônio em uma fonte única.', icon: Building2,
+    id: 'cadastros', label: 'Cadastros', description: 'Produtos, pessoas, postos, serviços e patrimônio em uma fonte única.', icon: Building2,
     groups: [
       { label: 'Engenharia', items: [{ label: 'Produtos', to: '/produtos', icon: Boxes, module: 'Produtos' }, { label: 'Serviços', to: '/servicos', icon: BriefcaseBusiness, module: 'Serviços' }] },
-      { label: 'Organização', items: [{ label: 'Pessoas', to: '/pessoas', icon: Users, module: 'Pessoas' }, { label: 'Parceiros', to: '/parceiros', icon: Handshake, module: 'Parceiros' }, { label: 'Ativos', to: '/ativos', icon: Factory, module: 'Ativos' }] },
+      { label: 'Organização', items: [{ label: 'Pessoas', to: '/pessoas', icon: Users, module: 'Pessoas' }, { label: 'Parceiros', to: '/parceiros', icon: Handshake, module: 'Parceiros' }, { label: 'Postos', to: '/postos', icon: Cog, module: 'Postos' }, { label: 'Ativos', to: '/ativos', icon: Factory, module: 'Ativos' }] },
     ],
   },
   {

@@ -40,11 +40,11 @@ Chamado de assistência → vínculo com cliente, pedido, lote ou serial → age
 
 ### Produção
 
-Pedido aprovado → OP com revisão congelada → reserva → separação → execução no tablet → inspeção → expedição. A separação pode ser desfeita antes do primeiro apontamento.
+Pedido aprovado → OP com revisão congelada → reserva → separação → execução no tablet → inspeção → expedição. A separação pode ser desfeita antes do primeiro apontamento. O posto é cadastro da empresa (tipo, minutos por dia e custo-hora). O ativo físico aponta para o posto; o ferramental continua no item.
 
 ## Persistência do protótipo
 
-O estado fica no `localStorage`, na chave `thalamus-erp-v37`. Não há banco de dados nem API nesta fase. Restaurar a demonstração recria o seed completo.
+O estado fica no `localStorage`, na chave `thalamus-erp-v38`. Não há banco de dados nem API nesta fase. Restaurar a demonstração recria o seed completo.
 
 Campo novo no estado exige subir a chave. Não há migração: a chave nova nasce do seed, e a antiga é descartada.
 

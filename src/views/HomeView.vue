@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowRight, BellRing, CircleAlert, Clock3, Factory, PackageCheck, Sparkles, Tablet, TriangleAlert } from 'lucide-vue-next'
 import { FLOW_STAGES } from '../domain/engine'
+import { showOnFloor } from '../domain/resources'
 import { AREAS, moduleFeature } from '../navigation'
 import { useErpStore } from '../stores/erp'
 import { useUiStore, type RecordKind } from '../stores/ui'
@@ -47,7 +48,7 @@ const areas = computed(() => AREAS.map(area => ({
 })).filter(area => area.items.length))
 
 const stages = computed(() => FLOW_STAGES.map(stage => ({ stage, count: store.state.salesOrders.filter(order => store.stage(order) === stage).length })))
-const machines = computed(() => store.state.resources.filter(resource => resource.kind === 'Injetora' || resource.kind === 'Montagem')
+const machines = computed(() => store.state.resources.filter(resource => resource.tenantId === ui.activeTenantId && (resource.kind === 'Injetora' || resource.kind === 'Montagem') && showOnFloor(store.state, resource))
   .map(resource => ({ name: resource.name.replace('Montagem · Célula ', 'Célula ').replace(/ · .*$/, ''), state: store.machineState(resource.id) })))
 const producing = computed(() => machines.value.filter(machine => machine.state === 'Produzindo').length)
 const alerts = computed(() => store.state.alerts.filter(alert => !alert.resolved))

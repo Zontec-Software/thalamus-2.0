@@ -7,16 +7,17 @@ import * as enterprise from '../domain/enterprise'
 import * as engineering from '../domain/engineering'
 import * as budget from '../domain/budget'
 import * as partners from '../domain/partners'
+import * as resources from '../domain/resources'
 import { profileCan } from '../domain/access'
 import { provisionCompany, saveEconomicGroup, saveOmieConnection } from '../domain/platform'
 import type { ErpState } from '../domain/engine'
 import { createSeedState } from '../mocks/seed'
 import type { OmieGateway } from '../services/omie/gateway'
 import { MockOmieGateway } from '../services/omie/mockOmieGateway'
-import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NonConformity, Role, SalesOrder, UnitConversion } from '../types/domain'
+import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NonConformity, Resource, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v37'
+const STORAGE_KEY = 'thalamus-erp-v40'
 
 function load(): ErpState {
   const seed = createSeedState()
@@ -217,7 +218,10 @@ export const useErpStore = defineStore('erp', () => {
   const rejectInspection = (opId: string, quantity: number, reason: string, inspector = actor()) => run(() => engine.rejectInspection(state, opId, quantity, reason, inspector), 'Não conformidade aberta e retrabalho enviado')
   const updateNc = (id: string, status: NonConformity['status'], action: string) => run(() => engine.updateNonConformity(state, id, status, action, actor()), `${id} atualizada`)
 
-  const confirmShipment = (orderId: string, volumes: number, carrier: string, operator = actor()) => run(() => engine.confirmShipment(state, orderId, volumes, carrier, operator), 'Conferência registrada')
+  const confirmShipment = (orderId: string, volumes: number, carrier: string, operator = actor()) => run(() => {
+    partners.assertShipmentCarrier(state, carrier)
+    return engine.confirmShipment(state, orderId, volumes, carrier, operator)
+  }, 'Conferência registrada')
 
   async function shipOrder(orderId: string, operator = actor()) {
     const pending = run(() => engine.shipOrder(state, orderId, operator), 'Carga expedida. Aguardando NF-e do Omie…')
@@ -364,6 +368,13 @@ export const useErpStore = defineStore('erp', () => {
   const createService = bind(enterprise.createService, service => `${service.code} criado`)
   const updateService = bind(enterprise.updateService, 'Serviço atualizado')
   const createAsset = bind(enterprise.createAsset, asset => `${asset.name} cadastrado`)
+  const createResource = (input: { name: string; kind: Resource['kind']; dailyMinutes: number; hourlyRate?: number }) =>
+    run(() => resources.createResource(state, { ...input, tenantId: tenantId() }, actor()), resource => `${resource.name} cadastrado`)
+  const updateResource = (id: string, input: { name: string; kind: Resource['kind']; dailyMinutes: number; hourlyRate?: number }) =>
+    run(() => resources.updateResource(state, id, input, actor()), 'Posto atualizado')
+  const inactivateResource = (id: string) => run(() => resources.inactivateResource(state, id, actor()), 'Posto inativado')
+  const reactivateResource = (id: string) => run(() => resources.reactivateResource(state, id, actor()), 'Posto reativado')
+  const removeResource = (id: string) => run(() => resources.removeResource(state, id, actor()), 'Posto excluído')
   const updateAsset = bind(enterprise.updateAsset, 'Ativo atualizado')
   const eventsFor = (ref: string) => state.events.filter(event => event.ref === ref)
   const userName = (id?: string) => state.users.find(entry => entry.id === id)?.name ?? '—'
@@ -576,6 +587,6 @@ export const useErpStore = defineStore('erp', () => {
     createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk,
     createBudget, distributeGroupBudget, setAnnualBudget, adjustBudget, createBudgetCategory, updateBudgetCategory, configureBudget, decideBudgetException, acknowledgeBudgetAlert, linkBudgetInvoice,
     applyBudgetGrowth, applyRevenueTarget, applyPriorSeasonality, setMonthlyBudget, setSectorAllocations, setCategoryAssignment, createBudgetGroup, createPlannedCompany, setCostCenterSplit, applyCategorySuggestion, saveBudgetSimulation, applyBudgetSimulation, createCostCenter, updateCostCenter, setSectorDefaultCostCenter, applyGroupGrowth, applyGroupRevenueTarget,
-    createUser, updateUser, createPartner, updatePartnerMaster, addPartnerContact, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, createAsset, updateAsset,
+    createUser, updateUser, createPartner, updatePartnerMaster, addPartnerContact, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
   }
 })

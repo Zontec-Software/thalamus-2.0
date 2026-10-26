@@ -433,8 +433,10 @@ export interface Item {
 
 export interface Resource {
   id: string
+  tenantId: string
   name: string
   kind: 'Injetora' | 'Montagem' | 'Almoxarifado' | 'Qualidade' | 'Expedição'
+  status: 'Ativo' | 'Inativo'
   dailyMinutes: number
   /** Custo-hora do posto (máquina, energia, depreciação), sem a mão de obra. */
   hourlyRate?: number

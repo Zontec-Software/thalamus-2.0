@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { Tablet, Wrench } from 'lucide-vue-next'
 import StatusBadge from '../components/StatusBadge.vue'
 import { elapsedMs, openCorrective } from '../domain/engine'
+import { showOnFloor } from '../domain/resources'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 import { fmtDateTime, fmtDuration } from '../utils/format'
@@ -12,7 +13,7 @@ const store = useErpStore()
 const ui = useUiStore()
 const router = useRouter()
 
-const machines = computed(() => store.state.resources.filter(resource => resource.kind === 'Injetora').map(resource => {
+const machines = computed(() => store.state.resources.filter(resource => resource.tenantId === ui.activeTenantId && resource.kind === 'Injetora' && showOnFloor(store.state, resource)).map(resource => {
   const active = store.state.productionOrders.find(op => op.kind === 'Injeção' && op.resourceId === resource.id && ['Em produção', 'Liberada'].includes(op.status))
   const operation = active?.operations[0]
   const part = active ? store.item(active.itemId) : undefined

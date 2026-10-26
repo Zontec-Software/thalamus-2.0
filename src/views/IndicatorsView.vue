@@ -4,6 +4,7 @@ import { Clock, PackageX, ShoppingCart, Target, Wrench } from 'lucide-vue-next'
 import MetricCard from '../components/MetricCard.vue'
 import { abcAnalysis } from '../domain/catalogExtensions'
 import { FLOW_STAGES, today } from '../domain/engine'
+import { resourceIsOpen } from '../domain/resources'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 import { fmtCurrency, fmtNumber } from '../utils/format'
@@ -43,12 +44,12 @@ const downtimeByReason = computed(() => {
 })
 
 const productionByResource = computed(() => {
-  const rows = store.state.resources.filter(resource => ['Injetora', 'Montagem'].includes(resource.kind)).map(resource => {
+  const rows = store.state.resources.filter(resource => resource.tenantId === ui.activeTenantId && ['Injetora', 'Montagem'].includes(resource.kind)).map(resource => {
     const list = operations.value.filter(operation => operation.resourceId === resource.id)
     const good = list.reduce((sum, operation) => sum + operation.good, 0)
     const scrap = list.reduce((sum, operation) => sum + operation.scrap, 0)
-    return { name: resource.name, good, scrap }
-  })
+    return { name: resource.name, good, scrap, open: resourceIsOpen(resource) }
+  }).filter(row => row.open || row.good + row.scrap > 0)
   const max = Math.max(1, ...rows.map(row => row.good))
   return rows.map(row => ({ ...row, width: row.good / max * 100 }))
 })

@@ -1,5 +1,6 @@
 import type { ErpState } from './engine'
 import { addDays, DomainError, getItem, lineNeed, log, nextId, now, today } from './engine'
+import { assertResourceChoice } from './resources'
 import {
   assertGtin, canEdit, catalogOf, commit, createItem, currentPrice, editable, editorsLabel, findItem, needsStructure, sellable, track,
   type Change,
@@ -217,7 +218,8 @@ export function saveRoutingStep(state: ErpState, itemId: string, input: RouteSte
   const { item, catalog, routing } = routingEditable(state, itemId, role)
   const name = input.name.trim()
   if (name.length < 3) throw new DomainError('Dê um nome à operação')
-  if (!state.resources.some(entry => entry.id === input.resourceId)) throw new DomainError('Escolha o recurso da operação')
+  const currentResourceId = input.id ? routing.find(entry => entry.id === input.id)?.resourceId : undefined
+  assertResourceChoice(state, input.resourceId, currentResourceId)
   if (!(input.minutesPerUnit > 0)) throw new DomainError('O tempo padrão tem de ser maior que zero')
   const instructions = input.instructions.map(entry => entry.trim()).filter(Boolean)
   const resource = (id: string) => state.resources.find(entry => entry.id === id)?.name ?? id

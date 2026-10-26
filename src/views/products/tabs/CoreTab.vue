@@ -48,21 +48,28 @@ watch(() => [props.item.id, catalog.value.version], load, { immediate: true })
         <small v-if="form.type === 'SE'">Peça em processo tem cadastro próprio quando é armazenada, movimentada, inspecionada ou reutilizada. Etapa só de passagem fica na ordem de produção.</small>
         <small>{{ locked ? 'Congelado: o tipo define as camadas do item.' : 'Mudar o tipo zera as aprovações já registradas.' }}</small>
       </div>
-      <div class="field wide"><label>Descrição</label><input v-model="form.name" :disabled="locked" required />
-        <small v-if="locked"><button class="button ghost small" type="button" @click="ask = 'name'">Solicitar alteração</button></small>
+      <div class="field wide">
+        <div class="field-head"><label>Descrição</label><button v-if="locked" class="ask-link" type="button" @click="ask = 'name'">Solicitar alteração</button></div>
+        <input v-model="form.name" :disabled="locked" required />
       </div>
-      <div class="field"><label>Unidade base</label>
+      <div class="field">
+        <div class="field-head"><label>Unidade base</label><button v-if="locked" class="ask-link" type="button" @click="ask = 'unit'">Solicitar alteração</button></div>
         <input v-model="form.unit" :disabled="locked" />
-        <small v-if="locked">Congelada. <button class="button ghost small" type="button" @click="ask = 'unit'">Solicitar alteração</button></small>
+        <small v-if="locked">Congelada depois da ativação.</small>
       </div>
-      <div class="field wide"><label>Classificação</label>
+      <div class="field wide">
+        <div class="field-head"><label>Classificação</label><button v-if="locked" class="ask-link" type="button" @click="ask = 'class'">Solicitar alteração</button></div>
         <select v-model="form.classId" :disabled="locked"><option v-for="entry in classes" :key="entry.id" :value="entry.id">{{ entry.label }}</option></select>
-        <small v-if="locked"><button class="button ghost small" type="button" @click="ask = 'class'">Solicitar alteração</button> A categoria do catálogo não é a categoria do orçamento.</small>
+        <small>A categoria do catálogo não é a categoria do orçamento.</small>
       </div>
     </div>
-    <div class="field wide"><label>Indicadores de uso</label>
-      <div class="filter-row">
-        <label v-for="[key, label] in USAGE" :key="key" class="cell-sub"><input type="checkbox" :checked="usage[key]" :disabled="locked || disabled" @change="store.setItemUsage(item.id, { ...usage, [key]: !usage[key] })" /> {{ label }}</label>
+    <div class="field wide">
+      <label>Indicadores de uso</label>
+      <div class="usage-row">
+        <label v-for="[key, label] in USAGE" :key="key" class="usage-pill" :class="{ on: usage[key] }">
+          <input type="checkbox" :checked="usage[key]" :disabled="locked || disabled" @change="store.setItemUsage(item.id, { ...usage, [key]: !usage[key] })" />
+          {{ label }}
+        </label>
       </div>
       <small v-if="locked">Depois da ativação, estes indicadores mudam por solicitação com origem.</small>
     </div>

@@ -6,6 +6,7 @@ import MetricCard from '../components/MetricCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { plansMaterial } from '../domain/catalog'
 import { FLOW_STAGES } from '../domain/engine'
+import { showOnFloor } from '../domain/resources'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 import { fmtDate, fmtTime } from '../utils/format'
@@ -17,7 +18,7 @@ const router = useRouter()
 const openOrders = computed(() => store.state.salesOrders.filter(order => store.stage(order) !== 'Faturado'))
 const atRisk = computed(() => openOrders.value.filter(order => store.risks(order).length))
 const shortages = computed(() => store.state.items.filter(item => plansMaterial(item) && store.available(item.id) < item.minimum))
-const injectors = computed(() => store.state.resources.filter(resource => resource.kind === 'Injetora'))
+const injectors = computed(() => store.state.resources.filter(resource => resource.tenantId === ui.activeTenantId && resource.kind === 'Injetora' && showOnFloor(store.state, resource)))
 const running = computed(() => injectors.value.filter(resource => store.machineState(resource.id) === 'Produzindo').length)
 const byStage = computed(() => FLOW_STAGES.map(stage => ({ stage, count: store.state.salesOrders.filter(order => store.stage(order) === stage).length })))
 

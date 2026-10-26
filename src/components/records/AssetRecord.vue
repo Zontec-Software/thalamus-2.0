@@ -6,6 +6,7 @@ import RecordHeader from './RecordHeader.vue'
 import RecordTimeline from './RecordTimeline.vue'
 import StatusBadge from '../StatusBadge.vue'
 import { addDays, today } from '../../domain/engine'
+import { resourceOffered } from '../../domain/resources'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import type { Asset } from '../../types/domain'
@@ -24,6 +25,7 @@ const form = reactive({
   responsibleId: technicians.value[0]?.id ?? '', criticality: 'B' as Asset['criticality'], preventiveLimit: 250000,
   nextPreventive: addDays(today(), 90), value: 0, acquiredAt: today(),
 })
+const postos = computed(() => store.state.resources.filter(resource => resourceOffered(resource, ui.activeTenantId, [form.resourceId])))
 
 function create() {
   const created = store.createAsset({
@@ -69,7 +71,7 @@ function openOp(id: string) {
         <div class="field"><label>Fabricante</label><input v-model="form.manufacturer" /></div>
         <div class="field"><label>Número de série</label><input v-model="form.serial" /></div>
         <div class="field"><label>Localização</label><input v-model="form.location" /></div>
-        <div class="field"><label>Recurso produtivo</label><select v-model="form.resourceId"><option value="">Nenhum</option><option v-for="resource in store.state.resources" :key="resource.id" :value="resource.id">{{ resource.name }}</option></select><small>Liga o ativo à programação da fábrica</small></div>
+        <div class="field"><label>Recurso produtivo</label><select v-model="form.resourceId"><option value="">Nenhum</option><option v-for="resource in postos" :key="resource.id" :value="resource.id">{{ resource.name }}</option></select><small>Posto de Cadastros. Liga o ativo à programação. O posto inativo não entra em vínculo novo.</small></div>
         <div class="field"><label>Responsável</label><select v-model="form.responsibleId"><option v-for="user in technicians" :key="user.id" :value="user.id">{{ user.name }}</option></select></div>
         <div class="field"><label>Criticidade</label><select v-model="form.criticality"><option value="A">A · para a produção</option><option value="B">B · impacto parcial</option><option value="C">C · baixo impacto</option></select></div>
         <div v-if="form.kind === 'Molde'" class="field"><label>Limite de ciclos p/ preventiva</label><input v-model.number="form.preventiveLimit" type="number" min="0" step="10000" /></div>

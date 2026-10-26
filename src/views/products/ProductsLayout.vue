@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { Boxes, GitBranch, Receipt, ShieldCheck, Tags, Warehouse, Workflow, Wrench } from 'lucide-vue-next'
 import { canApprove, catalogOf, itemFlags, requiredApprovals } from '../../domain/catalog'
 import { hasFullAccess } from '../../domain/access'
@@ -8,6 +9,8 @@ import { useUiStore } from '../../stores/ui'
 
 const store = useErpStore()
 const ui = useUiStore()
+const route = useRoute()
+const itemOpen = computed(() => route.path.startsWith('/produtos/item/'))
 
 const live = computed(() => store.state.items.filter(item => !catalogOf(item).deletedAt))
 const awaitingMe = computed(() => live.value.filter(item => {
@@ -43,16 +46,17 @@ const MENU = computed<{ group: string; links: MenuLink[] }[]>(() => [
 </script>
 
 <template>
-  <div class="module-layout">
-    <nav class="module-subnav" data-tour="product-side" aria-label="Telas de Produtos">
-      <template v-for="(section, index) in MENU" :key="section.group">
-        <span v-if="index" class="subnav-sep" :title="section.group" />
-        <RouterLink v-for="link in section.links" :key="link.to" :to="link.to" :title="section.group" :class="{ active: link.exact ? $route.path === link.to || $route.path.startsWith('/produtos/item/') : $route.path.startsWith(link.to) }">
+  <div class="module-layout" :class="{ 'item-open': itemOpen }">
+    <aside v-if="!itemOpen" class="module-side" data-tour="product-side">
+      <p class="module-side-title">Produtos</p>
+      <template v-for="section in MENU" :key="section.group">
+        <span class="nav-label">{{ section.group }}</span>
+        <RouterLink v-for="link in section.links" :key="link.to" :to="link.to" :class="{ active: link.exact ? route.path === link.to : route.path.startsWith(link.to) }">
           <component :is="link.icon" :size="15" /> {{ link.label }}
           <b v-if="link.count" :class="{ alert: link.alert }">{{ link.count }}</b>
         </RouterLink>
       </template>
-    </nav>
+    </aside>
     <div class="module-content"><RouterView /></div>
   </div>
 </template>

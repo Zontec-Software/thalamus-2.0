@@ -5,6 +5,8 @@ import {
   ShieldX, Truck, Wrench,
 } from 'lucide-vue-next'
 import { elapsedMs, injectionSetup, openCorrective, PAUSE_REASONS, SCRAP_REASONS } from '../domain/engine'
+import { carrierChoices } from '../domain/partners'
+import { showOnFloor } from '../domain/resources'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 import type { Operation, ProductionOrder, Resource, Role, User } from '../types/domain'
@@ -18,7 +20,7 @@ const ui = useUiStore()
 
 const FLOOR_ROLES: Role[] = ['Operador', 'Líder de produção', 'Almoxarifado', 'Qualidade', 'Expedição', 'Manutenção']
 const ALERTS = ['Falta de material no posto', 'Dúvida na instrução de trabalho', 'Problema de qualidade na peça', 'Preciso de ajuda na máquina']
-const CARRIERS = ['Rodonaves', 'Braspress', 'Jadlog', 'Retirada pelo cliente']
+const carriers = computed(() => carrierChoices(store.state))
 const QUALITY_CHECKS = ['Dimensional e encaixe do tablet', 'Acabamento sem riscos ou rebarbas', 'Fixação de parafusos e película', 'Etiqueta de lote e embalagem']
 
 const step = ref<Step>('login')
@@ -31,7 +33,7 @@ const focusId = ref('')
 const almoxTab = ref<'separar' | 'receber'>('separar')
 const scanned = ref<string[]>([])
 const qualityChecks = ref<boolean[]>([])
-const shipForm = ref({ volumes: 1, carrier: CARRIERS[0] })
+const shipForm = ref({ volumes: 1, carrier: '' })
 const report = ref({ good: 0, scrap: 0, reason: '' })
 const pauseReason = ref('')
 const rejectForm = ref({ quantity: 1, reason: SCRAP_REASONS[3] })
@@ -44,7 +46,7 @@ const station = computed(() => store.state.resources.find(resource => resource.i
 const stationKind = computed(() => station.value?.kind ?? 'Manutenção')
 const stations = computed<Resource[]>(() => {
   const role = user.value?.role
-  if (role === 'Operador' || role === 'Líder de produção') return store.state.resources.filter(resource => ['Injetora', 'Montagem'].includes(resource.kind))
+  if (role === 'Operador' || role === 'Líder de produção') return store.state.resources.filter(resource => resource.tenantId === ui.activeTenantId && ['Injetora', 'Montagem'].includes(resource.kind) && showOnFloor(store.state, resource))
   return []
 })
 
@@ -255,7 +257,7 @@ const shipOrder = computed(() => store.state.salesOrders.find(order => order.id 
 
 function openShipment(orderId: string, quantity: number) {
   focusId.value = orderId
-  shipForm.value = { volumes: Math.ceil(quantity / 12), carrier: CARRIERS[0] }
+  shipForm.value = { volumes: Math.ceil(quantity / 12), carrier: carriers.value[0] ?? '' }
   step.value = 'work'
 }
 
@@ -282,7 +284,7 @@ const tip = computed(() => {
   if (step.value === 'queue') return 'A fila segue a programação do PCP. Operações liberadas ficam no topo; as próximas mostram por que ainda não podem começar.'
   return 'Botões grandes para luvas e pouca digitação. Cada toque atualiza os painéis de gestão em tempo real (veja à direita).'
 })
-const liveResources = computed(() => store.state.resources.filter(resource => ['Injetora', 'Montagem'].includes(resource.kind)))
+const liveResources = computed(() => store.state.resources.filter(resource => resource.tenantId === ui.activeTenantId && ['Injetora', 'Montagem'].includes(resource.kind) && showOnFloor(store.state, resource)))
 const liveEvents = computed(() => store.state.events.slice(0, 14))
 const openAlerts = computed(() => store.state.alerts.filter(alert => !alert.resolved))
 </script>
@@ -505,7 +507,7 @@ const openAlerts = computed(() => store.state.alerts.filter(alert => !alert.reso
               <p class="counter-label">Volumes conferidos</p>
               <div class="counter-box"><button @click="shipForm.volumes = Math.max(1, shipForm.volumes - 1)">−</button><b>{{ shipForm.volumes }}</b><button @click="shipForm.volumes++">+</button></div>
               <p class="counter-label" style="margin-top:12px">Transportadora</p>
-              <div class="t-grid four"><button v-for="carrier in CARRIERS" :key="carrier" class="t-reason" :class="{ on: shipForm.carrier === carrier }" @click="shipForm.carrier = carrier">{{ carrier }}</button></div>
+              <div class="t-grid two"><button v-for="carrier in carriers" :key="carrier" class="t-reason" :class="{ on: shipForm.carrier === carrier }" @click="shipForm.carrier = carrier">{{ carrier }}</button></div>
               <button class="t-btn start" style="width:100%; margin-top:14px" @click="confirmConference"><Check :size="20" /> Confirmar conferência</button>
             </template>
             <template v-else-if="shipOrder.shipment.status === 'Conferido'">

@@ -440,6 +440,7 @@ export function scheduleOp(state: ErpState, opId: string, resourceId: string, da
   const target = getResource(state, resourceId)
   const previousKind = getResource(state, op.resourceId).kind
   if (target.kind !== previousKind) throw new DomainError(`Esta OP só pode ir para recursos do tipo ${previousKind}`)
+  if (target.status === 'Inativo' && target.id !== op.resourceId) throw new DomainError(`${target.name} está inativo. Escolha um posto ativo.`)
   for (const operation of op.operations) {
     if (operation.resourceId === op.resourceId && operation.status !== 'Concluída') operation.resourceId = resourceId
   }

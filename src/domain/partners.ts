@@ -129,7 +129,23 @@ export function addAddress(state: ErpState, id: string, address: PartnerAddress,
   return partner
 }
 
-export function addRole(state: ErpState, id: string, role: 'Cliente' | 'Fornecedor', actor: string) {
+type ManagedRole = 'Cliente' | 'Fornecedor' | 'Transportadora'
+
+/** Nome gravado no embarque quando o cliente retira. Não é um parceiro. */
+export const PICKUP_CARRIER = 'Retirada pelo cliente'
+
+/** Parceiros com o papel Transportadora ativo, mais a retirada pelo cliente. */
+export function carrierChoices(state: ErpState) {
+  return [...openPartners(state, 'Transportadora').map(partner => partner.name), PICKUP_CARRIER]
+}
+
+export function assertShipmentCarrier(state: ErpState, carrier: string) {
+  if (!carrierChoices(state).includes(carrier)) {
+    throw new DomainError('Escolha uma transportadora com o papel ativo, ou a retirada pelo cliente.')
+  }
+}
+
+export function addRole(state: ErpState, id: string, role: ManagedRole, actor: string) {
   const partner = findPartner(state, id)
   if (partner.roles.includes(role) && roleStatus(partner, role) !== 'Inativo') throw new DomainError(`O papel ${role} já está neste cadastro`)
   if (!partner.roles.includes(role)) partner.roles.push(role)
@@ -141,7 +157,7 @@ export function addRole(state: ErpState, id: string, role: 'Cliente' | 'Forneced
 }
 
 /** Inativa só o papel. O outro papel, o histórico e as operações já abertas ficam. */
-export function inactivateRole(state: ErpState, id: string, role: 'Cliente' | 'Fornecedor', reason: string, actor: string) {
+export function inactivateRole(state: ErpState, id: string, role: ManagedRole, reason: string, actor: string) {
   const partner = findPartner(state, id)
   if (!partner.roles.includes(role)) throw new DomainError(`Este parceiro não tem o papel ${role}`)
   if (roleStatus(partner, role) === 'Inativo') throw new DomainError(`O papel ${role} já está inativo`)

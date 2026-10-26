@@ -74,7 +74,7 @@ export const MANUAL: ManualChapter[] = [
             items: [
               '**Barra superior**: marca, seletor de área (o nome da área acima do título da tela), busca geral, perfil, sino de notificações e o botão de ajuda.',
               '**Barra de módulos**: faixa escura logo abaixo do topo, com os módulos da área em que você está. O módulo aberto fica sublinhado em ciano. À direita fica o indicador do Omie, que mostra se há falhas de integração.',
-              '**Menu do módulo**: alguns módulos, como Produtos, têm o próprio menu, numa faixa branca logo acima do conteúdo, com as telas internas daquele módulo.',
+              '**Menu do módulo**: alguns módulos, como Produtos, têm o próprio menu lateral com as telas internas daquele módulo. Na ficha do item esse menu some, e a navegação passa a ser a da própria ficha.',
             ],
           },
           {
@@ -82,7 +82,7 @@ export const MANUAL: ManualChapter[] = [
             items: [
               'Na tela inicial, clique em **Entrar** no bloco da área, ou num atalho do bloco.',
               'Na barra de módulos, escolha o módulo.',
-              'Se o módulo tiver menu próprio, escolha a tela interna.',
+              'Se o módulo tiver menu lateral, escolha a tela interna.',
               'Para trocar de área sem voltar ao início, clique no nome da área acima do título da tela.',
             ],
           },
@@ -163,7 +163,7 @@ export const MANUAL: ManualChapter[] = [
 
   {
     id: 'cadastros', title: 'Cadastros', icon: Boxes,
-    intro: 'A base compartilhada: itens, estruturas, serviços, pessoas e ativos.',
+    intro: 'A base compartilhada: itens, estruturas, serviços, pessoas, postos e ativos.',
     sections: [
       {
         id: 'itens-conceitos', title: 'Cadastro de itens: núcleo e camadas',
@@ -387,8 +387,8 @@ export const MANUAL: ManualChapter[] = [
             kind: 'steps', title: 'Manter o roteiro e os prazos',
             items: [
               'Selecione a versão em rascunho na seção **Estrutura e roteiro** e abra a aba **Roteiro**. Um ponto laranja na aba indica que o roteiro mudou em relação à versão comparada.',
-              'Clique em **Operação** e informe nome, posto, tempo, preparação, equipe e instruções. Para injeção, escolha o molde: o tempo por peça é calculado pelo ciclo dividido pelas cavidades ativas.',
-              'Use as setas para mudar a ordem, o lápis para corrigir e a lixeira para tirar uma operação. **Copiar roteiro de outro item** traz as operações de um item parecido.',
+              'Clique na operação para abrir o detalhe. Na versão vigente o painel só mostra. Na versão em rascunho, o mesmo painel edita. **Operação** abre o painel vazio para incluir uma etapa: nome, posto, tempo, preparação, equipe e instruções. Para injeção, escolha o molde: o tempo por peça é calculado pelo ciclo dividido pelas cavidades ativas.',
+              'Use as setas para mudar a ordem e a lixeira para tirar uma operação. **Copiar roteiro de outro item** traz as operações de um item parecido.',
               'Em **Comparar com**, escolha outra versão para ver o que mudou na estrutura e no roteiro.',
               'Em **Prazos de fabricação**, informe o prazo de produção em dias. A data sugerida da proposta passa a ser esse prazo somado ao maior lead time de compra entre os componentes da estrutura vigente.',
             ],
@@ -398,13 +398,14 @@ export const MANUAL: ManualChapter[] = [
             items: [
               'Produto acabado e kit físico não liberam versão com roteiro vazio.',
               'Operação com molde só aceita injetora compatível com aquele molde.',
+              'O posto vem de Cadastros → Postos. Posto inativo não entra em operação nova; a operação que já o usa permanece.',
               'Qualquer mudança no roteiro desmarca o checklist da versão.',
               'Versão ligada a uma mudança de engenharia só é liberada pela própria mudança, na data de efetividade.',
             ],
           },
           { kind: 'note', tone: 'info', text: 'Mudar o roteiro de um item em homologação apaga a aprovação do PCP.' },
         ],
-        related: ['planejar-pedido', 'ordens-producao', 'ferramental', 'mudancas-engenharia'],
+        related: ['planejar-pedido', 'ordens-producao', 'ferramental', 'mudancas-engenharia', 'postos'],
       },
       {
         id: 'ferramental', title: 'Ferramental: moldes, gabaritos e dispositivos',
@@ -898,21 +899,31 @@ export const MANUAL: ManualChapter[] = [
       },
       {
         id: 'parceiros', title: 'Parceiros: clientes e fornecedores',
-        summary: 'Um cadastro mestre. Cliente e fornecedor são papéis.',
+        summary: 'Um cadastro mestre. Cliente, fornecedor e transportadora são papéis.',
         roles: ['Comercial', 'Compras', 'Gestor'],
         screens: [{ label: 'Parceiros', to: '/parceiros' }],
         tour: '/parceiros',
         blocks: [
-          { kind: 'p', text: 'O nome Parceiros é temporário. No Omie, cliente e fornecedor são o mesmo registro de pessoa. O Thalamus segue essa lógica: os dados gerais existem uma vez, e cada papel tem situação, perfil e indicadores próprios. Inativar o cliente não inativa o fornecedor.' },
+          { kind: 'p', text: 'O nome Parceiros é temporário. No Omie, cliente e fornecedor são o mesmo registro de pessoa. O Thalamus segue essa lógica: os dados gerais existem uma vez, e cada papel tem situação, perfil e indicadores próprios. Cliente, fornecedor e transportadora se atribuem no mesmo cadastro. Inativar um papel não inativa os outros.' },
+          {
+            kind: 'steps', title: 'Usar a tela',
+            items: [
+              'A lista mostra todos os parceiros. Filtre por papel ou busque por nome, documento ou cidade.',
+              'Clique em um parceiro para abrir a página dele. A seta ou o caminho **Parceiros** no topo voltam para a lista.',
+              'Na aba **Cadastro**, ajuste os dados gerais e os papéis Cliente, Fornecedor e Transportadora. **Inativar** pede o motivo, que fica no histórico. Transportadora inativa deixa de aparecer na expedição.',
+              'Na aba **Contatos e endereços**, inclua um contato ou endereço pelos botões **+**. O primeiro contato é o principal.',
+              '**Novo parceiro** abre um formulário. Se o documento já existir, a tela oferece abrir o cadastro existente.',
+            ],
+          },
           { kind: 'p', text: 'O perfil do cliente mostra os pedidos de Vendas, o período e a origem. A fórmula do ticket médio ainda não foi definida, então o valor não é publicado. A classe ABC vigente só muda com aprovação do Coordenador Comercial. Os limites A, B e C também não foram definidos: o alerta anual registra o faturamento e não sugere letra. A classe, sozinha, não libera crédito, desconto nem condição.' },
           { kind: 'p', text: 'O perfil do fornecedor mostra o volume recebido no Almoxarifado. A nota não é publicada enquanto a fórmula não existir. A homologação de matéria-prima aparece só como retrato. Na compra, matéria-prima C1 sem fornecedor homologado para aquele item é bloqueada com o motivo. C2 e C3 não exigem esse registro. Os critérios que classificam C1, C2 e C3 ainda não foram definidos; a criticidade é informada no item.' },
           { kind: 'rules', items: [
             'Documento repetido é avisado antes de criar outro registro.',
-            'Papel inativo bloqueia solicitação nova. Pedido, oportunidade e compra já abertos seguem até o fim.',
+            'Papel inativo bloqueia solicitação nova. Pedido, oportunidade e compra já abertos seguem até o fim. Embarque já conferido guarda o nome da transportadora daquele momento.',
             'A política de quem aprova a inativação ainda não foi definida. Nesta demonstração, a solicitação já inativa o papel.',
           ] },
         ],
-        related: ['pessoas', 'compras', 'crm'],
+        related: ['pessoas', 'compras', 'crm', 'expedicao'],
       },
       {
         id: 'pessoas', title: 'Pessoas e organograma',
@@ -930,20 +941,41 @@ export const MANUAL: ManualChapter[] = [
         related: ['perfis', 'tablet'],
       },
       {
+        id: 'postos', title: 'Postos de trabalho',
+        summary: 'A vaga da fábrica: capacidade, custo-hora e o que pode receber ordem nova.',
+        roles: ['Engenharia', 'PCP', 'Manutenção', 'Gestor'],
+        screens: [{ label: 'Postos', to: '/postos' }],
+        tour: '/postos',
+        blocks: [
+          { kind: 'p', text: 'O posto é o lugar da programação e do tablet: injetora, célula, almoxarifado, qualidade ou expedição. Cada posto pertence a uma empresa e tem minutos por dia e, quando faz sentido, custo-hora. O custo da engenharia usa esse custo-hora. O ativo físico (máquina, molde, equipamento) fica em Ativos e aponta para o posto. A lista ocupa a tela; clicar num posto, ou em Novo posto, abre a ficha numa janela.' },
+          {
+            kind: 'rules',
+            items: [
+              'Posto novo nasce ativo e já pode ser escolhido no roteiro, no ferramental e na programação.',
+              'Molde só é compatível com posto do tipo Injetora. Uma ordem já aberta só muda para outro posto do mesmo tipo.',
+              'Inativar tira o posto das escolhas novas. Roteiro gravado e ordem em andamento continuam nele. O tablet ainda mostra o posto inativo enquanto houver ordem aberta.',
+              'Excluir só é possível enquanto nenhum roteiro, ordem, ferramental ou ativo aponta para o posto.',
+              'Cadastrar o posto não cria o ativo. O vínculo fica na ficha do ativo, no campo Recurso produtivo.',
+            ],
+          },
+        ],
+        related: ['estrutura-versoes', 'ferramental', 'ativos', 'planejar-pedido'],
+      },
+      {
         id: 'ativos', title: 'Ativos: máquinas, moldes e equipamentos',
         summary: 'Capacidade, ciclos e manutenção a partir do ativo.',
         roles: ['Engenharia', 'Manutenção', 'Gestor'],
         screens: [{ label: 'Ativos', to: '/ativos' }],
         tour: '/ativos',
         blocks: [
-          { kind: 'p', text: 'Cada ativo tem criticidade, contador de ciclos e plano preventivo. Os moldes somam ciclos a cada OP de injeção concluída (peças boas divididas pelas cavidades).' },
+          { kind: 'p', text: 'Cada ativo tem criticidade, contador de ciclos e plano preventivo. Os moldes somam ciclos a cada OP de injeção concluída (peças boas divididas pelas cavidades). O campo Recurso produtivo liga o ativo a um posto de Cadastros. Sem esse vínculo, a máquina não entra na programação.' },
           {
             kind: 'list', title: 'Ações na ficha do ativo',
             items: ['**Corretiva**: abre uma OS e bloqueia a máquina para produção até a conclusão.', '**Preventiva**: entra no plano de manutenção.', '**Solicitar peça**: abre uma demanda de material ligada ao ativo.'],
           },
           { kind: 'rules', items: ['Quando um molde atinge o limite de ciclos, o sistema abre uma preventiva automaticamente (se ainda não houver uma aberta).'] },
         ],
-        related: ['manutencao'],
+        related: ['manutencao', 'postos'],
       },
     ],
   },
@@ -1031,7 +1063,7 @@ export const MANUAL: ManualChapter[] = [
             kind: 'steps',
             items: [
               'Quando todas as OPs de montagem do pedido são aprovadas na qualidade, o pedido entra em **Aguardando conferência**.',
-              'Confira e informe volumes e transportadora.',
+              'Confira e informe os volumes. A transportadora é um parceiro com esse papel ativo. **Retirada pelo cliente** continua disponível e não é um cadastro.',
               'Clique em **Expedir**: o produto sai do estoque e o sistema pede a NF-e ao Omie.',
               'Quando o Omie autoriza a nota, o pedido vira **Faturado**, o número da NF-e aparece no pedido. A conta a receber fica no Omie.',
             ],
@@ -1039,7 +1071,7 @@ export const MANUAL: ManualChapter[] = [
           { kind: 'rules', items: ['Sem volumes e transportadora não há conferência.', 'Sem conferência não há expedição.', 'A expedição respeita a regra de saldo negativo e os lotes do produto.'] },
           { kind: 'p', text: 'Quando o pedido tem mais de uma linha, a coluna do produto lista todas, com a quantidade de cada uma e o kit virtual de origem quando a linha veio de um kit. Todas são baixadas do estoque na expedição.' },
         ],
-        related: ['integracao-omie', 'kits'],
+        related: ['integracao-omie', 'kits', 'parceiros'],
       },
     ],
   },
