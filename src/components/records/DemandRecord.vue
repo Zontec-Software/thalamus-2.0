@@ -6,6 +6,7 @@ import RecordHeader from './RecordHeader.vue'
 import RecordTimeline from './RecordTimeline.vue'
 import StatusBadge from '../StatusBadge.vue'
 import { addDays, today } from '../../domain/engine'
+import { roleIsOpen } from '../../domain/partners'
 import { budgetSummary } from '../../domain/budget'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
@@ -20,7 +21,7 @@ const router = useRouter()
 const isNew = computed(() => props.id === 'new')
 const demand = computed(() => store.state.demands.find(entry => entry.id === props.id))
 const materials = computed(() => store.state.items.filter(entry => ['MP', 'CP', 'EM'].includes(entry.type)))
-const suppliers = computed(() => store.state.partners.filter(entry => entry.roles.includes('Fornecedor')))
+const suppliers = computed(() => store.state.partners.filter(entry => roleIsOpen(entry, 'Fornecedor')))
 const STEPS = ['Aberta', 'Em atendimento', 'Atendida'] as const
 
 const form = reactive({

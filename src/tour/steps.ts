@@ -62,7 +62,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('plan-btn', 'Planejar com um clique', 'O sistema olha a estrutura: peça injetada em falta vira OP de injeção; componente comprado em falta vira requisição; o case vira a OP de montagem.'),
   ],
   '/produtos': [
-    t('product-side', 'O menu é do módulo', 'Produtos tem o próprio menu: cadastro, camadas (estoque, estrutura, fiscal) e a homologação. Ele não divide espaço com os outros módulos da área.'),
+    t('product-side', 'O menu é do módulo', 'Esta faixa é o menu de Produtos: itens, classificação, estruturas e roteiros, mudanças, ferramental, estoque, fiscal e a análise do cadastro. O número ao lado mostra o que espera ação.'),
     t('product-list', 'Lista feita para milhares de itens', 'A faixa acima da tabela filtra o tipo: todos, produto acabado, matéria-prima e os demais. Busque por código, descrição, EAN ou NCM e refine situação, classificação ou pendência. Marque vários itens para agir em lote.'),
     t('new-record', 'Um código por item', 'O item nasce em rascunho, com código sequencial e sem significado. O sistema avisa se já existe descrição parecida. Rascunho não entra em pedido, compra nem produção.'),
   ],
@@ -73,7 +73,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('product-attributes', 'Atributos herdados', 'Os atributos vêm da classificação. Os marcados com asterisco são obrigatórios para homologar.'),
   ],
   '/produtos/classificacao': [
-    t('product-side', 'Árvore e atributos', 'Selecione um nó para ver os itens, criar filhos e definir atributos. O que é definido num nó vale para todos os nós abaixo.'),
+    t('class-tree', 'Árvore e atributos', 'Selecione um nó para ver os itens, criar filhos e definir atributos. O que é definido num nó vale para todos os nós abaixo.'),
     t('class-attributes', 'Atributos da classe', 'Defina tipo, unidade, opções e se é obrigatório ou eixo de variação da grade. Os herdados de nós acima aparecem marcados.'),
   ],
   '/produtos/mudancas': [
@@ -90,6 +90,11 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('manual-index', 'Manual do sistema', 'Cada capítulo cobre uma área e cada seção explica um processo: passo a passo, regras, quem participa e o atalho para a tela.'),
     t('manual-toc', 'Índice numerado', 'Abra e feche os capítulos e vá direto a uma seção. A seção aberta fica destacada.'),
     t('manual-search', 'Busca', 'Procure qualquer palavra, como “lote”, “garantia” ou “orçamento”. Acentos não importam.'),
+  ],
+  '/parceiros': [
+    t('partner-idea', 'Um cadastro, dois papéis', 'Cliente e fornecedor não são fichas separadas. O parceiro guarda os dados gerais uma vez. Cada papel tem o próprio perfil e a própria situação.'),
+    t('new-partner', 'Novo parceiro', 'O documento repetido é avisado antes de criar outro registro. Sem papel, o cadastro fica em cadastro.', 'close'),
+    t('partner-list', 'Perfis depois de abrir', 'Abra um parceiro. O perfil do cliente mostra a base de vendas e a classe ABC. O do fornecedor mostra os recebimentos e o retrato da homologação. Ticket médio e nota não têm fórmula definida, então o número não é publicado.'),
   ],
   '/pessoas': [
     t('org-chart', 'Organograma', 'Cada setor tem gestor e o código do centro padrão. O cadastro do centro fica em Finanças. Clique em um setor para filtrar as pessoas dele.', 'close'),

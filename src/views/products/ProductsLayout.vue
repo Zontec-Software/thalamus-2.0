@@ -44,17 +44,15 @@ const MENU = computed<{ group: string; links: MenuLink[] }[]>(() => [
 
 <template>
   <div class="module-layout">
-    <aside class="module-side" data-tour="product-side">
-      <p class="module-side-title">Produtos</p>
-      <template v-for="section in MENU" :key="section.group">
-        <span class="nav-label">{{ section.group }}</span>
-        <RouterLink v-for="link in section.links" :key="link.to" :to="link.to" :class="{ active: link.exact ? $route.path === link.to || $route.path.startsWith('/produtos/item/') : $route.path.startsWith(link.to) }">
+    <nav class="module-subnav" data-tour="product-side" aria-label="Telas de Produtos">
+      <template v-for="(section, index) in MENU" :key="section.group">
+        <span v-if="index" class="subnav-sep" :title="section.group" />
+        <RouterLink v-for="link in section.links" :key="link.to" :to="link.to" :title="section.group" :class="{ active: link.exact ? $route.path === link.to || $route.path.startsWith('/produtos/item/') : $route.path.startsWith(link.to) }">
           <component :is="link.icon" :size="15" /> {{ link.label }}
           <b v-if="link.count" :class="{ alert: link.alert }">{{ link.count }}</b>
         </RouterLink>
       </template>
-      <p class="module-side-foot">Perfil atual: <b>{{ ui.role }}</b>. Cada camada mostra quem pode editar.</p>
-    </aside>
+    </nav>
     <div class="module-content"><RouterView /></div>
   </div>
 </template>

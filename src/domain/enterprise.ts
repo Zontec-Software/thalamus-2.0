@@ -4,8 +4,9 @@ import { hasFullAccess } from './access'
 import * as budgetDomain from './budget'
 import type { ErpState } from './engine'
 import { addDays, addSyncLog, applyDueRevisions, assertUsable, availableQty, consumeStock, DomainError, getItem, getOp, log, nextId, now, receiveStock, today } from './engine'
+import { assertClientOpen, assertPurchaseAllowed, assertSupplierOpen } from './partners'
 import type {
-  Asset, Budget, BusinessPartner, CrmActivity, Demand, Item, Opportunity, Project, Proposal, ProposalLine,
+  Asset, Budget, CrmActivity, Demand, Item, Opportunity, Project, Proposal, ProposalLine,
   PurchaseOrder, Role, ServiceCatalogItem, TechnicalServiceOrder, User,
 } from '../types/domain'
 
@@ -110,6 +111,7 @@ export function contractService(state: ErpState, id: string, supplierId: string,
   const demand = find(state.demands, id, 'Demanda')
   if (demand.kind !== 'Serviço' || !demand.serviceId) throw new DomainError('Esta demanda não é de serviço')
   if (demand.status !== 'Aberta') throw new DomainError('A demanda já está em atendimento')
+  assertSupplierOpen(state, supplierId)
   const service = find(state.services, demand.serviceId, 'Serviço')
   const amount = service.cost * demand.quantity
   const budget = budgetFor(state, { projectId: demand.projectId, category: 'Serviço' }) ?? budgetFor(state, { category: service.category === 'Manutenção' ? 'Manutenção' : 'Material' })
@@ -172,6 +174,7 @@ export function createPurchaseOrder(state: ErpState, demandId: string, supplierI
   if (demand.status !== 'Aberta') throw new DomainError('A demanda já está em atendimento')
   const item = getItem(state, demand.itemId)
   assertUsable(item, 'compra')
+  assertPurchaseAllowed(state, supplierId, item.id)
   const lead = item.leadTimeDays ?? 7
   const other = state.partners.find(entry => entry.roles.includes('Fornecedor') && entry.id !== supplierId)
   const budget = demand.budgetCategoryId && demand.budgetPeriod ? budgetDomain.allocationOf(state, demand.budgetCategoryId, demand.budgetPeriod) : undefined
@@ -199,6 +202,7 @@ export function selectQuote(state: ErpState, orderId: string, supplierId: string
   if (order.status !== 'Aguardando aprovação') throw new DomainError('A cotação só pode mudar antes da aprovação')
   const quote = order.quotes.find(entry => entry.supplierId === supplierId)
   if (!quote) throw new DomainError('Cotação não encontrada')
+  assertPurchaseAllowed(state, supplierId, order.itemId)
   order.quotes.forEach(entry => { entry.selected = entry === quote })
   order.supplierId = supplierId
   order.unitPrice = quote.unitPrice
@@ -295,6 +299,7 @@ type OpportunityInput = Pick<Opportunity, 'partnerId' | 'title' | 'ownerId' | 'v
 export function createOpportunity(state: ErpState, input: OpportunityInput, actor: string) {
   if (!input.title.trim()) throw new DomainError('Dê um título à oportunidade')
   if (!input.partnerId) throw new DomainError('Escolha o cliente')
+  assertClientOpen(state, input.partnerId)
   const opportunity: Opportunity = {
     id: `OPP-${String(state.counters.OPP = (state.counters.OPP ?? 26043) + 1)}`, stage: 'Lead', probability: 10, activities: [], createdAt: now(), ...input,
   }
@@ -764,14 +769,6 @@ export function updateUser(state: ErpState, id: string, patch: Partial<Pick<User
   Object.assign(user, patch)
   if (changes.length) log(state, 'Pessoas', actor, `Cadastro atualizado (${changes.join(', ')})`, undefined, id)
   return user
-}
-
-export function createPartner(state: ErpState, input: Omit<BusinessPartner, 'id' | 'status'>, actor: string) {
-  if (!input.name.trim() || !input.roles.length) throw new DomainError('Informe nome e papel do parceiro')
-  const partner: BusinessPartner = { id: `bp${String(state.counters.BP = (state.counters.BP ?? 0) + 1)}`, status: 'Ativo', ...input }
-  state.partners.push(partner)
-  log(state, 'Cadastros', actor, `${partner.name} cadastrado (${partner.roles.join(', ')})`, undefined, partner.id)
-  return partner
 }
 
 export function createService(state: ErpState, input: Omit<ServiceCatalogItem, 'id' | 'code' | 'status'>, actor: string) {

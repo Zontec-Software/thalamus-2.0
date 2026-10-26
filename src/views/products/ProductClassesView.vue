@@ -75,7 +75,7 @@ function expandAll(value: boolean) {
           <button class="button ghost small" @click="expandAll(false)">Recolher</button>
         </div>
       </div>
-      <div class="tree">
+      <div class="tree" data-tour="class-tree">
         <div v-for="row in rows" :key="row.node.id" class="tree-row" :class="{ active: row.node.id === selectedId }" :style="{ paddingLeft: `${8 + row.depth * 20}px` }">
           <button class="toggle" :style="{ visibility: children(row.node.id).length ? 'visible' : 'hidden' }" @click="open[row.node.id] = !open[row.node.id]">
             <ChevronDown v-if="open[row.node.id]" :size="14" /><ChevronRight v-else :size="14" />

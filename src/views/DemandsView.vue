@@ -5,6 +5,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 import type { Demand } from '../types/domain'
+import { roleIsOpen } from '../domain/partners'
 import { daysUntil, fmtCurrency, fmtDate } from '../utils/format'
 
 const store = useErpStore()
@@ -26,7 +27,7 @@ const count = (value: string) => value === 'Ativas' ? active.value.length : stor
 const free = (entry: Demand) => entry.itemId ? store.available(entry.itemId) : undefined
 const supplierFor = (entry: Demand) => {
   const name = entry.itemId ? store.item(entry.itemId).supplier : undefined
-  const suppliers = store.state.partners.filter(partner => partner.roles.includes('Fornecedor'))
+  const suppliers = store.state.partners.filter(partner => roleIsOpen(partner, 'Fornecedor'))
   return (suppliers.find(partner => partner.name === name) ?? suppliers[0])?.id ?? ''
 }
 </script>

@@ -4,6 +4,7 @@ import { Save } from 'lucide-vue-next'
 import RecordHeader from './RecordHeader.vue'
 import RecordTimeline from './RecordTimeline.vue'
 import StatusBadge from '../StatusBadge.vue'
+import { roleIsOpen } from '../../domain/partners'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import type { ServiceCatalogItem } from '../../types/domain'
@@ -15,7 +16,7 @@ const ui = useUiStore()
 
 const isNew = computed(() => props.id === 'new')
 const service = computed(() => store.state.services.find(entry => entry.id === props.id))
-const suppliers = computed(() => store.state.partners.filter(entry => entry.roles.includes('Fornecedor')))
+const suppliers = computed(() => store.state.partners.filter(entry => roleIsOpen(entry, 'Fornecedor')))
 const form = reactive({
   name: '', category: 'Produção' as ServiceCatalogItem['category'], unit: 'hora' as ServiceCatalogItem['unit'], standardMinutes: 60,
   cost: 0, price: 0, outsourced: false, supplierId: '', description: '',

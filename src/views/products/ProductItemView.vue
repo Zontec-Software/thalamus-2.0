@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, RotateCcw, Trash2 } from 'lucide-vue-next'
+import { RotateCcw, Trash2 } from 'lucide-vue-next'
 import StatusBadge from '../../components/StatusBadge.vue'
 import { ITEM_TYPE_LABEL, catalogOf, classLabel, hasRouting, itemFlags, layersOf, missingAttributes, references } from '../../domain/catalog'
 import { hasFullAccess } from '../../domain/access'
@@ -145,7 +145,6 @@ function remove(reason: string) {
     <div style="margin-top:10px"><RouterLink to="/produtos" class="button secondary">Voltar à lista</RouterLink></div>
   </div>
   <template v-else>
-    <RouterLink to="/produtos" class="back-link"><ArrowLeft :size="13" /> Itens</RouterLink>
     <article class="card item-hero" data-tour="product-header">
       <div class="item-head">
         <img v-if="photo?.dataUrl" class="item-photo" :src="photo.dataUrl" :alt="photo.name" />

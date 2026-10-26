@@ -1,7 +1,7 @@
 import type { AccessProfile, Functionality, FunctionalityId, Role } from '../types/domain'
 
 export const MODULES = [
-  'Painel', 'Fluxo do pedido', 'Vendas', 'CRM', 'Produtos', 'Pessoas', 'Serviços', 'Ativos', 'Planejamento',
+  'Painel', 'Fluxo do pedido', 'Vendas', 'CRM', 'Produtos', 'Pessoas', 'Parceiros', 'Serviços', 'Ativos', 'Planejamento',
   'Ordens de produção', 'Demandas', 'Compras', 'Almoxarifado', 'Injeção', 'Montagem', 'Qualidade', 'Expedição',
   'Manutenção', 'Assistência Técnica', 'Indicadores', 'Projetos', 'Orçamentos', 'DRE', 'Organização', 'Integração Omie',
 ]
@@ -29,18 +29,18 @@ export const FUNCTIONALITIES: Functionality[] = [
 const roleModuleGrants: Record<Role, string[]> = {
   Administrador: MODULES,
   Gestor: MODULES,
-  Comercial: ['CRM', 'Vendas', 'Expedição', 'Produtos'],
-  Engenharia: ['Produtos', 'Serviços', 'Ativos', 'Projetos'],
-  PCP: ['Painel', 'Fluxo do pedido', 'Vendas', 'Produtos', 'Planejamento', 'Ordens de produção', 'Demandas', 'Injeção', 'Montagem', 'Indicadores'],
-  Compras: ['Painel', 'Demandas', 'Compras', 'Almoxarifado', 'Orçamentos', 'Produtos'],
-  Almoxarifado: ['Almoxarifado', 'Compras', 'Demandas', 'Ordens de produção', 'Produtos'],
+  Comercial: ['CRM', 'Vendas', 'Expedição', 'Produtos', 'Parceiros'],
+  Engenharia: ['Produtos', 'Serviços', 'Ativos', 'Projetos', 'Parceiros'],
+  PCP: ['Painel', 'Fluxo do pedido', 'Vendas', 'Produtos', 'Planejamento', 'Ordens de produção', 'Demandas', 'Injeção', 'Montagem', 'Indicadores', 'Parceiros'],
+  Compras: ['Painel', 'Demandas', 'Compras', 'Almoxarifado', 'Orçamentos', 'Produtos', 'Parceiros'],
+  Almoxarifado: ['Almoxarifado', 'Compras', 'Demandas', 'Ordens de produção', 'Produtos', 'Parceiros'],
   'Líder de produção': ['Painel', 'Fluxo do pedido', 'Planejamento', 'Ordens de produção', 'Demandas', 'Injeção', 'Montagem', 'Qualidade', 'Manutenção'],
   Operador: [],
   Qualidade: ['Qualidade', 'Ordens de produção', 'Indicadores'],
-  Expedição: ['Expedição', 'Vendas'],
-  Manutenção: ['Manutenção', 'Ativos', 'Serviços', 'Demandas', 'Injeção'],
-  Assistência: ['Assistência Técnica', 'Serviços', 'Demandas', 'Almoxarifado'],
-  Financeiro: ['Orçamentos', 'DRE', 'Projetos', 'Indicadores', 'Produtos'],
+  Expedição: ['Expedição', 'Vendas', 'Parceiros'],
+  Manutenção: ['Manutenção', 'Ativos', 'Serviços', 'Demandas', 'Injeção', 'Parceiros'],
+  Assistência: ['Assistência Técnica', 'Serviços', 'Demandas', 'Almoxarifado', 'Parceiros'],
+  Financeiro: ['Orçamentos', 'DRE', 'Projetos', 'Indicadores', 'Produtos', 'Parceiros'],
 }
 
 const profileDescription: Record<Role, string> = {

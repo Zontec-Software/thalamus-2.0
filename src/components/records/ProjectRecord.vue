@@ -6,6 +6,7 @@ import RecordHeader from './RecordHeader.vue'
 import RecordTimeline from './RecordTimeline.vue'
 import StatusBadge from '../StatusBadge.vue'
 import { addDays, today } from '../../domain/engine'
+import { roleIsOpen } from '../../domain/partners'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import type { Project } from '../../types/domain'
@@ -19,7 +20,7 @@ const router = useRouter()
 const isNew = computed(() => props.id === 'new')
 const project = computed(() => store.state.projects.find(entry => entry.id === props.id))
 const owners = computed(() => store.state.users.filter(entry => entry.role !== 'Operador'))
-const clients = computed(() => store.state.partners.filter(entry => entry.roles.includes('Cliente')))
+const clients = computed(() => store.state.partners.filter(entry => roleIsOpen(entry, 'Cliente')))
 const products = computed(() => store.state.items.filter(entry => entry.type === 'PA'))
 
 const form = reactive({

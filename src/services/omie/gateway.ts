@@ -21,7 +21,8 @@ export interface OmieOwnership {
 }
 
 export const OWNERSHIP: OmieOwnership[] = [
-  { data: 'Clientes e condições comerciais', owner: 'Omie', direction: 'Omie → Thalamus', trigger: 'Webhook + conciliação diária' },
+  { data: 'Parceiro (cliente e fornecedor no mesmo registro)', owner: 'Thalamus', direction: 'Thalamus → Omie', trigger: 'Inclusão ou alteração do cadastro mestre. No Omie o mesmo registro recebe a marca de cliente, de fornecedor ou as duas' },
+  { data: 'Condições comerciais do pedido', owner: 'Omie', direction: 'Omie → Thalamus', trigger: 'Webhook + conciliação diária' },
   { data: 'Pedidos de venda aprovados', owner: 'Omie', direction: 'Omie → Thalamus', trigger: 'Webhook de aprovação' },
   { data: 'Cadastro fiscal do item (NCM, Ex-TIPI, CEST, origem, benefício por UF, reforma)', owner: 'Thalamus', direction: 'Bidirecional', trigger: 'Ativação, cada vigência e cada alteração aqui; webhook de alteração no Omie. Mudança dos dois lados vira conflito decidido na ficha do item' },
   { data: 'Apuração fiscal e NF-e (CST e alíquota aplicados na nota)', owner: 'Omie', direction: 'Omie → Thalamus', trigger: 'Emissão da nota' },

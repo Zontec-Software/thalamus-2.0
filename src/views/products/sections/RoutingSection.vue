@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import { ArrowDown, ArrowUp, Copy, Pencil, Plus } from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, Copy, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { catalogOf } from '../../../domain/catalog'
 import { moldMinutesPerPiece } from '../../../domain/engineering'
 import { useErpStore } from '../../../stores/erp'
@@ -51,34 +51,35 @@ function copy() {
 </script>
 
 <template>
-  <div class="section-head" style="margin-top:18px">
-    <div>
-      <h3 class="drawer-title" data-tour="routing" style="margin:0">Roteiro da versão {{ revision.code }}</h3>
-      <p>{{ steps.length }} operação(ões) · {{ fmtNumber(perUnit, 2) }} min por unidade · {{ fmtNumber(setup, 0) }} min de preparação por lote.</p>
-    </div>
+  <div class="routing-head" data-tour="routing">
+    <span class="cell-sub">{{ steps.length }} operação(ões) · <b>{{ fmtNumber(perUnit, 2) }} min</b> por unidade · <b>{{ fmtNumber(setup, 0) }} min</b> de preparação por lote</span>
     <button v-if="isDraft" class="button secondary small" :disabled="disabled" @click="edit()"><Plus :size="13" /> Operação</button>
   </div>
-  <table class="dense">
-    <thead><tr><th>#</th><th>Operação</th><th>Posto</th><th>Ferramental</th><th>Tempo/un</th><th>Preparação</th><th>Equipe</th><th>Instruções</th><th v-if="isDraft" /></tr></thead>
-    <tbody>
-      <tr v-for="(step, index) in steps" :key="step.id">
-        <td>{{ (index + 1) * 10 }}</td>
-        <td><b>{{ step.name }}</b><span v-if="step.firstPiece" class="status info" style="margin-left:6px">1ª peça</span></td>
-        <td>{{ store.resourceName(step.resourceId) }}</td>
-        <td><RouterLink v-if="step.toolId" :to="`/produtos/item/${step.toolId}?aba=ferramental`" class="code">{{ toolCode(step.toolId) }}</RouterLink><span v-else class="cell-sub">—</span></td>
-        <td>{{ fmtNumber(step.minutesPerUnit, 3) }} min</td>
-        <td>{{ step.setupMinutes ? `${step.setupMinutes} min` : '—' }}</td>
-        <td>{{ step.crew ?? 1 }}</td>
-        <td><span class="cell-sub">{{ step.instructions.join(' · ') || '—' }}</span></td>
-        <td v-if="isDraft" class="row-actions">
-          <button class="button ghost small" title="Subir" :disabled="disabled || index === 0" @click="store.moveRevisionStep(revision.id, step.id, -1)"><ArrowUp :size="12" /></button>
-          <button class="button ghost small" title="Descer" :disabled="disabled || index === steps.length - 1" @click="store.moveRevisionStep(revision.id, step.id, 1)"><ArrowDown :size="12" /></button>
-          <button class="button ghost small" title="Editar" :disabled="disabled" @click="edit(step)"><Pencil :size="12" /></button>
-          <button class="button ghost small" :disabled="disabled" @click="store.removeRevisionStep(revision.id, step.id)">Remover</button>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+  <div class="table-scroll">
+    <table class="dense">
+      <thead><tr><th>#</th><th>Operação</th><th>Posto</th><th>Ferramental</th><th class="num">Tempo/un</th><th class="num">Preparação</th><th class="num">Equipe</th><th>Instruções</th><th v-if="isDraft && !disabled" /></tr></thead>
+      <tbody>
+        <tr v-for="(step, index) in steps" :key="step.id">
+          <td class="cell-sub">{{ (index + 1) * 10 }}</td>
+          <td><b>{{ step.name }}</b><span v-if="step.firstPiece" class="status info" style="margin-left:6px">1ª peça</span></td>
+          <td>{{ store.resourceName(step.resourceId) }}</td>
+          <td><RouterLink v-if="step.toolId" :to="`/produtos/item/${step.toolId}?aba=ferramental`" class="code">{{ toolCode(step.toolId) }}</RouterLink><span v-else class="cell-sub">—</span></td>
+          <td class="num">{{ fmtNumber(step.minutesPerUnit, 3) }} min</td>
+          <td class="num">{{ step.setupMinutes ? `${step.setupMinutes} min` : '—' }}</td>
+          <td class="num">{{ step.crew ?? 1 }}</td>
+          <td class="clip-cell" :title="step.instructions.join('\n')"><span class="cell-sub">{{ step.instructions.join(' · ') || '—' }}</span></td>
+          <td v-if="isDraft && !disabled">
+            <div class="row-actions">
+              <button class="icon-plain" title="Subir" :disabled="index === 0" @click="store.moveRevisionStep(revision.id, step.id, -1)"><ArrowUp :size="14" /></button>
+              <button class="icon-plain" title="Descer" :disabled="index === steps.length - 1" @click="store.moveRevisionStep(revision.id, step.id, 1)"><ArrowDown :size="14" /></button>
+              <button class="icon-plain" title="Editar" @click="edit(step)"><Pencil :size="14" /></button>
+              <button class="icon-plain" title="Remover operação" @click="store.removeRevisionStep(revision.id, step.id)"><Trash2 :size="14" /></button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
   <p v-if="!steps.length" class="empty-note">{{ item.type === 'SE' ? 'Sem roteiro: inclua a operação de injeção com o molde.' : 'Sem roteiro: o produto não pode ser planejado nem aprovado pelo PCP.' }}</p>
 
   <form v-if="editing && isDraft" class="card" style="margin-top:10px;background:#F8FAFC" @submit.prevent="save">
@@ -106,8 +107,8 @@ function copy() {
       </div>
     </fieldset>
   </form>
-  <form v-if="isDraft" class="filter-row" style="margin-top:10px" @submit.prevent="copy">
-    <fieldset class="layer filter-row" :disabled="disabled">
+  <form v-if="isDraft && !disabled" class="filter-row" style="margin-top:10px" @submit.prevent="copy">
+    <fieldset class="layer filter-row" style="flex:1">
       <select v-model="copyFrom" class="filter grow"><option value="" disabled>Copiar roteiro de outro item…</option><option v-for="source in sources" :key="source.id" :value="source.id">{{ source.code }} · {{ source.name }} ({{ source.routing!.length }} op.)</option></select>
       <button class="button secondary small" type="submit" :disabled="!copyFrom"><Copy :size="13" /> Copiar</button>
     </fieldset>

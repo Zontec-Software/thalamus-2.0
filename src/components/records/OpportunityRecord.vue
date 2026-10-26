@@ -6,6 +6,7 @@ import RecordTimeline from './RecordTimeline.vue'
 import StatusBadge from '../StatusBadge.vue'
 import { addDays, today } from '../../domain/engine'
 import { CRM_STAGES, proposalTotal } from '../../domain/enterprise'
+import { roleIsOpen } from '../../domain/partners'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import type { CrmActivity, Opportunity } from '../../types/domain'
@@ -17,7 +18,7 @@ const ui = useUiStore()
 
 const isNew = computed(() => props.id === 'new')
 const opportunity = computed(() => store.state.opportunities.find(entry => entry.id === props.id))
-const clients = computed(() => store.state.partners.filter(entry => entry.roles.includes('Cliente')))
+const clients = computed(() => store.state.partners.filter(entry => roleIsOpen(entry, 'Cliente')))
 const sellers = computed(() => store.state.users.filter(entry => entry.role === 'Comercial' || entry.role === 'Gestor' || entry.role === 'Administrador'))
 const products = computed(() => store.state.items.filter(entry => entry.type === 'PA'))
 const closed = computed(() => opportunity.value?.stage === 'Ganha' || opportunity.value?.stage === 'Perdida')

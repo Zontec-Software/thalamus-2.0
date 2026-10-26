@@ -666,7 +666,7 @@ watch([year, screen], () => { splitCategoryId.value = '' })
         <p>Valor, responsável, setores que usam o valor e o setor que recebe a demanda. A soma destinada não passa do valor da categoria.</p>
       </div>
     </div>
-    <table class="dense">
+    <table class="dense fit-table">
       <thead><tr><th>Código</th><th>Categoria</th><th class="num">Valor</th><th>Responsável</th><th>Valores destinados</th><th data-tour="budget-split">Utilizadores</th><th>Executor</th><th>Limiar</th><th>Saldo negativo</th><th>Situação</th></tr></thead>
       <tbody v-for="entry in tree" :key="entry.code">
         <tr class="group-row"><td colspan="2"><strong>{{ entry.name }}</strong></td><td class="num"><strong>{{ fmtCurrency(groupAnnual(entry.name)) }}</strong></td><td colspan="7"></td></tr>

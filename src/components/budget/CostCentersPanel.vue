@@ -66,7 +66,7 @@ function save(id: string, name: string, status: EntityStatus, responsibleUserId:
         <p>O responsável do centro recebe os alertas das contas em que o centro tem fatia. As fatias são definidas na aba Categorias.</p>
       </div>
     </div>
-    <table class="dense">
+    <table class="dense fit-table">
       <thead><tr><th>Código</th><th>Nome</th><th>Responsável</th><th>Contas com fatia em {{ year }}</th><th class="num">Orçado no centro</th><th>Padrão de</th><th>Situação</th></tr></thead>
       <tbody>
         <tr v-for="center in centers" :key="center.id">

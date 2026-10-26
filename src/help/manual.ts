@@ -74,7 +74,7 @@ export const MANUAL: ManualChapter[] = [
             items: [
               '**Barra superior**: marca, seletor de área (o nome da área acima do título da tela), busca geral, perfil, sino de notificações e o botão de ajuda.',
               '**Barra de módulos**: faixa escura logo abaixo do topo, com os módulos da área em que você está. O módulo aberto fica sublinhado em ciano. À direita fica o indicador do Omie, que mostra se há falhas de integração.',
-              '**Menu do módulo**: alguns módulos, como Produtos, têm o próprio menu lateral com as telas internas daquele módulo.',
+              '**Menu do módulo**: alguns módulos, como Produtos, têm o próprio menu, numa faixa branca logo acima do conteúdo, com as telas internas daquele módulo.',
             ],
           },
           {
@@ -82,7 +82,7 @@ export const MANUAL: ManualChapter[] = [
             items: [
               'Na tela inicial, clique em **Entrar** no bloco da área, ou num atalho do bloco.',
               'Na barra de módulos, escolha o módulo.',
-              'Se o módulo tiver menu lateral, escolha a tela interna.',
+              'Se o módulo tiver menu próprio, escolha a tela interna.',
               'Para trocar de área sem voltar ao início, clique no nome da área acima do título da tela.',
             ],
           },
@@ -362,9 +362,9 @@ export const MANUAL: ManualChapter[] = [
             kind: 'steps', title: 'Alterar a estrutura de um item',
             items: [
               'Abra o item e vá para a aba **Estrutura e roteiro**.',
-              'Na coluna da esquerda, informe o motivo e clique em **Abrir nova versão**. Ela nasce como cópia da vigente.',
-              'Ajuste as quantidades, inclua componentes pelo seletor ou remova linhas. A tabela mostra o que é novo, o que mudou ("era 8") e o que foi removido.',
-              'Marque os itens do checklist (estrutura conferida e, para produto acabado e kit físico, roteiro conferido).',
+              'As versões aparecem em linha no topo da aba. Clique em **Nova versão**, informe o motivo e confirme. Ela nasce como cópia da vigente.',
+              'Na aba **Estrutura**, ajuste quantidade e perda direto na linha, inclua componentes pela última linha da tabela ou remova com a lixeira. A tabela mostra o que é novo, o que mudou ("era 8"), o que foi removido e o custo de material por unidade.',
+              'No painel **Liberação**, marque os itens do checklist (estrutura conferida e, para produto acabado e kit físico, roteiro conferido).',
               'Escolha a data em **Vigente a partir de** e clique em **Liberar versão**.',
             ],
           },
@@ -386,9 +386,9 @@ export const MANUAL: ManualChapter[] = [
           {
             kind: 'steps', title: 'Manter o roteiro e os prazos',
             items: [
-              'Selecione a versão em rascunho na seção **Estrutura e roteiro** e vá até **Roteiro da versão**.',
+              'Selecione a versão em rascunho na seção **Estrutura e roteiro** e abra a aba **Roteiro**. Um ponto laranja na aba indica que o roteiro mudou em relação à versão comparada.',
               'Clique em **Operação** e informe nome, posto, tempo, preparação, equipe e instruções. Para injeção, escolha o molde: o tempo por peça é calculado pelo ciclo dividido pelas cavidades ativas.',
-              'Use as setas para mudar a ordem, **Editar** para corrigir e **Remover** para tirar uma operação. **Copiar roteiro de outro item** traz as operações de um item parecido.',
+              'Use as setas para mudar a ordem, o lápis para corrigir e a lixeira para tirar uma operação. **Copiar roteiro de outro item** traz as operações de um item parecido.',
               'Em **Comparar com**, escolha outra versão para ver o que mudou na estrutura e no roteiro.',
               'Em **Prazos de fabricação**, informe o prazo de produção em dias. A data sugerida da proposta passa a ser esse prazo somado ao maior lead time de compra entre os componentes da estrutura vigente.',
             ],
@@ -895,6 +895,24 @@ export const MANUAL: ManualChapter[] = [
           },
         ],
         related: ['demandas'],
+      },
+      {
+        id: 'parceiros', title: 'Parceiros: clientes e fornecedores',
+        summary: 'Um cadastro mestre. Cliente e fornecedor são papéis.',
+        roles: ['Comercial', 'Compras', 'Gestor'],
+        screens: [{ label: 'Parceiros', to: '/parceiros' }],
+        tour: '/parceiros',
+        blocks: [
+          { kind: 'p', text: 'O nome Parceiros é temporário. No Omie, cliente e fornecedor são o mesmo registro de pessoa. O Thalamus segue essa lógica: os dados gerais existem uma vez, e cada papel tem situação, perfil e indicadores próprios. Inativar o cliente não inativa o fornecedor.' },
+          { kind: 'p', text: 'O perfil do cliente mostra os pedidos de Vendas, o período e a origem. A fórmula do ticket médio ainda não foi definida, então o valor não é publicado. A classe ABC vigente só muda com aprovação do Coordenador Comercial. Os limites A, B e C também não foram definidos: o alerta anual registra o faturamento e não sugere letra. A classe, sozinha, não libera crédito, desconto nem condição.' },
+          { kind: 'p', text: 'O perfil do fornecedor mostra o volume recebido no Almoxarifado. A nota não é publicada enquanto a fórmula não existir. A homologação de matéria-prima aparece só como retrato. Na compra, matéria-prima C1 sem fornecedor homologado para aquele item é bloqueada com o motivo. C2 e C3 não exigem esse registro. Os critérios que classificam C1, C2 e C3 ainda não foram definidos; a criticidade é informada no item.' },
+          { kind: 'rules', items: [
+            'Documento repetido é avisado antes de criar outro registro.',
+            'Papel inativo bloqueia solicitação nova. Pedido, oportunidade e compra já abertos seguem até o fim.',
+            'A política de quem aprova a inativação ainda não foi definida. Nesta demonstração, a solicitação já inativa o papel.',
+          ] },
+        ],
+        related: ['pessoas', 'compras', 'crm'],
       },
       {
         id: 'pessoas', title: 'Pessoas e organograma',

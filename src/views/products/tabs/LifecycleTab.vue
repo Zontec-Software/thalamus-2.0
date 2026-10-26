@@ -16,6 +16,7 @@ const store = useErpStore()
 const ui = useUiStore()
 
 const catalog = computed(() => catalogOf(props.item))
+const portraits = computed(() => store.state.supplierHomologations.filter(entry => entry.itemId === props.item.id))
 const life = computed(() => catalog.value.lifecycle)
 const issues = computed(() => activationIssues(store.state, props.item))
 const pendencies = computed(() => openPendencies(store.state, props.item.id))
@@ -98,12 +99,13 @@ const canReturn = computed(() => (APPROVER[ui.role] ?? []).some(role => required
   <section v-if="item.type === 'MP'" class="layer">
     <h3 class="drawer-title">Retrato de homologação</h3>
     <p class="cell-sub">Leitura do outro submódulo, por fornecedor. Não se edita nem se decide aqui.</p>
-    <div v-if="catalog.homologation" class="mini-stats">
-      <div class="mini-stat"><strong>{{ catalog.homologation.supplier }}</strong><span>fornecedor</span></div>
-      <div class="mini-stat"><strong>{{ catalog.homologation.status }}</strong><span>{{ catalog.homologation.reference }}<template v-if="catalog.homologation.validUntil"> · até {{ catalog.homologation.validUntil }}</template></span></div>
-      <div class="mini-stat"><strong>Testes de P&amp;D</strong><span>{{ catalog.homologation.tests }}</span></div>
+    <div v-for="portrait in portraits" :key="portrait.id" class="list-row static">
+      <div>
+        <strong>{{ store.partnerName(portrait.partnerId) }} · {{ portrait.status }}</strong>
+        <span>{{ portrait.reference }}<template v-if="portrait.validUntil"> · até {{ portrait.validUntil }}</template><template v-if="portrait.tests"> · {{ portrait.tests }}</template></span>
+      </div>
     </div>
-    <p v-else class="empty-note">Sem retrato de homologação para este fornecedor.</p>
+    <p v-if="!portraits.length" class="empty-note">Sem retrato de homologação para este item. A decisão fica no submódulo de homologação.</p>
   </section>
   <p v-if="life === 'Bloqueado'" class="notice info" style="margin-top:10px">Bloqueado não entra em proposta, compra, pedido nem OP nova. Saldo e histórico ficam.</p>
   <p v-if="life === 'Obsoleto'" class="notice info" style="margin-top:10px">Obsoleto sai do planejamento. O saldo restante ainda pode ser consumido.</p>

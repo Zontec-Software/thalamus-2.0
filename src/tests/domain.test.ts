@@ -23,6 +23,7 @@ import { createSeedState } from '../mocks/seed'
 import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import { FUNCTIONALITIES, profileCan } from '../domain/access'
 import { provisionCompany, saveEconomicGroup, saveOmieConnection } from '../domain/platform'
+import { clientSalesBase, createPartner, decideAbcSuggestion, inactivateRole, registerAnnualBilling } from '../domain/partners'
 
 const TENANT = 'tenant-roboflex'
 const stageOf = (state: ErpState, id: string) => orderStage(state, state.salesOrders.find(order => order.id === id)!)
@@ -1001,5 +1002,63 @@ describe('cadastro completo: camadas estendidas', () => {
     expect(deliveryLead(state, item)).toBe(5 + slowest)
     item.catalog!.productionLeadDays = 0
     expect(deliveryLead(state, item)).toBe(item.leadTimeDays ?? 14)
+  })
+})
+
+describe('parceiros', () => {
+  const input = {
+    personType: 'Jurídica' as const, legalName: 'Oficina Norte Ltda', tradeName: 'Oficina Norte', document: '08.444.555/0001-66',
+    roles: ['Cliente', 'Fornecedor'] as ('Cliente' | 'Fornecedor')[],
+    contacts: [{ name: 'Helena', duty: 'Comercial', phone: '', email: 'helena@oficinanorte.com.br' }],
+    addresses: [{ purpose: 'Sede' as const, line: 'Rua 1', city: 'Sabará', state: 'MG' }],
+  }
+
+  it('recusa documento repetido e aceita quando a pessoa confirma', () => {
+    const state = createSeedState()
+    expect(() => createPartner(state, input, 'Marina')).toThrow(/Oficina Norte/)
+    const created = createPartner(state, { ...input, document: '10.200.300/0001-44', tradeName: 'Norte Dois' }, 'Marina')
+    expect(created.roles).toEqual(['Cliente', 'Fornecedor'])
+    expect(created.name).toBe('Norte Dois')
+    expect(state.partners.filter(entry => entry.document === '08.444.555/0001-66')).toHaveLength(1)
+  })
+
+  it('inativar o cliente não inativa o fornecedor e bloqueia só solicitação nova', () => {
+    const state = createSeedState()
+    const before = state.purchaseOrders.length
+    inactivateRole(state, 'p-norte', 'Cliente', 'Sem compra nova', 'Marina')
+    expect(state.partners.find(entry => entry.id === 'p-norte')?.roleStatus.Fornecedor).toBe('Ativo')
+    expect(() => createOpportunity(state, { partnerId: 'p-norte', title: 'Nova', ownerId: 'u12', value: 0, expectedClose: '2026-12-01', source: 'Site', nextAction: 'Ligar' }, 'Camila')).toThrow(/inativo/)
+    expect(() => createOpportunity(state, { partnerId: 'c1', title: 'Segue', ownerId: 'u12', value: 0, expectedClose: '2026-12-01', source: 'Site', nextAction: 'Ligar' }, 'Camila')).not.toThrow()
+    const open = state.purchaseOrders.find(entry => entry.supplierId === 'f2' && entry.status !== 'Recebido' && entry.status !== 'Cancelado')
+    inactivateRole(state, 'f2', 'Fornecedor', 'Troca de fonte', 'Marina')
+    expect(open?.status).not.toBe('Cancelado')
+    expect(state.purchaseOrders.length).toBe(before)
+    const demand = createDemand(state, { kind: 'Material', itemId: 'mp-tpu', description: 'Nova compra', quantity: 1, origin: 'Manual', neededBy: '2026-12-01', priority: 'Normal', assigneeRole: 'Compras' }, 'Compras')
+    expect(() => createPurchaseOrder(state, demand.id, 'f2', 'Compras')).toThrow(/inativo/)
+  })
+
+  it('bloqueia matéria-prima C1 sem homologação e deixa C2 seguir', () => {
+    const state = createSeedState()
+    const blocked = createDemand(state, { kind: 'Material', itemId: 'mp-abs', description: 'ABS', quantity: 1, origin: 'Manual', neededBy: '2026-12-01', priority: 'Normal', assigneeRole: 'Compras' }, 'Compras')
+    expect(() => createPurchaseOrder(state, blocked.id, 'f2', 'Compras')).toThrow(/C1/)
+    const allowed = createDemand(state, { kind: 'Material', itemId: 'mp-abs', description: 'ABS homologado', quantity: 1, origin: 'Manual', neededBy: '2026-12-01', priority: 'Normal', assigneeRole: 'Compras' }, 'Compras')
+    expect(createPurchaseOrder(state, allowed.id, 'f1', 'Compras').supplierId).toBe('f1')
+    const c2 = createDemand(state, { kind: 'Material', itemId: 'mp-tpu', description: 'TPU', quantity: 1, origin: 'Manual', neededBy: '2026-12-01', priority: 'Normal', assigneeRole: 'Compras' }, 'Compras')
+    expect(createPurchaseOrder(state, c2.id, 'f1', 'Compras').id).toBeTruthy()
+  })
+
+  it('mostra a base de vendas e não publica ticket nem classe ABC sem regra', () => {
+    const state = createSeedState()
+    const base = clientSalesBase(state, 'c1')
+    expect(base.count).toBeGreaterThan(0)
+    expect(base.total).toBeGreaterThan(0)
+    expect(base).not.toHaveProperty('ticket')
+    const suggestion = registerAnnualBilling(state, 'c2', '2026', 'Camila')
+    expect(suggestion.suggestedClass).toBeUndefined()
+    expect(() => decideAbcSuggestion(state, 'c2', suggestion.id, true, 'Comercial', 'Camila')).toThrow(/limites/)
+    expect(state.partners.find(entry => entry.id === 'c2')?.abcClass).toBeUndefined()
+    decideAbcSuggestion(state, 'c2', suggestion.id, false, 'Comercial', 'Camila')
+    expect(suggestion.status).toBe('Recusada')
+    expect(() => decideAbcSuggestion(state, 'c1', 'ABC-2026', true, 'Compras', 'Juliana')).toThrow(/Coordenador/)
   })
 })

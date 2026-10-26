@@ -412,6 +412,11 @@ export interface Item {
   currentRevisionId?: string
   leadTimeDays?: number
   supplier?: string
+  /**
+   * Criticidade da matéria-prima. Os critérios objetivos ainda não foram definidos;
+   * o valor é informado, não calculado. Só C1 exige homologação na compra.
+   */
+  criticality?: 'C1' | 'C2' | 'C3'
   /** PA */
   family?: 'Lite' | 'Hard'
   variant?: string
@@ -669,15 +674,75 @@ export interface JobPosition {
   description: string
 }
 
+export type PartnerRoleName = 'Cliente' | 'Fornecedor' | 'Transportadora'
+export type PartnerRoleStatus = 'Em cadastro' | 'Ativo' | 'Inativo'
+export type AddressPurpose = 'Sede' | 'Cobrança' | 'Entrega' | 'Correspondência' | 'Pedido' | 'Recebimento' | 'Faturamento'
+
+export interface PartnerContact {
+  name: string
+  duty: string
+  phone: string
+  email: string
+}
+
+export interface PartnerAddress {
+  purpose: AddressPurpose
+  line: string
+  city: string
+  state: string
+}
+
+export interface AbcSuggestion {
+  id: string
+  year: string
+  billing: number
+  /** Vazio enquanto os limites A/B/C não existem. Nenhuma letra é inventada. */
+  suggestedClass?: 'A' | 'B' | 'C'
+  status: 'Pendente' | 'Aprovada' | 'Recusada'
+  createdAt: string
+  decidedBy?: string
+  decidedAt?: string
+  note: string
+}
+
+/** Retrato da homologação de matéria-prima. O processo vive em outro submódulo; aqui só se lê. */
+export interface SupplierHomologation {
+  id: string
+  partnerId: string
+  itemId: string
+  status: 'Homologado' | 'Em análise' | 'Reprovado'
+  reference: string
+  tests?: string
+  validUntil?: string
+}
+
+/**
+ * Cadastro mestre de parceiro. No Omie, cliente e fornecedor são o mesmo registro;
+ * Cliente e Fornecedor são papéis deste registro, não cadastros separados.
+ */
 export interface BusinessPartner {
   id: string
+  personType: 'Física' | 'Jurídica'
+  legalName: string
+  tradeName: string
   name: string
   document: string
-  roles: ('Cliente' | 'Fornecedor' | 'Transportadora')[]
+  roles: PartnerRoleName[]
+  roleStatus: Partial<Record<PartnerRoleName, PartnerRoleStatus>>
+  contacts: PartnerContact[]
+  addresses: PartnerAddress[]
   city: string
   contact: string
   email: string
   status: EntityStatus
+  origin: string
+  createdAt: string
+  createdBy: string
+  audit: { at: string; actor: string; text: string; before?: string; after?: string }[]
+  abcClass?: 'A' | 'B' | 'C'
+  abcDecidedBy?: string
+  abcDecidedAt?: string
+  abcSuggestions: AbcSuggestion[]
 }
 
 export interface ProductRevision {

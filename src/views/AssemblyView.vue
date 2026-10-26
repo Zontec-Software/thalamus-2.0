@@ -22,6 +22,7 @@ const cells = computed(() => store.state.resources.filter(resource => resource.k
   }
 }))
 const cell = (opId: string, step: string) => store.state.productionOrders.find(op => op.id === opId)?.operations.find(operation => operation.name === step)
+const steps = computed(() => STEPS.filter(step => ops.value.some(op => op.operations.some(operation => operation.name === step))))
 </script>
 
 <template>
@@ -48,18 +49,16 @@ const cell = (opId: string, step: string) => store.state.productionOrders.find(o
       <div class="legend"><span><i class="dot Concluída"></i>Concluída</span><span><i class="dot Em execução"></i>Em execução</span><span><i class="dot Pausada"></i>Parada</span><span><i class="dot Disponível"></i>Liberada</span><span><i class="dot"></i>Aguardando</span></div>
     </div>
     <table class="matrix" style="margin-top:12px">
-      <thead><tr><th>OP / pedido</th><th>Produto</th><th>Limite</th><th v-for="step in STEPS" :key="step" style="text-align:center">{{ step }}</th><th>Progresso</th><th>Situação</th></tr></thead>
+      <thead><tr><th>OP / pedido</th><th>Produto</th><th v-for="step in steps" :key="step" class="step-head">{{ step }}</th><th>Situação</th></tr></thead>
       <tbody>
         <tr v-for="op in ops" :key="op.id" class="clickable" @click="ui.opDrawer = op.id">
-          <td><span class="cell-main">{{ op.id }}</span><span class="cell-sub">{{ op.salesOrderId }}</span></td>
+          <td><span class="cell-main">{{ op.id }}</span><span class="cell-sub">{{ op.salesOrderId }} · até {{ fmtDate(op.dueDate) }}</span></td>
           <td>{{ store.itemLabel(op.itemId) }}<span class="cell-sub">{{ op.quantity }} un.</span></td>
-          <td>{{ fmtDate(op.dueDate) }}</td>
-          <td v-for="step in STEPS" :key="step" class="cell">
+          <td v-for="step in steps" :key="step" class="cell">
             <i v-if="cell(op.id, step)" class="dot" :class="cell(op.id, step)!.status" :title="`${cell(op.id, step)!.status} · ${cell(op.id, step)!.good} boas`"></i>
             <span v-else class="cell-sub">—</span>
           </td>
-          <td><div class="progress"><span :style="{ width: `${opProgress(op)}%` }"></span></div></td>
-          <td><StatusBadge :value="op.status" /></td>
+          <td><StatusBadge :value="op.status" /><div class="progress" style="margin-top:6px" :title="`${opProgress(op)}% concluído`"><span :style="{ width: `${opProgress(op)}%` }"></span></div></td>
         </tr>
       </tbody>
     </table>

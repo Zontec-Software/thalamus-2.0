@@ -5,7 +5,7 @@ import {
 } from '../domain/engine'
 import { defaultCatalog, ensureClassPath, seedPath, withCheckDigit } from '../domain/catalog'
 import { FUNCTIONALITIES, profileCode, seededProfiles } from '../domain/access'
-import type { Item, RouteStep, SalesOrder } from '../types/domain'
+import type { BusinessPartner, Item, PartnerRoleName, RouteStep, SalesOrder } from '../types/domain'
 
 const mp = (id: string, code: string, name: string, stock: number, minimum: number, cost: number, supplier: string, leadTimeDays: number): Item =>
   ({ id, code, name, type: 'MP', unit: 'kg', stock, minimum, cost, supplier, leadTimeDays, location: 'Silo / A-01' })
@@ -26,6 +26,19 @@ const injection = (toolId: string, resourceId: string, cycleSeconds: number, act
   step('inj', 'Injeção', resourceId, Math.round(cycleSeconds / activeCavities / 60 * 10000) / 10000, ['Montar e aquecer o molde', 'Liberar primeira peça com a qualidade', 'Separar refugo por motivo'], { toolId, setupMinutes: 45, crew: 1, firstPiece: true }),
   ...extraSteps,
 ]
+
+function bp(input: Pick<BusinessPartner, 'id' | 'name' | 'document' | 'roles' | 'city' | 'contact' | 'email'> & Partial<BusinessPartner>): BusinessPartner {
+  const [city, state] = input.city.split(',').map(part => part.trim())
+  const contacts = input.contacts ?? [{ name: input.contact, duty: 'Principal', phone: '', email: input.email }]
+  const addresses = input.addresses ?? [{ purpose: 'Sede' as const, line: '', city, state: state ?? '' }]
+  const roles = input.roles as PartnerRoleName[]
+  return {
+    personType: 'Jurídica', legalName: input.name, tradeName: input.name,
+    roleStatus: Object.fromEntries(roles.map(role => [role, 'Ativo' as const])),
+    contacts, addresses, origin: 'Carga inicial', createdAt: '2026-08-01T12:00:00.000Z', createdBy: 'Carga inicial',
+    audit: [], abcSuggestions: [], status: 'Ativo', ...input, roles,
+  }
+}
 
 function baseState(): ErpState {
   return {
@@ -192,16 +205,22 @@ function baseState(): ErpState {
       { id: 'pos-ast', name: 'Técnico de campo', sectorId: 'sec-ser', description: 'Triagem e execução de assistência' },
       { id: 'pos-op', name: 'Operador industrial', sectorId: 'sec-pro', description: 'Apontamento e autocontrole' },
     ],
+    supplierHomologations: [],
     partners: [
-      { id: 'c1', name: 'Mineradora Horizonte', document: '12.345.678/0001-10', roles: ['Cliente'], city: 'Itabira, MG', contact: 'Marcelo Dias', email: 'marcelo@horizonte.com.br', status: 'Ativo' },
-      { id: 'c2', name: 'Translog Brasil', document: '23.456.789/0001-20', roles: ['Cliente', 'Transportadora'], city: 'Contagem, MG', contact: 'Bianca Alves', email: 'bianca@translog.com.br', status: 'Ativo' },
-      { id: 'c3', name: 'Agro Vale Verde', document: '34.567.890/0001-30', roles: ['Cliente'], city: 'Rio Verde, GO', contact: 'Rui Prado', email: 'rui@agrovale.com.br', status: 'Ativo' },
-      { id: 'c4', name: 'Hotel Serra Azul', document: '45.678.901/0001-40', roles: ['Cliente'], city: 'Gramado, RS', contact: 'Lívia Costa', email: 'livia@serraazul.com.br', status: 'Ativo' },
-      { id: 'c5', name: 'Porto Leste', document: '56.789.012/0001-50', roles: ['Cliente'], city: 'Vitória, ES', contact: 'Fábio Luz', email: 'fabio@portoleste.com.br', status: 'Ativo' },
-      { id: 'c6', name: 'Rede Varejo Prime', document: '67.890.123/0001-60', roles: ['Cliente'], city: 'São Paulo, SP', contact: 'Nina Lopes', email: 'nina@varejoprime.com.br', status: 'Ativo' },
-      { id: 'f1', name: 'Polímeros Minas', document: '71.111.111/0001-11', roles: ['Fornecedor'], city: 'Betim, MG', contact: 'César Mota', email: 'vendas@polimerosminas.com.br', status: 'Ativo' },
-      { id: 'f2', name: 'TecnoPoli', document: '72.222.222/0001-22', roles: ['Fornecedor'], city: 'Campinas, SP', contact: 'Bia Lima', email: 'bia@tecnopoli.com.br', status: 'Ativo' },
-      { id: 'f3', name: 'EletroSul Componentes', document: '73.333.333/0001-33', roles: ['Fornecedor'], city: 'Joinville, SC', contact: 'Luiz Reis', email: 'luiz@eletrosul.com.br', status: 'Ativo' },
+      bp({ id: 'c1', name: 'Mineradora Horizonte', document: '12.345.678/0001-10', roles: ['Cliente'], city: 'Itabira, MG', contact: 'Marcelo Dias', email: 'marcelo@horizonte.com.br', abcClass: 'A', abcDecidedBy: 'Camila Nunes', abcDecidedAt: '2026-01-15T12:00:00.000Z' }),
+      bp({ id: 'c2', name: 'Translog Brasil', document: '23.456.789/0001-20', roles: ['Cliente', 'Transportadora'], city: 'Contagem, MG', contact: 'Bianca Alves', email: 'bianca@translog.com.br' }),
+      bp({ id: 'c3', name: 'Agro Vale Verde', document: '34.567.890/0001-30', roles: ['Cliente'], city: 'Rio Verde, GO', contact: 'Rui Prado', email: 'rui@agrovale.com.br' }),
+      bp({ id: 'c4', name: 'Hotel Serra Azul', document: '45.678.901/0001-40', roles: ['Cliente'], city: 'Gramado, RS', contact: 'Lívia Costa', email: 'livia@serraazul.com.br' }),
+      bp({ id: 'c5', name: 'Porto Leste', document: '56.789.012/0001-50', roles: ['Cliente'], city: 'Vitória, ES', contact: 'Fábio Luz', email: 'fabio@portoleste.com.br' }),
+      bp({ id: 'c6', name: 'Rede Varejo Prime', document: '67.890.123/0001-60', roles: ['Cliente'], city: 'São Paulo, SP', contact: 'Nina Lopes', email: 'nina@varejoprime.com.br' }),
+      bp({ id: 'f1', name: 'Polímeros Minas', document: '71.111.111/0001-11', roles: ['Fornecedor'], city: 'Betim, MG', contact: 'César Mota', email: 'vendas@polimerosminas.com.br' }),
+      bp({ id: 'f2', name: 'TecnoPoli', document: '72.222.222/0001-22', roles: ['Fornecedor'], city: 'Campinas, SP', contact: 'Bia Lima', email: 'bia@tecnopoli.com.br' }),
+      bp({ id: 'f3', name: 'EletroSul Componentes', document: '73.333.333/0001-33', roles: ['Fornecedor'], city: 'Joinville, SC', contact: 'Luiz Reis', email: 'luiz@eletrosul.com.br' }),
+      bp({
+        id: 'p-norte', name: 'Oficina Norte', legalName: 'Oficina Norte Ltda', tradeName: 'Oficina Norte', document: '08.444.555/0001-66', roles: ['Cliente', 'Fornecedor'], city: 'Sabará, MG', contact: 'Helena Prado', email: 'helena@oficinanorte.com.br',
+        contacts: [{ name: 'Helena Prado', duty: 'Comercial', phone: '31 3333-1000', email: 'helena@oficinanorte.com.br' }, { name: 'Ivo Prado', duty: 'Financeiro', phone: '31 3333-1001', email: 'ivo@oficinanorte.com.br' }],
+        addresses: [{ purpose: 'Sede', line: 'Rua do Comércio, 40', city: 'Sabará', state: 'MG' }, { purpose: 'Entrega', line: 'Rua do Comércio, 40', city: 'Sabará', state: 'MG' }],
+      }),
     ],
     productRevisions: [
       { id: 'rev-a11-c', itemId: 'pa-a11-ext', code: 'C', status: 'Liberada', createdAt: '2026-08-02T10:00:00.000Z', releasedAt: '2026-08-10T14:00:00.000Z', releasedBy: 'Eduardo Freitas', checklist: [{ label: 'Cadastro', done: true }, { label: 'Estrutura', done: true }, { label: 'Roteiro', done: true }, { label: 'Fiscal', done: true }], notes: 'Reforço do alojamento do conector.' },
@@ -389,6 +408,7 @@ export function createSeedState(): ErpState {
     profileId: `profile-${profileCode(user.role)}`,
   }))
   prepareCatalog(s)
+  preparePartners(s)
   const at = (dayOffset: number, hour: number, minute = 0) => setClock(new Date(2026, 9, 15 + dayOffset, hour, minute))
   const runOperations = (opId: string, operator: string) => {
     const op = s.productionOrders.find(entry => entry.id === opId)!
@@ -503,10 +523,29 @@ export function createSeedState(): ErpState {
     setClock(null)
   }
   for (const category of s.budgetCategories) category.omieId = `OMIE-${category.code}`
+  const horizonte = s.partners.find(partner => partner.id === 'c1')
+  if (horizonte) {
+    horizonte.abcSuggestions = [{
+      id: 'ABC-2026', year: '2026',
+      billing: s.salesOrders.filter(entry => entry.customerId === 'c1' && entry.receivedAt.startsWith('2026')).reduce((sum, entry) => sum + entry.value, 0),
+      status: 'Pendente', createdAt: '2026-10-20T12:00:00.000Z',
+      note: 'Limites A, B e C ainda não definidos. Nenhuma classe foi sugerida e a classe vigente não muda.',
+    }]
+  }
   return s
 }
 
 /** Catálogo, árvore, versões de estrutura com vigência e lotes iniciais. */
+function preparePartners(s: ErpState) {
+  const abs = s.items.find(item => item.id === 'mp-abs')
+  const tpu = s.items.find(item => item.id === 'mp-tpu')
+  if (abs) abs.criticality = 'C1'
+  if (tpu) tpu.criticality = 'C2'
+  s.supplierHomologations = [
+    { id: 'HOM-MP-ABS', partnerId: 'f1', itemId: 'mp-abs', status: 'Homologado', reference: 'HOM-MP-ABS', validUntil: '2027-03-31', tests: 'Tração e fluidez, laudo P&D PD-118' },
+  ]
+}
+
 function prepareCatalog(s: ErpState) {
   for (const item of s.items) {
     item.catalog = defaultCatalog(item)

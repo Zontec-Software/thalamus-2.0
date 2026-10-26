@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
-import { Plus, ShieldCheck } from 'lucide-vue-next'
+import { Plus, ShieldCheck, X } from 'lucide-vue-next'
 import { AREAS } from '../navigation'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
@@ -24,7 +24,6 @@ function loadProfile() {
 }
 watch(selectedId, loadProfile, { immediate: true })
 const assigned = (userId: string, profileId: string) => store.state.userProfileAssignments.some(entry => entry.userId === userId && entry.profileId === profileId && entry.tenantId === ui.activeTenantId)
-const profileNames = (userId: string) => store.state.userProfileAssignments.filter(entry => entry.userId === userId && entry.tenantId === ui.activeTenantId).map(entry => store.state.accessProfiles.find(profile => profile.id === entry.profileId)?.name).filter(Boolean).join(', ') || 'Sem perfil'
 function toggleFunctionality(id: string) {
   form.functionalityIds = form.functionalityIds.includes(id) ? form.functionalityIds.filter(entry => entry !== id) : [...form.functionalityIds, id]
 }
@@ -81,12 +80,24 @@ function createProfile() {
   </section>
 
   <article class="card flush" data-tour="permissions">
-    <div class="section-head"><div><h2>Pessoas e perfis da empresa</h2><p>{{ canEditAccess ? 'Marque todos os perfis aplicáveis. Alterações ficam registradas no cenário.' : 'Somente Administrador pode gerir acessos.' }}</p></div></div>
+    <div class="section-head"><div><h2>Pessoas e perfis da empresa</h2><p>{{ canEditAccess ? 'Adicione perfis pelo + Perfil e retire pelo × da etiqueta. Alterações ficam registradas no cenário.' : 'Somente Administrador pode gerir acessos.' }}</p></div></div>
     <table>
-      <thead><tr><th>Pessoa</th><th>Setor</th><th>Perfis</th><th v-for="profile in profiles" :key="profile.id">{{ profile.name }}</th></tr></thead>
+      <thead><tr><th>Pessoa</th><th>Setor</th><th>Perfis</th></tr></thead>
       <tbody><tr v-for="user in companyUsers" :key="user.id">
-        <td><span class="cell-main">{{ user.name }}</span><span class="cell-sub">{{ user.email ?? 'Sem e-mail' }}</span></td><td>{{ user.sector }}</td><td>{{ profileNames(user.id) }}</td>
-        <td v-for="profile in profiles" :key="profile.id" class="cell"><input type="checkbox" :checked="assigned(user.id, profile.id)" :disabled="!canEditAccess" :aria-label="`${profile.name} para ${user.name}`" @change="store.assignProfile(user.id, profile.id, ($event.target as HTMLInputElement).checked)" /></td>
+        <td><span class="cell-main">{{ user.name }}</span><span class="cell-sub">{{ user.email ?? 'Sem e-mail' }}</span></td><td>{{ user.sector }}</td>
+        <td>
+          <div class="profile-chips">
+            <span v-for="profile in profiles.filter(entry => assigned(user.id, entry.id))" :key="profile.id" class="chip active">
+              {{ profile.name }}
+              <button v-if="canEditAccess" type="button" class="chip-x" :aria-label="`Tirar ${profile.name} de ${user.name}`" @click="store.assignProfile(user.id, profile.id, false)"><X :size="11" /></button>
+            </span>
+            <span v-if="!profiles.some(entry => assigned(user.id, entry.id))" class="cell-sub">Sem perfil</span>
+            <select v-if="canEditAccess && profiles.some(entry => !assigned(user.id, entry.id))" class="filter chip-add" value="" :aria-label="`Adicionar perfil a ${user.name}`" @change="store.assignProfile(user.id, ($event.target as HTMLSelectElement).value, true); ($event.target as HTMLSelectElement).value = ''">
+              <option value="" disabled>+ Perfil</option>
+              <option v-for="profile in profiles.filter(entry => !assigned(user.id, entry.id))" :key="profile.id" :value="profile.id">{{ profile.name }}</option>
+            </select>
+          </div>
+        </td>
       </tr></tbody>
     </table>
   </article>

@@ -6,6 +6,7 @@ import * as engine from '../domain/engine'
 import * as enterprise from '../domain/enterprise'
 import * as engineering from '../domain/engineering'
 import * as budget from '../domain/budget'
+import * as partners from '../domain/partners'
 import { profileCan } from '../domain/access'
 import { provisionCompany, saveEconomicGroup, saveOmieConnection } from '../domain/platform'
 import type { ErpState } from '../domain/engine'
@@ -15,7 +16,7 @@ import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NonConformity, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v36'
+const STORAGE_KEY = 'thalamus-erp-v37'
 
 function load(): ErpState {
   const seed = createSeedState()
@@ -351,7 +352,15 @@ export const useErpStore = defineStore('erp', () => {
     run(() => { requireGroupPlanning(); return budget.applyGroupRevenueTarget(state, groupId, year, targetRevenue, reason, actor(), ui.role) }, result => `Meta do grupo aplicada: ${result.growthPct >= 0 ? '+' : ''}${result.growthPct}% a cada empresa`)
   const createUser = bind(enterprise.createUser, user => `${user.name} cadastrado · PIN ${user.pin}`)
   const updateUser = bind(enterprise.updateUser, 'Cadastro atualizado')
-  const createPartner = bind(enterprise.createPartner, partner => `${partner.name} cadastrado`)
+  const createPartner = bind(partners.createPartner, partner => `${partner.name} cadastrado`)
+  const updatePartnerMaster = bind(partners.updatePartnerMaster, 'Dados gerais salvos')
+  const addPartnerContact = bind(partners.addContact, 'Contato incluído')
+  const addPartnerAddress = bind(partners.addAddress, 'Endereço incluído')
+  const addPartnerRole = bind(partners.addRole, partner => `${partner.name} atualizado`)
+  const inactivatePartnerRole = bind(partners.inactivateRole, 'Papel inativado. Novas solicitações deste papel ficam bloqueadas')
+  const registerAnnualBilling = bind(partners.registerAnnualBilling, 'Faturamento anual registrado. Nenhuma classe foi sugerida')
+  const decideAbcSuggestion = bind(partners.decideAbcSuggestion, 'Decisão da classificação registrada. A classe vigente só muda quando há uma classe sugerida')
+  const setItemCriticality = bind(partners.setItemCriticality, 'Criticidade registrada')
   const createService = bind(enterprise.createService, service => `${service.code} criado`)
   const updateService = bind(enterprise.updateService, 'Serviço atualizado')
   const createAsset = bind(enterprise.createAsset, asset => `${asset.name} cadastrado`)
@@ -567,6 +576,6 @@ export const useErpStore = defineStore('erp', () => {
     createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk,
     createBudget, distributeGroupBudget, setAnnualBudget, adjustBudget, createBudgetCategory, updateBudgetCategory, configureBudget, decideBudgetException, acknowledgeBudgetAlert, linkBudgetInvoice,
     applyBudgetGrowth, applyRevenueTarget, applyPriorSeasonality, setMonthlyBudget, setSectorAllocations, setCategoryAssignment, createBudgetGroup, createPlannedCompany, setCostCenterSplit, applyCategorySuggestion, saveBudgetSimulation, applyBudgetSimulation, createCostCenter, updateCostCenter, setSectorDefaultCostCenter, applyGroupGrowth, applyGroupRevenueTarget,
-    createUser, updateUser, createPartner, createService, updateService, createAsset, updateAsset,
+    createUser, updateUser, createPartner, updatePartnerMaster, addPartnerContact, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, createAsset, updateAsset,
   }
 })

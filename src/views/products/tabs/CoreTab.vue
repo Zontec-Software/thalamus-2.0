@@ -66,6 +66,14 @@ watch(() => [props.item.id, catalog.value.version], load, { immediate: true })
       </div>
       <small v-if="locked">Depois da ativação, estes indicadores mudam por solicitação com origem.</small>
     </div>
+    <div v-if="item.type === 'MP'" class="field">
+      <label>Criticidade</label>
+      <select :value="item.criticality ?? ''" @change="store.setItemCriticality(item.id, ($event.target as HTMLSelectElement).value as '' | 'C1' | 'C2' | 'C3')">
+        <option value="">Sem classe</option>
+        <option>C1</option><option>C2</option><option>C3</option>
+      </select>
+      <small>Os critérios objetivos ainda não foram definidos. O valor é informado. Só C1 exige fornecedor homologado na compra; C2 e C3 não.</small>
+    </div>
     <button v-if="!locked" class="button" @click="store.updateItemCore(item.id, { ...form })">Salvar núcleo</button>
   </fieldset>
 

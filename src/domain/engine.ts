@@ -2,7 +2,7 @@ import type {
   AccessProfile, Asset, Budget, BudgetAlert, BudgetCategory, BudgetEntry, BudgetException, BudgetGroupDef, BudgetSimulation, BusinessPartner, CostCenter, Customer, Demand, Downtime, EconomicGroup, EngineeringChange, FiscalRule, FlowEvent, FlowStage, Functionality, Item, ItemClass, ItemModel, JobPosition, OmieConnection,
   MachineState, MaintenanceOrder, NonConformity, Opportunity, OpMaterial, Operation, PriceTable, ProductRevision, ProductionOrder, Project,
   OmieCategory, OmiePayment, Proposal, PurchaseOrder, Requisition, RequisitionStatus, Resource, SalesOrder, Sector, ServiceCatalogItem,
-  ShopAlert, StockMovement, SyncLog, TechnicalServiceOrder, Tenant, User, UserProfileAssignment,
+  ShopAlert, StockMovement, SupplierHomologation, SyncLog, TechnicalServiceOrder, Tenant, User, UserProfileAssignment,
 } from '../types/domain'
 
 export interface ErpState {
@@ -16,6 +16,7 @@ export interface ErpState {
   costCenters: CostCenter[]
   positions: JobPosition[]
   partners: BusinessPartner[]
+  supplierHomologations: SupplierHomologation[]
   salesOrders: SalesOrder[]
   omieQueue: SalesOrder[]
   productionOrders: ProductionOrder[]
