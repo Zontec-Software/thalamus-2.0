@@ -59,7 +59,7 @@ const nc = computed(() => store.state.nonConformities.find(entry => entry.id ===
 const demands = computed(() => store.state.demands.filter(entry => entry.originId === props.id))
 const estimate = computed(() => {
   if (!technical.value || !record.chargeable) return 0
-  const visit = store.state.services.find(entry => entry.category === 'Assistência')?.price ?? 480
+  const visit = store.state.services.find(entry => entry.status === 'Ativo' && entry.sellable && entry.usableInServiceOrder && entry.place === 'Cliente' && entry.executor === 'Própria')?.price ?? 480
   const material = (technical.value.parts ?? []).reduce((sum, entry) => sum + store.item(entry.itemId).cost * entry.quantity * 1.3, 0)
   return Math.round(visit + material + record.laborHours * 120)
 })

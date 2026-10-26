@@ -293,11 +293,11 @@ export function createRequisition(state: ErpState, itemId: string, quantity: num
 
 /* ---------- Planejamento ---------- */
 
-type StepSource = Pick<Operation, 'id' | 'name' | 'resourceId' | 'minutesPerUnit' | 'instructions' | 'setupMinutes' | 'toolId' | 'firstPiece'>
+type StepSource = Pick<Operation, 'id' | 'name' | 'resourceId' | 'minutesPerUnit' | 'instructions' | 'setupMinutes' | 'toolId' | 'firstPiece' | 'serviceId' | 'serviceInstructionVersion'>
 
 function toOperation(step: StepSource): Operation {
-  const { id, name, resourceId, minutesPerUnit, instructions, setupMinutes, toolId, firstPiece } = step
-  return { id, name, resourceId, minutesPerUnit, instructions: [...instructions], setupMinutes, toolId, firstPiece, status: 'Aguardando', good: 0, scrap: 0, accumulatedMs: 0 }
+  const { id, name, resourceId, minutesPerUnit, instructions, setupMinutes, toolId, firstPiece, serviceId, serviceInstructionVersion } = step
+  return { id, name, resourceId, minutesPerUnit, instructions: [...instructions], setupMinutes, toolId, firstPiece, serviceId, serviceInstructionVersion, status: 'Aguardando', good: 0, scrap: 0, accumulatedMs: 0 }
 }
 
 /** Injeção da peça: o roteiro com molde (ferramental FE) manda; sem ele, valem os campos antigos da peça. */

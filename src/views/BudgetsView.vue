@@ -403,9 +403,21 @@ const sectorName = (id?: string) => store.state.sectors.find(entry => entry.id =
 const groupOptions = computed(() => groupsFor(store.state, ui.activeTenantId))
 const categoryForm = reactive({ name: '', group: '03. Custos' as string, parentId: '' })
 const motherForm = reactive({ code: '', name: '' })
+const creatingCategory = ref(false)
+const categoryKind = ref<'conta' | 'mae'>('conta')
 const companyForm = reactive({ legalName: '', tradeName: '', document: '', city: '', adminName: '', adminEmail: '' })
+function openCategory() {
+  categoryKind.value = 'conta'
+  const preferred = groupOptions.value.find(entry => entry.name.startsWith('03.')) ?? groupOptions.value[0]
+  Object.assign(categoryForm, { name: '', group: preferred?.name ?? '03. Custos', parentId: '' })
+  Object.assign(motherForm, { code: '', name: '' })
+  creatingCategory.value = true
+}
 function createMother() {
-  if (store.createBudgetGroup(motherForm.code, motherForm.name)) Object.assign(motherForm, { code: '', name: '' })
+  if (store.createBudgetGroup(motherForm.code, motherForm.name)) {
+    Object.assign(motherForm, { code: '', name: '' })
+    creatingCategory.value = false
+  }
 }
 function createCompany() {
   if (store.createPlannedCompany({ ...companyForm })) Object.assign(companyForm, { legalName: '', tradeName: '', document: '', city: '', adminName: '', adminEmail: '' })
@@ -420,7 +432,10 @@ const codePreview = computed(() => {
 })
 function createCategory() {
   const created = store.createBudgetCategory({ name: categoryForm.name, group: parentCategory.value?.group ?? categoryForm.group, parentId: categoryForm.parentId || undefined })
-  if (created) Object.assign(categoryForm, { name: '', parentId: '' })
+  if (created) {
+    Object.assign(categoryForm, { name: '', parentId: '' })
+    creatingCategory.value = false
+  }
 }
 function changeStatus(entry: BudgetCategory, status: BudgetCategoryStatus) {
   store.updateBudgetCategory(entry.id, { name: entry.name, status }, 'Situação enviada ao Omie')
@@ -665,6 +680,7 @@ watch([year, screen], () => { splitCategoryId.value = '' })
         <h2><ListTree :size="16" /> Categorias de {{ year }}</h2>
         <p>Valor, responsável, setores que usam o valor e o setor que recebe a demanda. A soma destinada não passa do valor da categoria.</p>
       </div>
+      <button v-if="canManage" class="button" @click="openCategory"><Plus :size="15" /> Nova categoria</button>
     </div>
     <table class="dense fit-table">
       <thead><tr><th>Código</th><th>Categoria</th><th class="num">Valor</th><th>Responsável</th><th>Valores destinados</th><th data-tour="budget-split">Utilizadores</th><th>Executor</th><th>Limiar</th><th>Saldo negativo</th><th>Situação</th></tr></thead>
@@ -710,18 +726,6 @@ watch([year, screen], () => { splitCategoryId.value = '' })
         </template>
       </tbody>
     </table>
-    <fieldset v-if="canManage" class="layer"><legend>Nova categoria ou subcategoria</legend><div class="filter-row">
-      <select v-model="categoryForm.group" class="filter"><option v-for="entry in groupOptions" :key="entry.code" :value="entry.name">{{ entry.name }}</option></select>
-      <select v-model="categoryForm.parentId" class="filter"><option value="">Nova categoria neste grupo</option><option v-for="entry in usableCategories.filter(item => item.group === categoryForm.group && !item.parentId)" :key="entry.id" :value="entry.id">Subcategoria de {{ entry.code }} · {{ entry.name }}</option></select>
-      <input v-model="categoryForm.name" class="filter grow" placeholder="Nome" />
-      <span class="cell-sub">Código {{ codePreview }}</span>
-      <button class="button small" @click="createCategory"><Plus :size="14" /> Criar</button>
-    </div></fieldset>
-    <fieldset v-if="canManage" class="layer"><legend>Nova categoria mãe</legend><div class="filter-row">
-      <input v-model="motherForm.code" class="filter" placeholder="Código, ex. 06" maxlength="2" />
-      <input v-model="motherForm.name" class="filter grow" placeholder="Nome, ex. Despesas com pessoal" />
-      <button class="button small" @click="createMother"><Plus :size="14" /> Criar categoria mãe</button>
-    </div></fieldset>
   </article>
 
   <!-- Planejamento -->
@@ -881,6 +885,27 @@ watch([year, screen], () => { splitCategoryId.value = '' })
       </div>
     </article>
   </template>
+
+  <BaseModal :open="creatingCategory" title="Nova categoria" subtitle="Categoria e subcategoria recebem o código sozinhas. A categoria mãe usa dois dígitos, como 06." width="560px" @close="creatingCategory = false">
+    <div class="seg">
+      <button type="button" :class="{ on: categoryKind === 'conta' }" @click="categoryKind = 'conta'">Categoria ou subcategoria</button>
+      <button type="button" :class="{ on: categoryKind === 'mae' }" @click="categoryKind = 'mae'">Categoria mãe</button>
+    </div>
+    <form v-if="categoryKind === 'conta'" id="new-budget-category" class="form-grid" style="margin-top:14px" @submit.prevent="createCategory">
+      <div class="field"><label>Grupo</label><select v-model="categoryForm.group"><option v-for="entry in groupOptions" :key="entry.code" :value="entry.name">{{ entry.name }}</option></select></div>
+      <div class="field"><label>Código</label><input :value="codePreview" readonly /></div>
+      <div class="field wide"><label>Onde entra</label><select v-model="categoryForm.parentId"><option value="">Nova categoria neste grupo</option><option v-for="entry in usableCategories.filter(item => item.group === categoryForm.group && !item.parentId)" :key="entry.id" :value="entry.id">Subcategoria de {{ entry.code }} · {{ entry.name }}</option></select></div>
+      <div class="field wide"><label>Nome</label><input v-model="categoryForm.name" required placeholder="Ex. Energia elétrica" /></div>
+    </form>
+    <form v-else id="new-budget-mother" class="form-grid" style="margin-top:14px" @submit.prevent="createMother">
+      <div class="field"><label>Código</label><input v-model="motherForm.code" required maxlength="2" placeholder="06" /><small>Dois dígitos. Vira o grupo, como 03. Custos.</small></div>
+      <div class="field"><label>Nome</label><input v-model="motherForm.name" required placeholder="Despesas com pessoal" /></div>
+    </form>
+    <template #footer>
+      <button class="button secondary" type="button" @click="creatingCategory = false">Cancelar</button>
+      <button class="button" type="submit" :form="categoryKind === 'conta' ? 'new-budget-category' : 'new-budget-mother'">Criar</button>
+    </template>
+  </BaseModal>
 
   <BaseModal :open="!!splitCategory" :title="splitTitle" :subtitle="splitSubtitle" width="680px" @close="closeSplit">
     <p v-if="!(splitAmount > 0)" class="notice warning">Informe o valor da categoria antes de destinar aos setores.</p>

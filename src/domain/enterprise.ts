@@ -5,10 +5,11 @@ import * as budgetDomain from './budget'
 import type { ErpState } from './engine'
 import { addDays, addSyncLog, applyDueRevisions, assertUsable, availableQty, consumeStock, DomainError, getItem, getOp, log, nextId, now, receiveStock, today } from './engine'
 import { assertClientOpen, assertPurchaseAllowed, assertSupplierOpen } from './partners'
+import { fieldVisitService } from './services'
 import { assertResourceChoice } from './resources'
 import type {
   Asset, Budget, CrmActivity, Demand, Item, Opportunity, Project, Proposal, ProposalLine,
-  PurchaseOrder, Role, ServiceCatalogItem, TechnicalServiceOrder, User,
+  PurchaseOrder, Role, TechnicalServiceOrder, User,
 } from '../types/domain'
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -115,7 +116,7 @@ export function contractService(state: ErpState, id: string, supplierId: string,
   assertSupplierOpen(state, supplierId)
   const service = find(state.services, demand.serviceId, 'Serviço')
   const amount = service.cost * demand.quantity
-  const budget = budgetFor(state, { projectId: demand.projectId, category: 'Serviço' }) ?? budgetFor(state, { category: service.category === 'Manutenção' ? 'Manutenção' : 'Material' })
+  const budget = budgetFor(state, { projectId: demand.projectId, category: 'Serviço' }) ?? budgetFor(state, { category: 'Material' })
   commit(state, budget, amount, actor, demand.id, [demand.id])
   demand.status = 'Em atendimento'
   demand.supplierId = supplierId
@@ -132,7 +133,7 @@ export function completeDemand(state: ErpState, id: string, actor: string) {
   if (demand.kind === 'Serviço' && demand.serviceId) {
     const service = find(state.services, demand.serviceId, 'Serviço')
     const amount = service.cost * demand.quantity
-    const budget = budgetFor(state, { projectId: demand.projectId, category: 'Serviço' }) ?? budgetFor(state, { category: service.category === 'Manutenção' ? 'Manutenção' : 'Material' })
+    const budget = budgetFor(state, { projectId: demand.projectId, category: 'Serviço' }) ?? budgetFor(state, { category: 'Material' })
     realize(state, budget, amount, actor, demand.id)
   }
   log(state, 'Demandas', actor, `${demand.id} concluída`, undefined, demand.id)
@@ -633,7 +634,7 @@ export function advanceTechnicalOrder(state: ErpState, id: string, actor: string
     technical.report ||= 'Produto testado, reaperto realizado e funcionamento validado.'
     technical.status = 'Concluída'
     if (technical.chargeable) {
-      const visit = state.services.find(entry => entry.category === 'Assistência')
+      const visit = fieldVisitService(state)
       const parts = (technical.parts ?? []).reduce((sum, part) => sum + getItem(state, part.itemId).cost * part.quantity * 1.3, 0)
       const labor = (technical.laborHours ?? 0) * 120
       technical.chargeAmount = Math.round((visit?.price ?? 480) + parts + labor)
@@ -770,23 +771,6 @@ export function updateUser(state: ErpState, id: string, patch: Partial<Pick<User
   Object.assign(user, patch)
   if (changes.length) log(state, 'Pessoas', actor, `Cadastro atualizado (${changes.join(', ')})`, undefined, id)
   return user
-}
-
-export function createService(state: ErpState, input: Omit<ServiceCatalogItem, 'id' | 'code' | 'status'>, actor: string) {
-  if (!input.name.trim()) throw new DomainError('Informe o nome do serviço')
-  const prefix = { Produção: 'PRO', Manutenção: 'MAN', Terceiro: 'TER', Assistência: 'AST' }[input.category]
-  const number = state.counters.SV = (state.counters.SV ?? 4) + 1
-  const service: ServiceCatalogItem = { id: `sv-${number}`, code: `SV-${prefix}-${String(number).padStart(3, '0')}`, status: 'Ativo', ...input }
-  state.services.push(service)
-  log(state, 'Serviços', actor, `${service.code} criado: ${service.name}`, undefined, service.id)
-  return service
-}
-
-export function updateService(state: ErpState, id: string, patch: Partial<Omit<ServiceCatalogItem, 'id' | 'code'>>, actor: string) {
-  const service = find(state.services, id, 'Serviço')
-  Object.assign(service, patch)
-  log(state, 'Serviços', actor, 'Serviço atualizado', undefined, id)
-  return service
 }
 
 export function createAsset(state: ErpState, input: Omit<Asset, 'id' | 'shots'>, actor: string) {

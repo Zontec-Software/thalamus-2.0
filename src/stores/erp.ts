@@ -8,6 +8,7 @@ import * as engineering from '../domain/engineering'
 import * as budget from '../domain/budget'
 import * as partners from '../domain/partners'
 import * as resources from '../domain/resources'
+import * as serviceCatalog from '../domain/services'
 import { profileCan } from '../domain/access'
 import { provisionCompany, saveEconomicGroup, saveOmieConnection } from '../domain/platform'
 import type { ErpState } from '../domain/engine'
@@ -17,7 +18,7 @@ import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NonConformity, Resource, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v40'
+const STORAGE_KEY = 'thalamus-erp-v41'
 
 function load(): ErpState {
   const seed = createSeedState()
@@ -365,8 +366,14 @@ export const useErpStore = defineStore('erp', () => {
   const registerAnnualBilling = bind(partners.registerAnnualBilling, 'Faturamento anual registrado. Nenhuma classe foi sugerida')
   const decideAbcSuggestion = bind(partners.decideAbcSuggestion, 'Decisão da classificação registrada. A classe vigente só muda quando há uma classe sugerida')
   const setItemCriticality = bind(partners.setItemCriticality, 'Criticidade registrada')
-  const createService = bind(enterprise.createService, service => `${service.code} criado`)
-  const updateService = bind(enterprise.updateService, 'Serviço atualizado')
+  const createService = (input: Omit<serviceCatalog.ServiceInput, 'tenantId'>) =>
+    run(() => serviceCatalog.createService(state, { ...input, tenantId: tenantId() }, actor()), service => `${service.code} criado`)
+  const updateService = (id: string, input: Omit<serviceCatalog.ServiceInput, 'tenantId'>) =>
+    run(() => serviceCatalog.updateService(state, id, input, actor()), 'Serviço atualizado')
+  const setServiceStatus = (id: string, status: 'Ativo' | 'Inativo') =>
+    run(() => serviceCatalog.setServiceStatus(state, id, status, actor()), status === 'Ativo' ? 'Serviço reativado' : 'Serviço inativado')
+  const openServiceRoutingChange = (serviceId: string, itemIds: string[], mode: 'mesmos' | 'novo') =>
+    run(() => serviceCatalog.openServiceRoutingChange(state, serviceId, itemIds, mode, actor(), ui.role), result => mode === 'novo' ? 'Serviço novo criado e apontado nos rascunhos escolhidos' : `Rascunho aberto em ${result.revisionIds.length} produto(s)`)
   const createAsset = bind(enterprise.createAsset, asset => `${asset.name} cadastrado`)
   const createResource = (input: { name: string; kind: Resource['kind']; dailyMinutes: number; hourlyRate?: number }) =>
     run(() => resources.createResource(state, { ...input, tenantId: tenantId() }, actor()), resource => `${resource.name} cadastrado`)
@@ -587,6 +594,6 @@ export const useErpStore = defineStore('erp', () => {
     createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk,
     createBudget, distributeGroupBudget, setAnnualBudget, adjustBudget, createBudgetCategory, updateBudgetCategory, configureBudget, decideBudgetException, acknowledgeBudgetAlert, linkBudgetInvoice,
     applyBudgetGrowth, applyRevenueTarget, applyPriorSeasonality, setMonthlyBudget, setSectorAllocations, setCategoryAssignment, createBudgetGroup, createPlannedCompany, setCostCenterSplit, applyCategorySuggestion, saveBudgetSimulation, applyBudgetSimulation, createCostCenter, updateCostCenter, setSectorDefaultCostCenter, applyGroupGrowth, applyGroupRevenueTarget,
-    createUser, updateUser, createPartner, updatePartnerMaster, addPartnerContact, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
+    createUser, updateUser, createPartner, updatePartnerMaster, addPartnerContact, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, setServiceStatus, openServiceRoutingChange, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
   }
 })

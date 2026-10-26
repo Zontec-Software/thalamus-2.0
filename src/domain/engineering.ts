@@ -3,6 +3,7 @@ import { DomainError, lineNeed, log, nextId, now, today } from './engine'
 import { assertGtin, canApprove, canEdit, catalogOf, commit, editable, editorsLabel, findItem, hasRouting, openBomVersion, track, type Change } from './catalog'
 import { releaseRevision } from './enterprise'
 import { assertResourceChoice, keptCompatibleResources } from './resources'
+import { assertRoutingService } from './services'
 import type {
   ChangeDisposition, ChangeStage, EngineeringChange, FiscalSnapshot, Item, PackagingLevel, PackagingLevelName, ProductRevision, Role, RouteStep, Tooling,
 } from '../types/domain'
@@ -96,6 +97,7 @@ export interface RevisionStepInput {
   toolId?: string
   firstPiece: boolean
   instructions: string[]
+  serviceId?: string
 }
 
 function draftWithRouting(state: ErpState, revisionId: string, role: Role) {
@@ -116,8 +118,10 @@ export function saveRevisionStep(state: ErpState, revisionId: string, input: Rev
   const { revision, routing } = draftWithRouting(state, revisionId, role)
   const name = input.name.trim()
   if (name.length < 3) throw new DomainError('Dê um nome à operação')
-  const currentResourceId = input.id ? routing.find(entry => entry.id === input.id)?.resourceId : undefined
+  const previous = input.id ? routing.find(entry => entry.id === input.id) : undefined
+  const currentResourceId = previous?.resourceId
   const resource = assertResourceChoice(state, input.resourceId, currentResourceId)
+  const service = assertRoutingService(state, input.serviceId, previous?.serviceId)
   if (!(input.setupMinutes >= 0)) throw new DomainError('A preparação não pode ser negativa')
   if (!(input.crew >= 0) || !Number.isInteger(input.crew)) throw new DomainError('Equipe é um número inteiro de pessoas (0 = máquina sem operador dedicado)')
   let minutesPerUnit = input.minutesPerUnit
@@ -135,6 +139,8 @@ export function saveRevisionStep(state: ErpState, revisionId: string, input: Rev
     id: input.id ?? nextId(state, 'ST').toLowerCase(), name, resourceId: resource.id, minutesPerUnit,
     setupMinutes: input.setupMinutes || undefined, crew: input.crew, toolId: tool?.id, firstPiece: input.firstPiece || undefined,
     instructions: input.instructions.map(entry => entry.trim()).filter(Boolean),
+    serviceId: service?.id,
+    serviceInstructionVersion: service ? service.instructions.at(-1)?.version : undefined,
   }
   if (input.id) {
     const index = routing.findIndex(entry => entry.id === input.id)
@@ -170,7 +176,10 @@ export function copyRoutingFrom(state: ErpState, revisionId: string, sourceItemI
   const source = findItem(state, sourceItemId)
   if (source.id === item.id) throw new DomainError('Escolha outro item como origem')
   if (!source.routing?.length) throw new DomainError(`${source.code} não tem roteiro vigente`)
-  for (const step of source.routing) assertResourceChoice(state, step.resourceId)
+  for (const step of source.routing) {
+    assertResourceChoice(state, step.resourceId)
+    assertRoutingService(state, step.serviceId)
+  }
   revision.routing = source.routing.map(step => ({ ...step, id: nextId(state, 'ST').toLowerCase(), instructions: [...step.instructions] }))
   uncheck(revision)
   log(state, 'Engenharia', actor, `${item.code}: roteiro copiado de ${source.code} para a versão ${revision.code}`, undefined, item.id)
@@ -189,7 +198,8 @@ export interface RevisionDiff {
 const stepSignature = (state: ErpState, step: RouteStep) => {
   const resource = state.resources.find(entry => entry.id === step.resourceId)?.name ?? step.resourceId
   const tool = step.toolId ? state.items.find(entry => entry.id === step.toolId)?.code : ''
-  return [resource, `${brNumber(step.minutesPerUnit, 2)} min/un`, step.setupMinutes ? `setup ${step.setupMinutes} min` : '', step.crew !== undefined ? `${step.crew} pessoa(s)` : '', tool ? `ferramental ${tool}` : '', step.instructions.join(' | ')].filter(Boolean).join(' · ')
+  const service = step.serviceId ? state.services.find(entry => entry.id === step.serviceId)?.code : ''
+  return [resource, `${brNumber(step.minutesPerUnit, 2)} min/un`, step.setupMinutes ? `setup ${step.setupMinutes} min` : '', step.crew !== undefined ? `${step.crew} pessoa(s)` : '', tool ? `ferramental ${tool}` : '', service ? `serviço ${service}${step.serviceInstructionVersion ? ` v${step.serviceInstructionVersion}` : ''}` : '', step.instructions.join(' | ')].filter(Boolean).join(' · ')
 }
 
 /** Diferença entre duas versões (ou entre uma versão e o que está vigente no item). */

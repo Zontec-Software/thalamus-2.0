@@ -389,6 +389,9 @@ export interface RouteStep {
   crew?: number
   /** Exige liberação da primeira peça pela qualidade. */
   firstPiece?: boolean
+  /** Serviço do catálogo usado nesta operação. A revisão guarda a versão da instrução. */
+  serviceId?: string
+  serviceInstructionVersion?: number
 }
 
 export interface Item {
@@ -521,6 +524,9 @@ export interface Operation {
   firstPiece?: boolean
   firstPieceBy?: string
   firstPieceAt?: string
+  /** Cópia do serviço e da instrução vigentes quando a ordem foi criada. */
+  serviceId?: string
+  serviceInstructionVersion?: number
 }
 
 export type OpStatus = 'Aguardando material' | 'Planejada' | 'Liberada' | 'Em produção' | 'Inspeção' | 'Concluída'
@@ -789,19 +795,46 @@ export interface EngineeringChange {
   history: { at: string; actor: string; text: string }[]
 }
 
+export type ServicePlace = 'Roboflex' | 'Cliente' | 'Outro'
+export type ServiceExecutor = 'Própria' | 'Terceirizado'
+
+/** Instrução técnica versionada. A versão antiga permanece para consulta. */
+export interface ServiceInstruction {
+  version: number
+  text: string
+  author: string
+  createdAt: string
+  origin: string
+}
+
+/**
+ * Cadastro mestre de serviço. Usos, local e executor são independentes.
+ * Categoria oficial, código, papéis e fórmula de tempo médio ainda não foram definidos.
+ */
 export interface ServiceCatalogItem {
   id: string
+  tenantId: string
   code: string
   name: string
-  category: 'Produção' | 'Manutenção' | 'Terceiro' | 'Assistência'
+  description?: string
   unit: 'hora' | 'un' | 'visita'
-  standardMinutes: number
+  status: EntityStatus
+  sellable: boolean
+  usableInServiceOrder: boolean
+  usableInRouting: boolean
+  place: ServicePlace
+  executor: ServiceExecutor
+  sectorId?: string
+  teamLabel?: string
+  instructions: ServiceInstruction[]
+  /** Informado no cadastro. A média dos apontamentos não é calculada enquanto a fórmula não existir. */
+  estimatedMinutes?: number
+  datasheetName?: string
+  supplierId?: string
   cost: number
   price: number
-  outsourced: boolean
-  status: EntityStatus
-  description?: string
-  supplierId?: string
+  /** Texto livre. Não há classificação nem cálculo fiscal neste cadastro. */
+  fiscalNote?: string
 }
 
 export interface Demand {

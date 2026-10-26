@@ -39,7 +39,7 @@ function tablePrice(itemId?: string) {
 
 const newLine = reactive({ kind: 'item' as 'item' | 'service', id: '', quantity: 1 })
 const products = computed(() => store.state.items.filter(entry => sellable(entry) && entry.type !== 'SV'))
-const services = computed(() => store.state.services.filter(entry => entry.price > 0 && entry.status === 'Ativo'))
+const services = computed(() => store.state.services.filter(entry => entry.sellable && entry.status === 'Ativo'))
 const rejecting = ref(false)
 const rejection = ref('')
 

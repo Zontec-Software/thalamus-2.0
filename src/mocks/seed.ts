@@ -232,10 +232,10 @@ function baseState(): ErpState {
     ],
     engineeringChanges: [],
     services: [
-      { id: 'sv-mont', code: 'SV-PRO-001', name: 'Montagem mecânica de case', category: 'Produção', unit: 'hora', standardMinutes: 60, cost: 52, price: 0, outsourced: false, status: 'Ativo' },
-      { id: 'sv-prev', code: 'SV-MAN-002', name: 'Preventiva em injetora', category: 'Manutenção', unit: 'hora', standardMinutes: 180, cost: 95, price: 0, outsourced: false, status: 'Ativo' },
-      { id: 'sv-campo', code: 'SV-AST-003', name: 'Visita técnica em campo', category: 'Assistência', unit: 'visita', standardMinutes: 240, cost: 320, price: 480, outsourced: false, status: 'Ativo' },
-      { id: 'sv-lab', code: 'SV-TER-004', name: 'Ensaio IP65 em laboratório', category: 'Terceiro', unit: 'un', standardMinutes: 0, cost: 850, price: 1200, outsourced: true, status: 'Ativo' },
+      { id: 'sv-mont', tenantId: 'tenant-roboflex', code: 'SV-PRO-001', name: 'Montagem mecânica de case', unit: 'hora', status: 'Ativo', sellable: false, usableInServiceOrder: false, usableInRouting: true, place: 'Roboflex', executor: 'Própria', sectorId: 'sec-pro', teamLabel: 'Montagem', estimatedMinutes: 60, cost: 52, price: 0, instructions: [{ version: 1, text: 'Montar o case na sequência do roteiro e conferir o encaixe no gabarito.', author: 'Carga inicial', createdAt: '2026-08-01T12:00:00.000Z', origin: 'Carga inicial' }] },
+      { id: 'sv-prev', tenantId: 'tenant-roboflex', code: 'SV-MAN-002', name: 'Preventiva em injetora', unit: 'hora', status: 'Ativo', sellable: false, usableInServiceOrder: true, usableInRouting: false, place: 'Roboflex', executor: 'Própria', sectorId: 'sec-ser', teamLabel: 'Manutenção', estimatedMinutes: 180, cost: 95, price: 0, instructions: [{ version: 1, text: 'Executar o plano preventivo da injetora e registrar o que foi encontrado.', author: 'Carga inicial', createdAt: '2026-08-01T12:00:00.000Z', origin: 'Carga inicial' }] },
+      { id: 'sv-campo', tenantId: 'tenant-roboflex', code: 'SV-AST-003', name: 'Visita técnica em campo', unit: 'visita', status: 'Ativo', sellable: true, usableInServiceOrder: true, usableInRouting: false, place: 'Cliente', executor: 'Própria', sectorId: 'sec-ser', teamLabel: 'Assistência', estimatedMinutes: 240, cost: 320, price: 480, instructions: [{ version: 1, text: 'Atender no cliente, testar o produto e registrar o relatório da visita.', author: 'Carga inicial', createdAt: '2026-08-01T12:00:00.000Z', origin: 'Carga inicial' }] },
+      { id: 'sv-lab', tenantId: 'tenant-roboflex', code: 'SV-TER-004', name: 'Ensaio IP65 em laboratório', unit: 'un', status: 'Ativo', sellable: true, usableInServiceOrder: false, usableInRouting: false, place: 'Outro', executor: 'Terceirizado', datasheetName: 'IP65-datasheet.pdf', supplierId: 'f3', cost: 850, price: 1200, instructions: [] },
     ],
     demands: [
       { id: 'DM-104', kind: 'Material', itemId: 'mp-tpu', description: 'TPU para OP urgente', quantity: 38, origin: 'OP', originId: 'OP-24035', neededBy: '2026-10-18', priority: 'Urgente', status: 'Em atendimento', assigneeRole: 'Compras', requester: 'u5', purchaseOrderId: 'PC-7310', supplierId: 'f2', estimatedCost: 1660, notes: 'Sem TPU a OP de montagem para no dia 18.', createdAt: '2026-10-15T07:30:00.000Z' },
@@ -575,7 +575,7 @@ function prepareCatalog(s: ErpState) {
     }
   }
   const extMec = s.items.find(item => item.id === 'pa-a11-ext')!.routing!.find(entry => entry.id === 'mec')!
-  Object.assign(extMec, { toolId: 'fe-g11', firstPiece: true })
+  Object.assign(extMec, { toolId: 'fe-g11', firstPiece: true, serviceId: 'sv-mont', serviceInstructionVersion: 1 })
 
   const ext = s.items.find(item => item.id === 'pa-a11-ext')!
   const lines = (id: string) => (s.items.find(item => item.id === id)!.bom ?? []).map(line => ({ ...line }))

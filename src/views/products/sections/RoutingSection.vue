@@ -20,7 +20,7 @@ const steps = computed(() => props.revision.routing ?? props.item.routing ?? [])
 const perUnit = computed(() => steps.value.reduce((sum, step) => sum + step.minutesPerUnit, 0))
 const setup = computed(() => steps.value.reduce((sum, step) => sum + (step.setupMinutes ?? 0), 0))
 const editing = ref<string | 'new' | ''>('')
-const form = reactive({ name: '', resourceId: '', minutesPerUnit: 1, setupMinutes: 0, crew: 1, toolId: '', firstPiece: false, instructions: '' })
+const form = reactive({ name: '', resourceId: '', minutesPerUnit: 1, setupMinutes: 0, crew: 1, toolId: '', firstPiece: false, instructions: '', serviceId: '' })
 const copyFrom = ref('')
 
 const tools = computed(() => store.state.items.filter(entry => entry.type === 'FE' && !catalogOf(entry).deletedAt && catalogOf(entry).tooling))
@@ -33,19 +33,25 @@ const moldTime = computed(() => {
 const sources = computed(() => store.state.items.filter(entry => entry.id !== props.item.id && entry.routing?.length && !catalogOf(entry).deletedAt).sort((a, b) => a.code.localeCompare(b.code)))
 const toolCode = (id?: string) => id ? store.state.items.find(entry => entry.id === id)?.code ?? id : ''
 const postos = computed(() => store.state.resources.filter(resource => resourceOffered(resource, ui.activeTenantId, [form.resourceId])))
+const routingServices = computed(() => store.state.services.filter(entry => entry.usableInRouting && (entry.status === 'Ativo' || entry.id === form.serviceId)))
+const serviceLabel = (id?: string, version?: number) => {
+  if (!id) return ''
+  const service = store.state.services.find(entry => entry.id === id)
+  return service ? `${service.code}${version ? ` · instrução v${version}` : ''}` : id
+}
 const modalTitle = computed(() => editing.value === 'new' ? 'Nova operação' : form.name || 'Operação')
 
 function edit(step?: RouteStep) {
   editing.value = step?.id ?? 'new'
   const fallback = store.state.resources.find(entry => entry.tenantId === ui.activeTenantId && resourceIsOpen(entry) && entry.kind === (props.item.type === 'SE' ? 'Injetora' : 'Montagem'))?.id ?? ''
   Object.assign(form, step
-    ? { name: step.name, resourceId: step.resourceId, minutesPerUnit: step.minutesPerUnit, setupMinutes: step.setupMinutes ?? 0, crew: step.crew ?? 1, toolId: step.toolId ?? '', firstPiece: !!step.firstPiece, instructions: step.instructions.join('\n') }
-    : { name: '', resourceId: fallback, minutesPerUnit: 1, setupMinutes: 0, crew: 1, toolId: '', firstPiece: false, instructions: '' })
+    ? { name: step.name, resourceId: step.resourceId, minutesPerUnit: step.minutesPerUnit, setupMinutes: step.setupMinutes ?? 0, crew: step.crew ?? 1, toolId: step.toolId ?? '', firstPiece: !!step.firstPiece, instructions: step.instructions.join('\n'), serviceId: step.serviceId ?? '' }
+    : { name: '', resourceId: fallback, minutesPerUnit: 1, setupMinutes: 0, crew: 1, toolId: '', firstPiece: false, instructions: '', serviceId: '' })
 }
 function save() {
   const result = store.saveRevisionStep(props.revision.id, {
     id: editing.value === 'new' ? undefined : editing.value, name: form.name, resourceId: form.resourceId, minutesPerUnit: moldTime.value ?? form.minutesPerUnit,
-    setupMinutes: form.setupMinutes, crew: form.crew, toolId: form.toolId || undefined, firstPiece: form.firstPiece, instructions: form.instructions.split('\n'),
+    setupMinutes: form.setupMinutes, crew: form.crew, toolId: form.toolId || undefined, firstPiece: form.firstPiece, serviceId: form.serviceId || undefined, instructions: form.instructions.split('\n'),
   })
   if (result !== undefined) editing.value = ''
 }
@@ -65,7 +71,7 @@ function copy() {
       <tbody>
         <tr v-for="(step, index) in steps" :key="step.id" class="clickable" :title="isDraft && !disabled ? 'Editar operação' : 'Ver operação'" @click="edit(step)">
           <td class="cell-sub">{{ (index + 1) * 10 }}</td>
-          <td><b>{{ step.name }}</b><span v-if="step.firstPiece" class="status info" style="margin-left:6px">1ª peça</span></td>
+          <td><b>{{ step.name }}</b><span v-if="step.firstPiece" class="status info" style="margin-left:6px">1ª peça</span><small v-if="step.serviceId" class="cell-sub">{{ serviceLabel(step.serviceId, step.serviceInstructionVersion) }}</small></td>
           <td>{{ store.resourceName(step.resourceId) }}</td>
           <td @click.stop><RouterLink v-if="step.toolId" :to="`/produtos/item/${step.toolId}?aba=ferramental`" class="code">{{ toolCode(step.toolId) }}</RouterLink><span v-else class="cell-sub">—</span></td>
           <td class="num">{{ fmtNumber(step.minutesPerUnit, 3) }} min</td>
@@ -92,6 +98,10 @@ function copy() {
       <fieldset class="layer" :disabled="disabled">
         <div class="form-grid three">
           <div class="field"><label>Operação</label><input v-model="form.name" required /></div>
+          <div class="field"><label>Serviço do catálogo</label>
+            <select v-model="form.serviceId"><option value="">Nenhum</option><option v-for="service in routingServices" :key="service.id" :value="service.id">{{ service.code }} · {{ service.name }}{{ service.status === 'Inativo' ? ' · inativo' : '' }}</option></select>
+            <small>Só entra serviço marcado para roteiro. A operação guarda a versão da instrução deste momento.</small>
+          </div>
           <div class="field"><label>Posto de trabalho</label><select v-model="form.resourceId" required @change="form.toolId = ''"><option v-for="resource in postos" :key="resource.id" :value="resource.id">{{ resource.name }}{{ resource.status === 'Inativo' ? ' · inativo' : '' }}</option></select><small>A lista vem de Cadastros → Postos. Posto inativo não entra em operação nova.</small></div>
           <div class="field"><label>Ferramental</label>
             <select v-model="form.toolId"><option value="">Nenhum</option><option v-for="tool in compatibleTools" :key="tool.id" :value="tool.id">{{ tool.code }} · {{ tool.name }}</option></select>

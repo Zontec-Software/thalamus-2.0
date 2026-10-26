@@ -107,10 +107,10 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('person-team', 'Equipe e pendências', 'Quem gere um setor vê a equipe aqui. Abaixo ficam as tarefas que este papel tem agora, as mesmas de Minhas tarefas.', 'person'),
   ],
   '/servicos': [
-    t('record-list', 'Um catálogo, vários usos', 'O mesmo serviço entra em proposta, demanda de terceiro, manutenção e assistência. A coluna Usos mostra onde ele já foi aplicado.', 'close'),
-    t('new-record', 'Novo serviço', 'Defina custo, preço e se a execução é de terceiro. Terceiro vira contratação com fornecedor e conta a pagar.', 'close'),
-    t('service-form', 'Custo, preço e execução', 'Preço zero significa que o serviço não é vendido. Marcado como terceiro, a demanda pede um fornecedor, cria a previsão orçamentária e gera a conta a pagar na conclusão.', 'service'),
-    t('service-usage', 'Onde este serviço aparece', 'Propostas, demandas e chamados que usam o serviço. Cada linha abre o registro correspondente.', 'service'),
+    t('record-list', 'Um cadastro, vários usos', 'Venda, ordem de serviço e roteiro podem valer juntos. O local não define quem executa: equipe própria no cliente continua sendo execução própria.', 'close'),
+    t('new-record', 'Novo serviço', 'Informe os usos, o local e quem executa. Terceirizado só grava com o datasheet. A categoria oficial ainda não foi definida.', 'close'),
+    t('service-form', 'O que aparece depende do uso', 'Equipe própria pede setor e instrução. Venda ou ordem de serviço abre preço e cenário fiscal, sem lista e sem cálculo. O tempo médio não é calculado.', 'service'),
+    t('service-usage', 'Onde este serviço aparece', 'Propostas, demandas e as revisões de roteiro que apontam para ele. Alterar abre um rascunho no produto e não troca ordem já criada.', 'service'),
   ],
   '/postos': [
     t('post-idea', 'A vaga da fábrica', 'O posto é onde a ordem entra e o que o operador escolhe no tablet. A máquina física continua em Ativos e aponta para este posto.'),
@@ -162,7 +162,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('record-list', 'Visão geral', 'Custo, despesa e investimento no período: orçado, realizado, previsão, desvio e uso, com a cor da situação. Financeiro e Administrador veem todas as contas, inclusive sem movimento. Os demais veem só as categorias em que são o responsável. Clique numa conta para ver o valor e o percentual de cada setor utilizador. Clique num setor para filtrar as origens, da maior para a menor.', 'close'),
     t('budget-detail', 'A ficha da conta', 'O realizado é a nota do Omie. A linha diz a compra, o projeto ou a ordem. Sem esse vínculo, a ação aparece para o setor executor.', 'budget'),
     t('budget-actions', 'Ações', 'Sem categoria fica com o Financeiro. Sem vínculo fica com o executor da categoria. Saldo excedido fica com o responsável da conta.', 'close'),
-    t('budget-categories', 'Categorias', 'O valor do ano, a pessoa responsável, os setores que usam o valor e o setor que recebe a demanda. A categoria mãe nova usa um código de dois dígitos.', 'close'),
+    t('budget-categories', 'Categorias', 'O valor do ano, a pessoa responsável, os setores que usam o valor e o setor que recebe a demanda. Nova categoria abre o formulário. A categoria mãe usa um código de dois dígitos.', 'close'),
     t('budget-split', 'Setores da conta', 'O botão abre a destinação desta conta. Informe o valor ou o percentual de cada setor. A soma não passa do valor da categoria. O que ficar sem utilizador não libera demanda.', 'close'),
     t('budget-plan-modes', 'Planejamento', 'Anual monta o ano sobre o realizado anterior, Mensal reparte pelos meses e CAPEX trata o investimento à parte. Aqui também se cadastra uma empresa nova do grupo, com orçamento vazio.', 'close'),
     t('budget-summary', 'Meta de faturamento', 'O realizado do ano anterior e o percentual necessário para a meta. Definir meta aplica esse percentual a todas as contas. A coluna Cresc. % ajusta conta por conta.', 'close'),

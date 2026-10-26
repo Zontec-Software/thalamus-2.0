@@ -5,7 +5,7 @@ import {
 } from '../domain/engine'
 import {
   DEFAULT_PRICE_TABLE, addConversion, approvalIssues, approveItem, blockItem, convertQuantity, createItem, currentPrice, decideKeyChange, deleteItem,
-  catalogOf, inactivateItem, itemFlags, obsoleteItem, openBomVersion, openPendencies, requestKeyChange, restoreItem, setBomLine, similarItems, submitItem,
+  catalogOf, discardBomVersion, inactivateItem, itemFlags, obsoleteItem, openBomVersion, openPendencies, requestKeyChange, restoreItem, setBomLine, similarItems, submitItem,
   updateCommercial, updateCore, withCheckDigit,
 } from '../domain/catalog'
 import {
@@ -26,6 +26,7 @@ import { provisionCompany, saveEconomicGroup, saveOmieConnection } from '../doma
 import { addRole, assertShipmentCarrier, carrierChoices, clientSalesBase, createPartner, decideAbcSuggestion, inactivateRole, registerAnnualBilling } from '../domain/partners'
 import { saveTooling } from '../domain/engineering'
 import { createResource, inactivateResource, removeResource, updateResource } from '../domain/resources'
+import { createService, openServiceRoutingChange, serviceRoutingUses, updateService } from '../domain/services'
 
 const TENANT = 'tenant-roboflex'
 const stageOf = (state: ErpState, id: string) => orderStage(state, state.salesOrders.find(order => order.id === id)!)
@@ -1117,5 +1118,46 @@ describe('postos', () => {
     inactivateResource(state, 'inj1', 'PCP')
     saveTooling(state, 'fe-m112', { ...tooling, shotWeightG: tooling.shotWeightG + 1 }, 'Eduardo', 'Engenharia')
     expect(catalogOf(state.items.find(entry => entry.id === 'fe-m112')!).tooling!.compatibleResourceIds).toContain('inj1')
+  })
+})
+
+describe('serviços', () => {
+  const proprio = {
+    tenantId: TENANT, name: 'Calibração em campo', unit: 'visita' as const, place: 'Cliente' as const, executor: 'Própria' as const,
+    sellable: true, usableInServiceOrder: true, usableInRouting: false, cost: 40, price: 0, instruction: 'Primeira instrução', estimatedMinutes: 30,
+  }
+
+  it('recusa terceirizado sem datasheet e guarda a instrução antiga', () => {
+    const state = createSeedState()
+    expect(() => createService(state, { ...proprio, executor: 'Terceirizado', place: 'Outro', usableInRouting: true }, 'Eduardo')).toThrow(/datasheet/)
+    const created = createService(state, proprio, 'Eduardo')
+    expect(created.code.startsWith('SV-')).toBe(true)
+    expect(created.place).toBe('Cliente')
+    expect(created.executor).toBe('Própria')
+    expect(created.sellable).toBe(true)
+    expect(created.estimatedMinutes).toBe(30)
+    expect(created).not.toHaveProperty('averageMinutes')
+    updateService(state, created.id, { ...proprio, name: created.name, instruction: 'Primeira instrução' }, 'Eduardo')
+    updateService(state, created.id, { ...proprio, name: created.name, instruction: 'Segunda instrução' }, 'Eduardo')
+    expect(created.instructions.map(entry => entry.text)).toEqual(['Primeira instrução', 'Segunda instrução'])
+    expect(created.instructions[0].version).toBe(1)
+  })
+
+  it('lista o roteiro e abre rascunho sem reescrever a revisão liberada nem a ordem', () => {
+    const state = createSeedState()
+    expect(serviceRoutingUses(state, 'sv-mont').some(row => row.itemId === 'pa-a11-ext' && row.stepId === 'mec')).toBe(true)
+    const released = state.productRevisions.find(entry => entry.itemId === 'pa-a11-ext' && entry.status === 'Liberada')!
+    const versionBefore = released.routing?.find(step => step.id === 'mec')?.serviceInstructionVersion
+    const ordersBefore = state.productionOrders.filter(order => order.itemId === 'pa-a11-ext').map(order => order.revisionId)
+    expect(() => openServiceRoutingChange(state, 'sv-mont', ['pa-a11-ext'], 'mesmos', 'Eduardo', 'Engenharia')).toThrow(/rascunho/)
+    discardBomVersion(state, 'rev-a11-d', 'Eduardo', 'Engenharia')
+    const opened = openServiceRoutingChange(state, 'sv-mont', ['pa-a11-ext'], 'novo', 'Eduardo', 'Engenharia')
+    const draft = state.productRevisions.find(entry => entry.id === opened.revisionIds[0])!
+    expect(draft.status).toBe('Rascunho')
+    expect(draft.routing?.find(step => step.id === 'mec')?.serviceId).toBe(opened.serviceId)
+    expect(opened.serviceId).not.toBe('sv-mont')
+    expect(released.routing?.find(step => step.id === 'mec')?.serviceId).toBe('sv-mont')
+    expect(released.routing?.find(step => step.id === 'mec')?.serviceInstructionVersion).toBe(versionBefore)
+    expect(state.productionOrders.filter(order => order.itemId === 'pa-a11-ext').map(order => order.revisionId)).toEqual(ordersBefore)
   })
 })
