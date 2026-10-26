@@ -9,7 +9,7 @@ export function readOnly(item: Item, role: Role, layer: CatalogLayer) {
 }
 
 export const LIFE_TONE: Record<ItemLifecycle, string> = {
-  Rascunho: 'warning', 'Em homologação': 'info', Ativo: 'success', Bloqueado: 'danger', Obsoleto: 'neutral', Inativo: 'neutral',
+  Rascunho: 'warning', 'Em homologação': 'info', Ativo: 'success', 'Alteração pendente': 'warning', 'Inativação pendente': 'warning', Bloqueado: 'danger', Obsoleto: 'neutral', Inativo: 'neutral',
 }
 
 export const FLAG_TONE: Record<string, string> = {

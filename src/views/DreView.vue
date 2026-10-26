@@ -96,20 +96,20 @@ function rowClass(entry: DreLine) {
       <div class="orc-card-head">
         <div>
           <h2>Onde o dinheiro foi pago</h2>
-          <p>Os cinco centros com mais realizado pago no período.</p>
+          <p>Os cinco setores com mais realizado pago no período.</p>
         </div>
       </div>
       <table class="dense">
-        <thead><tr><th>Centro</th><th class="num">Pago</th><th class="num">Parte</th></tr></thead>
+        <thead><tr><th>Setor</th><th class="num">Pago</th><th class="num">Parte</th></tr></thead>
         <tbody>
           <tr v-for="center in snapshot.centers" :key="`${center.tenantId}-${center.code}`">
-            <td>{{ center.code }} {{ center.name }}<span v-if="groupView" class="cell-sub">{{ center.company }}</span></td>
+            <td>{{ center.name }}<span v-if="groupView" class="cell-sub">{{ center.company }}</span></td>
             <td class="num">{{ fmtCurrency(center.amount) }}</td>
             <td class="num">{{ center.share.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) }}%</td>
           </tr>
         </tbody>
       </table>
-      <p v-if="!snapshot.centers.length" class="empty-note">Nenhum pagamento deste período tem centro de custo.</p>
+      <p v-if="!snapshot.centers.length" class="empty-note">Nenhum pagamento deste período está num setor.</p>
     </article>
   </section>
 

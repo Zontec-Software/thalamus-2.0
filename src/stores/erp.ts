@@ -15,7 +15,7 @@ import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NonConformity, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v32'
+const STORAGE_KEY = 'thalamus-erp-v36'
 
 function load(): ErpState {
   const seed = createSeedState()
@@ -313,6 +313,23 @@ export const useErpStore = defineStore('erp', () => {
     run(() => { requireFeature('orcamentos.gerir'); return budget.applyPriorSeasonality(state, tenantId(), categoryIds, year, actor(), ui.role) }, applied => `Sazonalidade de ${Number(year) - 1} aplicada a ${applied.length} conta(s)`)
   const setMonthlyBudget = (categoryId: string, year: string, monthlyAmounts: number[], reason = '') =>
     run(() => { requireFeature('orcamentos.gerir'); return budget.setMonthlyBudget(state, tenantId(), categoryId, year, monthlyAmounts, reason, actor(), ui.role) }, 'Distribuição mensal salva')
+  const setSectorAllocations = (categoryId: string, year: string, lines: { sectorId: string; amount: number }[]) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.setSectorAllocations(state, tenantId(), categoryId, year, lines, actor(), ui.role) }, 'Valores destinados aos setores')
+  const setCategoryAssignment = (id: string, responsibleUserId: string, executorSectorId: string) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.setCategoryAssignment(state, tenantId(), id, { responsibleUserId, executorSectorId }, actor(), ui.role) }, 'Responsável e executor salvos')
+  const createBudgetGroup = (code: string, name: string) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.createBudgetGroup(state, tenantId(), { code, name }, actor(), ui.role) }, 'Categoria mãe criada')
+  const createPlannedCompany = (input: { legalName: string; tradeName: string; document: string; city: string; adminName: string; adminEmail: string }) =>
+    run(() => {
+      requireFeature('orcamentos.gerir')
+      const groupId = state.tenants.find(entry => entry.id === tenantId())?.groupId
+      if (!groupId) throw new engine.DomainError('A empresa ativa não está num grupo')
+      const created = provisionCompany(state, input)
+      const tenant = state.tenants.find(entry => entry.id === created.tenantId)
+      if (tenant) tenant.groupId = groupId
+      ui.activeTenantId = created.tenantId
+      return created
+    }, 'Empresa criada no grupo, com orçamento vazio')
   const setCostCenterSplit = (categoryId: string, year: string, mode: 'percent' | 'amount', lines: { costCenterId: string; value: number }[]) =>
     run(() => { requireFeature('orcamentos.gerir'); return budget.setCostCenterSplit(state, tenantId(), categoryId, year, mode, lines, actor(), ui.role) }, 'Distribuição por centro de custo salva')
   const applyCategorySuggestion = (categoryId: string, year: string) =>
@@ -367,7 +384,11 @@ export const useErpStore = defineStore('erp', () => {
   const updateItemBranch = (itemId: string, branch: string, patch: Parameters<typeof catalog.updateBranch>[3]) => as((name, role) => catalog.updateBranch(state, itemId, branch, patch, name, role), 'Filial salva')
   const addItemConversion = (itemId: string, conversion: UnitConversion) => as((name, role) => catalog.addConversion(state, itemId, conversion, name, role), 'Conversão adicionada')
   const removeItemConversion = (itemId: string, index: number) => as((name, role) => catalog.removeConversion(state, itemId, index, name, role), 'Conversão removida')
-  const requestKeyChange = (itemId: string, field: 'unit' | 'ncm', to: string, reason: string) => as((name, role) => catalog.requestKeyChange(state, itemId, field, to, reason, name, role), 'Exceção enviada para aprovação')
+  const requestKeyChange = (itemId: string, field: 'unit' | 'ncm' | 'name' | 'class', to: string, reason: string, origin: { module: string; id: string }) => as((name, role) => catalog.requestKeyChange(state, itemId, field, to, reason, name, role, origin), 'Alteração enviada para aprovação')
+  const requestInactivation = (itemId: string, reason: string) => as((name, role) => catalog.requestInactivation(state, itemId, reason, name, role), 'Inativação enviada para aprovação')
+  const approveInactivation = (itemId: string) => as((name, role) => catalog.approveInactivation(state, itemId, name, role), 'Item inativado. O que já estava aberto segue')
+  const rejectInactivation = (itemId: string, reason: string) => as((name, role) => catalog.rejectInactivation(state, itemId, reason, name, role), 'Inativação recusada')
+  const setItemUsage = (itemId: string, usage: catalog.ItemUsage) => as((name, role) => catalog.setItemUsage(state, itemId, usage, name, role), 'Indicadores de uso salvos')
   const decideKeyChange = (itemId: string, requestId: string, approve: boolean, note: string) => as((name, role) => catalog.decideKeyChange(state, itemId, requestId, approve, note, name, role), approve ? 'Exceção aprovada e aplicada' : 'Exceção recusada')
   const submitItem = (itemId: string) => as((name, role) => catalog.submitItem(state, itemId, name, role), 'Item enviado para homologação')
   const approveItem = (itemId: string, approval: ApprovalRole) => as((name, role) => catalog.approveItem(state, itemId, approval, name, role), result => result === 'Ativo' ? 'Aprovação registrada: item ativado' : 'Aprovação registrada')
@@ -531,7 +552,7 @@ export const useErpStore = defineStore('erp', () => {
     updateNc, confirmShipment, shipOrder, createMaintenance, advanceMaintenance, retrySync, resetDemo,
     newRevision, toggleRevisionCheck, publishItem, createRequisition, releaseRevision, undoPick, eventsFor, userName,
     createCatalogItem, updateItemCore, updateItemCommercial, updateItemFiscal, updateItemStock, updateItemBranch, addItemConversion, removeItemConversion,
-    requestKeyChange, decideKeyChange, submitItem, approveItem, finishActivation, returnItem, blockItem, reactivateItem, obsoleteItem, inactivateItem,
+    requestKeyChange, decideKeyChange, submitItem, approveItem, finishActivation, returnItem, blockItem, reactivateItem, obsoleteItem, requestInactivation, approveInactivation, rejectInactivation, setItemUsage, inactivateItem,
     deleteItem, restoreItem, createClass, renameClass, removeClass, bulkItems, setBomLine, removeBomLine, discardBomVersion,
     addBarcode, removeBarcode, setMainBarcode, createPriceTable, setPrice, removePrice, setStandardCost, updateProductionLead,
     saveRoutingStep, removeRoutingStep, moveRoutingStep, addMedia, removeMedia, moveMedia, setMainMedia, linkProject, unlinkProject,
@@ -545,7 +566,7 @@ export const useErpStore = defineStore('erp', () => {
     createTechnicalOrder, scheduleTechnicalOrder, updateTechnicalOrder, addTechnicalPart, advanceTechnicalOrder, cancelTechnicalOrder,
     createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk,
     createBudget, distributeGroupBudget, setAnnualBudget, adjustBudget, createBudgetCategory, updateBudgetCategory, configureBudget, decideBudgetException, acknowledgeBudgetAlert, linkBudgetInvoice,
-    applyBudgetGrowth, applyRevenueTarget, applyPriorSeasonality, setMonthlyBudget, setCostCenterSplit, applyCategorySuggestion, saveBudgetSimulation, applyBudgetSimulation, createCostCenter, updateCostCenter, setSectorDefaultCostCenter, applyGroupGrowth, applyGroupRevenueTarget,
+    applyBudgetGrowth, applyRevenueTarget, applyPriorSeasonality, setMonthlyBudget, setSectorAllocations, setCategoryAssignment, createBudgetGroup, createPlannedCompany, setCostCenterSplit, applyCategorySuggestion, saveBudgetSimulation, applyBudgetSimulation, createCostCenter, updateCostCenter, setSectorDefaultCostCenter, applyGroupGrowth, applyGroupRevenueTarget,
     createUser, updateUser, createPartner, createService, updateService, createAsset, updateAsset,
   }
 })

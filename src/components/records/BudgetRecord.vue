@@ -3,7 +3,7 @@ import { computed, reactive } from 'vue'
 import MoneyInput from '../MoneyInput.vue'
 import ReasonField from '../ReasonField.vue'
 import RecordHeader from './RecordHeader.vue'
-import { budgetSummary, budgetWindow, childrenOf, costCenterAmounts, invoiceOrigin, linkableDocuments, subcategorySummary } from '../../domain/budget'
+import { budgetSummary, budgetWindow, childrenOf, invoiceOrigin, linkableDocuments, subcategorySummary } from '../../domain/budget'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import type { BudgetEntry, InvoiceLinkModule } from '../../types/domain'
@@ -56,17 +56,21 @@ function create() {
   if (created && created !== true) ui.openRecord('budget', created.id)
 }
 const userName = (id?: string) => store.state.users.find(entry => entry.id === id)?.name ?? '—'
-const sectorLines = computed(() => allocation.value?.costCenterSplit ? costCenterAmounts(allocation.value.amount, allocation.value.costCenterSplit) : [])
-const uncovered = computed(() => sectorLines.value.length ? Math.round((100 - sectorLines.value.reduce((sum, line) => sum + line.percent, 0)) * 100) / 100 : 0)
-const costCenterLabel = (id: string) => {
-  const center = store.state.costCenters.find(entry => entry.id === id)
-  return center ? `${center.code} ${center.name}` : id
+const sectorName = (id: string) => store.state.sectors.find(entry => entry.id === id)?.name ?? id
+const sectorLines = computed(() => allocation.value?.sectorAllocations ?? [])
+const uncovered = computed(() => {
+  const total = allocation.value?.amount ?? 0
+  const used = sectorLines.value.reduce((sum, line) => sum + line.amount, 0)
+  return Math.round((total - used) * 100) / 100
+})
+function pctOf(amount: number) {
+  const total = allocation.value?.amount ?? 0
+  return total ? Math.round(amount / total * 1000) / 10 : 0
 }
-const centerOwner = (id: string) => userName(store.state.costCenters.find(entry => entry.id === id)?.responsibleUserId)
-function centersOf(categoryId: string) {
+function sectorsOf(categoryId: string) {
   const budget = store.state.budgets.find(entry => entry.categoryId === categoryId && entry.period === allocation.value?.period)
-  const codes = (budget?.costCenterSplit?.lines ?? []).map(line => store.state.costCenters.find(entry => entry.id === line.costCenterId)?.code).filter(Boolean)
-  return codes.length ? codes.join(', ') : 'sem centro'
+  const names = (budget?.sectorAllocations ?? []).map(line => sectorName(line.sectorId))
+  return names.length ? names.join(', ') : 'sem utilizador'
 }
 </script>
 
@@ -97,12 +101,13 @@ function centersOf(categoryId: string) {
       <p v-if="viewKey !== allocation.period" class="cell-sub">Orçamento do ano {{ allocation.period }}: {{ fmtCurrency(allocation.amount) }}. Os números acima são a fatia de {{ viewLabel }}.</p>
       <div class="field">
         <label>Quem responde</label>
+        <div class="cell-sub">{{ category.responsibleUserId ? userName(category.responsibleUserId) : 'Sem responsável' }}<template v-if="category.executorSectorId"> · executor {{ sectorName(category.executorSectorId) }}</template></div>
         <div v-if="sectorLines.length" class="cell-sub">
-          <template v-for="(line, index) in sectorLines" :key="line.costCenterId">{{ index ? ' · ' : '' }}{{ costCenterLabel(line.costCenterId) }} ({{ centerOwner(line.costCenterId) }}) {{ fmtCurrency(line.amount) }}, {{ line.percent }}%</template>
-          <template v-if="uncovered > 0"> · sem centro {{ uncovered }}%, com o Financeiro</template>
+          <template v-for="(line, index) in sectorLines" :key="line.sectorId">{{ index ? ' · ' : '' }}{{ sectorName(line.sectorId) }} {{ fmtCurrency(line.amount) }}, {{ pctOf(line.amount) }}%</template>
+          <template v-if="uncovered > 0.009"> · sem utilizador {{ fmtCurrency(uncovered) }}, sem liberar demanda</template>
         </div>
-        <div v-else class="cell-sub">{{ subcategories.length ? 'Os centros ficam em cada subcategoria.' : 'Nenhum centro escolhido. O Financeiro responde pela conta.' }}</div>
-        <small>Os responsáveis dos centros recebem os alertas. Os centros se escolhem em Orçamentos, aba Categorias.</small>
+        <div v-else class="cell-sub">{{ subcategories.length ? 'Os setores ficam em cada subcategoria.' : 'Nenhum setor escolhido. O valor não libera demanda.' }}</div>
+        <small>O responsável da conta recebe o alerta. Os setores se escolhem em Orçamentos, aba Categorias.</small>
       </div>
 
       <div v-if="subcategories.length" class="notice info">O valor do ano desta categoria é a soma das subcategorias. O ano de cada uma é editado na aba Categorias.</div>
@@ -110,7 +115,7 @@ function centersOf(categoryId: string) {
       <template v-if="subcategories.length">
         <h3 class="drawer-title">Subcategorias</h3>
         <div v-for="entry in subcategories" :key="entry.category.id" class="list-row" @click="entry.allocation && ui.openRecord('budget', entry.allocation.id)">
-          <div><strong>{{ entry.category.code }} · {{ entry.category.name }}</strong><span>{{ centersOf(entry.category.id) }} · ano {{ fmtCurrency(entry.annual) }} · neste período {{ fmtCurrency(entry.amount) }} · previsão {{ fmtCurrency(entry.forecast) }} · realizado {{ fmtCurrency(entry.realized) }}</span></div><b>{{ fmtCurrency(entry.annual) }}</b>
+          <div><strong>{{ entry.category.code }} · {{ entry.category.name }}</strong><span>{{ sectorsOf(entry.category.id) }} · ano {{ fmtCurrency(entry.annual) }} · neste período {{ fmtCurrency(entry.amount) }} · previsão {{ fmtCurrency(entry.forecast) }} · realizado {{ fmtCurrency(entry.realized) }}</span></div><b>{{ fmtCurrency(entry.annual) }}</b>
         </div>
       </template>
 

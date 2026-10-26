@@ -5,7 +5,7 @@ import {
 } from '../domain/engine'
 import {
   DEFAULT_PRICE_TABLE, addConversion, approvalIssues, approveItem, blockItem, convertQuantity, createItem, currentPrice, decideKeyChange, deleteItem,
-  inactivateItem, itemFlags, obsoleteItem, openBomVersion, openPendencies, requestKeyChange, restoreItem, setBomLine, similarItems, submitItem,
+  catalogOf, inactivateItem, itemFlags, obsoleteItem, openBomVersion, openPendencies, requestKeyChange, restoreItem, setBomLine, similarItems, submitItem,
   updateCommercial, updateCore, withCheckDigit,
 } from '../domain/catalog'
 import {
@@ -17,7 +17,7 @@ import {
   contractService, createDemand, createOpportunity, createProject, createProposal, createPurchaseOrder, createTechnicalOrder, deliveryLead, loseOpportunity,
   moveOpportunity, releaseRevision, tasksForRole, toggleMilestone, undoPick, updateProposal,
 } from '../domain/enterprise'
-import { absorbOmieCategories, acknowledgeAlert, applyBudgetSimulation, applyCategorySuggestion, applyOmiePayment, applyPriorSeasonality, applyRemoteCategories, budgetSummary, categoryOf, costCenterAmounts, createBudgetCategory, createCostCenter, decideBudgetException, financeSnapshot, linkBudgetInvoice, notifiedUsers, rangeSummary, saveBudgetSimulation, sectorCostCenter, setBudget, setCostCenterSplit, setGroupBudget, setSectorDefaultCostCenter, suggestCategoryCenters, suggestCostCenterShare, updateBudgetCategory, updateCostCenter, upsertForecast, viewerCenterScope } from '../domain/budget'
+import { absorbOmieCategories, acknowledgeAlert, applyBudgetSimulation, applyCategorySuggestion, applyOmiePayment, applyPriorSeasonality, applyRemoteCategories, budgetSummary, categoryOf, costCenterAmounts, createBudgetCategory, createBudgetGroup, createCostCenter, decideBudgetException, financeSnapshot, linkBudgetInvoice, notifiedUsers, rangeSummary, saveBudgetSimulation, sectorCostCenter, seesBudgetException, setBudget, setCategoryAssignment, setCostCenterSplit, setGroupBudget, setSectorAllocations, setSectorDefaultCostCenter, suggestCategoryCenters, suggestCostCenterShare, updateBudgetCategory, updateCostCenter, upsertForecast, viewerCategoryScope, viewerCenterScope } from '../domain/budget'
 import { assetDepreciation, dreReading, dreStatement, periodLabel, superaEstimate } from '../domain/dre'
 import { createSeedState } from '../mocks/seed'
 import { MockOmieGateway } from '../services/omie/mockOmieGateway'
@@ -469,20 +469,20 @@ describe('orçamento integrado por categoria e período', () => {
     expect(periodLabel({ year: '2026', fromMonth: 3, toMonth: 5 })).toBe('março a maio de 2026')
   })
 
-  it('lê o orçamento e o centro de custo do período sem misturar empresas', () => {
+  it('lê o orçamento e o setor do período sem misturar empresas', () => {
     const state = createSeedState()
     const year = financeSnapshot(state, [TENANT], '2026', 1, 12)
     expect(year.receita.budget).toBe(48_000_000)
     expect(year.realizedPaid).toBe(96740 + 17450 + 41600 + 890)
-    expect(year.centers[0]).toMatchObject({ code: 'CC-320', name: 'Suprimentos', amount: 96740, company: 'Roboflex' })
+    expect(year.centers[0]).toMatchObject({ code: 'sec-sup', name: 'Suprimentos', amount: 96740, company: 'Roboflex' })
     expect(year.resultado.budget).toBeCloseTo(year.liquida.budget - year.custos.budget - year.despesas.budget, 2)
-    expect(year.lines.join(' ')).toContain('CC-320')
+    expect(year.lines.join(' ')).toContain('Suprimentos')
     expect(year.lines.join(' ')).toContain('fora dessa conta')
     const october = financeSnapshot(state, [TENANT], '2026', 10, 10)
     expect(october.realizedPaid).toBe(year.realizedPaid)
     expect(financeSnapshot(state, [TENANT], '2026', 1, 1).realizedPaid).toBe(0)
     const group = financeSnapshot(state, [TENANT, 'tenant-roboflex-sul'], '2026', 1, 12)
-    expect(group.centers.filter(entry => entry.code === 'CC-320')).toEqual([year.centers[0]])
+    expect(group.centers.filter(entry => entry.name === 'Suprimentos')).toEqual([year.centers[0]])
     expect(group.receita.budget).toBeGreaterThan(year.receita.budget)
     expect(() => financeSnapshot(state, [TENANT], '2026', 8, 3)).toThrow('período')
   })
@@ -511,20 +511,56 @@ describe('orçamento integrado por categoria e período', () => {
     expect(budgetSummary(state, 'BC-OPER', '2026-10').realized).toBe(before + 3250)
   })
 
-  it('avisa o responsável de cada centro com fatia; a parte sem centro fica com o Financeiro', () => {
+  it('avisa a pessoa responsável da categoria', () => {
     const state = createSeedState()
     upsertForecast(state, { categoryId: 'BC-OPER', period: '2026-10', amount: 3500, sourceModule: 'Manutenção', sourceType: 'OS', sourceId: 'OS-ALERTA', description: 'Reparo' }, 'Manutenção')
     const alert = state.budgetAlerts.find(entry => entry.categoryId === 'BC-OPER' && entry.kind === 'Alerta')!
-    expect(alert.notifiedUserIds).toEqual(['u5', 'u13', 'u3'])
-    expect(alert.notifiedRoles).toEqual(expect.arrayContaining(['Líder de produção', 'Engenharia', 'Compras', 'Financeiro']))
+    expect(alert.notifiedUserIds).toEqual(['u5'])
+    expect(alert.notifiedRoles).toEqual(expect.arrayContaining(['Líder de produção', 'Financeiro']))
     expect(() => acknowledgeAlert(state, alert.id, 'u12', 'Comercial', 'Comercial')).toThrow('outro responsável')
     expect(tasksForRole(state, 'Líder de produção', 'u5').some(task => task.id === alert.id)).toBe(true)
     expect(tasksForRole(state, 'Comercial', 'u12').some(task => task.id === alert.id)).toBe(false)
     expect(acknowledgeAlert(state, alert.id, 'u5', 'Bruno Alves', 'Líder de produção').status).toBe('Ciente')
     expect(notifiedUsers(state, 'BC-PERDAS', '2026-10')).toEqual(['u14'])
-    expect(notifiedUsers(state, 'BC-CMV', '2026-10')).toEqual(['u3', 'u14'])
+    expect(notifiedUsers(state, 'BC-CMV', '2026-10')).toEqual(['u3'])
     setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'percent', [{ costCenterId: 'cc-rob-400', value: 40 }], 'Patrícia', 'Financeiro')
-    expect(notifiedUsers(state, 'BC-OPER', '2026-10')).toEqual(['u5', 'u14'])
+    expect(notifiedUsers(state, 'BC-OPER', '2026-10')).toEqual(['u5'])
+  })
+
+  it('destina o valor da categoria a setores e trava o que passa ou vem sem valor', () => {
+    const state = createSeedState()
+    expect(() => setSectorAllocations(state, TENANT, 'BC-OPER', '2026', [{ sectorId: 'sec-pro', amount: 0 }], 'Patrícia', 'Financeiro')).toThrow('valor destinado')
+    expect(() => setSectorAllocations(state, TENANT, 'BC-OPER', '2026', [{ sectorId: 'sec-pro', amount: 400000 }], 'Patrícia', 'Financeiro')).toThrow('não pode passar')
+    expect(() => setSectorAllocations(state, TENANT, 'BC-OPER', '2026', [{ sectorId: 'sec-pro', amount: 1000 }, { sectorId: 'sec-pro', amount: 1000 }], 'Patrícia', 'Financeiro')).toThrow('duas vezes')
+    expect(() => setSectorAllocations(state, TENANT, 'BC-CMV', '2026', [{ sectorId: 'sec-sup', amount: 1000 }], 'Patrícia', 'Financeiro')).toThrow('recebe o valor')
+    const saved = setSectorAllocations(state, TENANT, 'BC-OPER', '2026', [{ sectorId: 'sec-pro', amount: 200000 }], 'Patrícia', 'Financeiro')
+    expect(saved.sectorAllocations).toEqual([{ sectorId: 'sec-pro', amount: 200000 }])
+    expect(setSectorAllocations(state, TENANT, 'BC-OPER', '2026', [], 'Patrícia', 'Financeiro').sectorAllocations).toBeUndefined()
+    expect(() => upsertForecast(state, { categoryId: 'BC-OPER', period: '2026-10', amount: 100, sourceModule: 'Demandas', sourceType: 'Material', sourceId: 'DM-SETOR', description: 'Sem fatia', sectorId: 'sec-eng' }, 'Compras')).toThrow('não tem valor destinado')
+    setSectorAllocations(state, TENANT, 'BC-OPER', '2026', [{ sectorId: 'sec-eng', amount: 1000 }], 'Patrícia', 'Financeiro')
+    expect(upsertForecast(state, { categoryId: 'BC-OPER', period: '2026-10', amount: 100, sourceModule: 'Demandas', sourceType: 'Material', sourceId: 'DM-SETOR', description: 'Com fatia', sectorId: 'sec-eng' }, 'Compras').status).not.toBe('Cancelado')
+  })
+
+  it('cria categoria mãe e mostra a ação para quem responde', () => {
+    const state = createSeedState()
+    const group = createBudgetGroup(state, TENANT, { code: '06', name: 'Despesas com pessoal' }, 'Patrícia', 'Financeiro')
+    expect(group).toMatchObject({ code: '06', name: '06. Despesas com pessoal', tenantId: TENANT })
+    expect(() => createBudgetGroup(state, TENANT, { code: '6', name: 'Curto' }, 'Patrícia', 'Financeiro')).toThrow('dois dígitos')
+    expect(() => createBudgetGroup(state, TENANT, { code: '06', name: 'Outra' }, 'Patrícia', 'Financeiro')).toThrow('Já existe')
+    const exception = state.budgetExceptions.find(entry => entry.kind === 'Saldo excedido')!
+    expect(seesBudgetException(state, exception, 'u14', 'Financeiro')).toBe(true)
+    expect(seesBudgetException(state, exception, 'u5', 'Líder de produção')).toBe(false)
+    expect(seesBudgetException(state, exception, 'u16', 'Administrador')).toBe(true)
+    const unlinked = state.budgetExceptions.find(entry => entry.kind === 'Sem vínculo')
+    if (unlinked) {
+      const category = state.budgetCategories.find(entry => entry.id === unlinked.categoryIds[0])
+      if (category) setCategoryAssignment(state, TENANT, category.id, { executorSectorId: 'sec-sup', responsibleUserId: category.responsibleUserId }, 'Patrícia', 'Financeiro')
+      expect(seesBudgetException(state, unlinked, 'u3', 'Compras')).toBe(true)
+      expect(seesBudgetException(state, unlinked, 'u5', 'Líder de produção')).toBe(false)
+    }
+    expect(viewerCategoryScope(state, TENANT, 'u5', 'Líder de produção').categoryIds).toContain('BC-OPER')
+    expect(viewerCategoryScope(state, TENANT, 'u5', 'Líder de produção').limited).toBe(true)
+    expect(viewerCategoryScope(state, TENANT, 'u14', 'Financeiro').limited).toBe(false)
   })
 
   it('o Financeiro dá ciente em qualquer alerta da empresa', () => {
@@ -723,12 +759,16 @@ describe('cadastro de itens', () => {
     const item = state.items.find(entry => entry.id === 'cp-paraf')!
     const core = { name: item.name, type: item.type, unit: item.unit, classId: item.catalog!.classId }
     expect(() => updateCore(state, item.id, { ...core, type: 'MP' }, 'Eduardo', 'Engenharia')).toThrow(/tipo/)
-    expect(() => updateCore(state, item.id, { ...core, unit: 'cento' }, 'Eduardo', 'Engenharia')).toThrow(/exceção/)
-    const request = requestKeyChange(state, item.id, 'unit', 'pç', 'Padronizar com o Omie', 'Eduardo', 'Engenharia')
+    expect(() => updateCore(state, item.id, { ...core, unit: 'cento' }, 'Eduardo', 'Engenharia')).toThrow(/origem/)
+    expect(() => requestKeyChange(state, item.id, 'unit', 'pç', 'Padronizar com o Omie', 'Eduardo', 'Engenharia')).toThrow(/origem/)
+    const request = requestKeyChange(state, item.id, 'unit', 'pç', 'Padronizar com o Omie', 'Eduardo', 'Engenharia', { module: 'OP', id: 'OP-10' })
+    expect(catalogOf(item).lifecycle).toBe('Alteração pendente')
+    expect(item.unit).not.toBe('pç')
     expect(() => decideKeyChange(state, item.id, request.id, true, '', 'Eduardo', 'Gestor')).toThrow(/própria/)
     expect(() => decideKeyChange(state, item.id, request.id, true, '', 'Paulo', 'PCP')).toThrow(/gestão/)
     decideKeyChange(state, item.id, request.id, true, '', 'Marina', 'Gestor')
     expect(item.unit).toBe('pç')
+    expect(catalogOf(item).lifecycle).toBe('Ativo')
     expect(request).toMatchObject({ status: 'Aprovada', decidedBy: 'Marina' })
   })
 
@@ -776,7 +816,7 @@ describe('cadastro de itens', () => {
     expect(state.productRevisions.find(entry => entry.id === previous)!.status).toBe('Substituída')
   })
 
-  it('recusa conversão inválida e cadeia, e só inativa sem pendências', () => {
+  it('recusa conversão inválida e cadeia, e a inativação deixa o que já está aberto seguir', () => {
     const state = createSeedState()
     const item = state.items.find(entry => entry.id === 'mp-abs')!
     expect(() => addConversion(state, item.id, { unit: 'kg', factor: 25, context: 'Compra' }, 'Carlos', 'Compras')).toThrow(/base/)
@@ -784,10 +824,16 @@ describe('cadastro de itens', () => {
     addConversion(state, item.id, { unit: 'big-bag', factor: 500, context: 'Compra' }, 'Carlos', 'Compras')
     expect(convertQuantity(item, 2, 'big-bag', 'kg')).toBe(1000)
     expect(() => convertQuantity(item, 1, 'saco', 'big-bag')).toThrow(/cadeia/)
-    expect(() => inactivateItem(state, item.id, 'Fim de linha', 'Marina', 'Gestor')).toThrow(/obsoletar/)
-    obsoleteItem(state, item.id, 'Fim de linha', 'Marina', 'Gestor')
-    expect(() => inactivateItem(state, item.id, 'Fim de linha', 'Marina', 'Gestor')).toThrow(/Saldo/)
+    const stock = item.stock
     expect(openPendencies(state, item.id).length).toBeGreaterThan(0)
+    const pending = requestKeyChange(state, item.id, 'name', 'ABS fora de linha', 'Troca pedida na ordem', 'Eduardo', 'Engenharia', { module: 'OS', id: 'OS-4' })
+    inactivateItem(state, item.id, 'Fim de linha', 'Marina', 'Gestor')
+    expect(item.catalog!.lifecycle).toBe('Inativo')
+    expect(item.stock).toBe(stock)
+    expect(item.name).not.toBe('ABS fora de linha')
+    expect(pending.status).toBe('Recusada')
+    expect(pending.note).toMatch(/inativado/)
+    expect(() => requestKeyChange(state, item.id, 'name', 'Outro', 'Depois', 'Eduardo', 'Engenharia', { module: 'OS', id: 'OS-5' })).toThrow(/inativo/)
   })
 
   it('apaga de verdade o rascunho nunca usado e exclui logicamente o que já foi usado', () => {

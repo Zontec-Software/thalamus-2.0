@@ -1,5 +1,5 @@
 import type {
-  AccessProfile, Asset, Budget, BudgetAlert, BudgetCategory, BudgetEntry, BudgetException, BudgetSimulation, BusinessPartner, CostCenter, Customer, Demand, Downtime, EconomicGroup, EngineeringChange, FiscalRule, FlowEvent, FlowStage, Functionality, Item, ItemClass, ItemModel, JobPosition, OmieConnection,
+  AccessProfile, Asset, Budget, BudgetAlert, BudgetCategory, BudgetEntry, BudgetException, BudgetGroupDef, BudgetSimulation, BusinessPartner, CostCenter, Customer, Demand, Downtime, EconomicGroup, EngineeringChange, FiscalRule, FlowEvent, FlowStage, Functionality, Item, ItemClass, ItemModel, JobPosition, OmieConnection,
   MachineState, MaintenanceOrder, NonConformity, Opportunity, OpMaterial, Operation, PriceTable, ProductRevision, ProductionOrder, Project,
   OmieCategory, OmiePayment, Proposal, PurchaseOrder, Requisition, RequisitionStatus, Resource, SalesOrder, Sector, ServiceCatalogItem,
   ShopAlert, StockMovement, SyncLog, TechnicalServiceOrder, Tenant, User, UserProfileAssignment,
@@ -37,6 +37,7 @@ export interface ErpState {
   technicalServiceOrders: TechnicalServiceOrder[]
   projects: Project[]
   budgetCategories: BudgetCategory[]
+  budgetGroups: BudgetGroupDef[]
   budgets: Budget[]
   budgetEntries: BudgetEntry[]
   budgetExceptions: BudgetException[]
@@ -156,14 +157,14 @@ export function assertUsable(item: Item, use: ItemUse) {
   if (!catalog) return
   if (catalog.deletedAt) throw new DomainError(`${item.code} foi excluído do cadastro`)
   const life = catalog.lifecycle
-  if (life === 'Ativo') {
+  if (life === 'Ativo' || life === 'Alteração pendente' || life === 'Inativação pendente') {
     if (use === 'venda' && catalog.nature === 'Imobilizado') throw new DomainError(`${item.code} é imobilizado e não é vendido`)
     if (use === 'compra' && (catalog.nature === 'Serviço' || catalog.nature === 'Kit virtual')) throw new DomainError(`${item.code} não é comprado como material`)
     return
   }
   if (life === 'Obsoleto' && use === 'consumo') return
   const reason: Record<string, string> = {
-    Rascunho: 'ainda é rascunho', 'Em homologação': 'ainda está em homologação', Bloqueado: 'está bloqueado',
+    Rascunho: 'ainda é rascunho', 'Em homologação': 'ainda está em análise', Bloqueado: 'está bloqueado',
     Obsoleto: 'está obsoleto: só o saldo restante pode ser consumido', Inativo: 'está inativo',
   }
   throw new DomainError(`${item.code} ${reason[life]} e não entra em ${use}`)

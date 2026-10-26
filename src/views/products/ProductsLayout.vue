@@ -37,7 +37,7 @@ const MENU = computed<{ group: string; links: MenuLink[] }[]>(() => [
     { to: '/produtos/fiscal', label: 'Fiscal', icon: Receipt, count: fiscalPending.value, alert: fiscalPending.value > 0 },
   ] },
   { group: 'Governança', links: [
-    { to: '/produtos/homologacao', label: 'Homologação', icon: ShieldCheck, count: awaitingMe.value, alert: awaitingMe.value > 0 },
+    { to: '/produtos/homologacao', label: 'Análise do cadastro', icon: ShieldCheck, count: awaitingMe.value, alert: awaitingMe.value > 0 },
   ] },
 ])
 </script>

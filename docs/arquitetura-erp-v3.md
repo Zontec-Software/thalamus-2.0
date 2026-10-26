@@ -44,7 +44,7 @@ Pedido aprovado → OP com revisão congelada → reserva → separação → ex
 
 ## Persistência do protótipo
 
-O estado fica no `localStorage`, na chave `thalamus-erp-v32`. Não há banco de dados nem API nesta fase. Restaurar a demonstração recria o seed completo.
+O estado fica no `localStorage`, na chave `thalamus-erp-v36`. Não há banco de dados nem API nesta fase. Restaurar a demonstração recria o seed completo.
 
 Campo novo no estado exige subir a chave. Não há migração: a chave nova nasce do seed, e a antiga é descartada.
 

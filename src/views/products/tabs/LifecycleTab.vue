@@ -18,11 +18,11 @@ const ui = useUiStore()
 const catalog = computed(() => catalogOf(props.item))
 const life = computed(() => catalog.value.lifecycle)
 const issues = computed(() => activationIssues(store.state, props.item))
-const pendencies = computed(() => life.value === 'Obsoleto' ? openPendencies(store.state, props.item.id) : [])
+const pendencies = computed(() => openPendencies(store.state, props.item.id))
 const canCycle = computed(() => canEdit(ui.role, 'ciclo') && !catalog.value.deletedAt)
 const past = (step: string) => LIFECYCLE.indexOf(step as typeof life.value) < LIFECYCLE.indexOf(life.value) && LIFECYCLE.indexOf(life.value) <= 2
 
-type Ask = 'return' | 'block' | 'reactivate' | 'obsolete' | 'inactivate' | 'refuse'
+type Ask = 'return' | 'block' | 'reactivate' | 'obsolete' | 'inactivate' | 'reject-inactivation' | 'refuse'
 const ask = ref<Ask | ''>('')
 const refusing = ref('')
 const ASK: Record<Ask, { title: string; confirm: string; tone: 'danger' | 'warning' | '' }> = {
@@ -30,7 +30,8 @@ const ASK: Record<Ask, { title: string; confirm: string; tone: 'danger' | 'warni
   block: { title: 'Bloquear item', confirm: 'Bloquear', tone: 'danger' },
   reactivate: { title: 'Reativar item', confirm: 'Reativar', tone: '' },
   obsolete: { title: 'Obsoletar item', confirm: 'Obsoletar', tone: 'warning' },
-  inactivate: { title: 'Inativar item', confirm: 'Inativar', tone: 'danger' },
+  inactivate: { title: 'Solicitar inativação', confirm: 'Solicitar', tone: 'danger' },
+  'reject-inactivation': { title: 'Recusar inativação', confirm: 'Recusar', tone: 'warning' },
   refuse: { title: 'Recusar exceção', confirm: 'Recusar', tone: 'danger' },
 }
 function confirm(reason: string) {
@@ -41,7 +42,8 @@ function confirm(reason: string) {
     block: () => store.blockItem(id, reason),
     reactivate: () => store.reactivateItem(id, reason),
     obsolete: () => store.obsoleteItem(id, reason),
-    inactivate: () => store.inactivateItem(id, reason),
+    inactivate: () => store.requestInactivation(id, reason),
+    'reject-inactivation': () => store.rejectInactivation(id, reason),
     refuse: () => store.decideKeyChange(id, refusing.value, false, reason),
     '': () => undefined,
   }[action]()
@@ -79,22 +81,38 @@ const canReturn = computed(() => (APPROVER[ui.role] ?? []).some(role => required
     <button v-if="life === 'Ativo'" class="button secondary" :disabled="!canCycle" @click="ask = 'block'">Bloquear</button>
     <button v-if="life === 'Bloqueado'" class="button" :disabled="!canCycle" @click="ask = 'reactivate'">Reativar</button>
     <button v-if="life === 'Ativo' || life === 'Bloqueado'" class="button secondary" :disabled="!canCycle" @click="ask = 'obsolete'">Obsoletar</button>
-    <button v-if="life === 'Obsoleto'" class="button secondary" :disabled="!canCycle || pendencies.length > 0" @click="ask = 'inactivate'">Inativar</button>
+    <button v-if="life === 'Ativo' || life === 'Alteração pendente' || life === 'Bloqueado' || life === 'Obsoleto'" class="button secondary" :disabled="!canCycle" @click="ask = 'inactivate'">Solicitar inativação</button>
+    <template v-if="life === 'Inativação pendente'">
+      <button class="button" :disabled="!canCycle" @click="store.approveInactivation(item.id)">Aprovar inativação</button>
+      <button class="button secondary" :disabled="!canCycle" @click="ask = 'reject-inactivation'">Recusar</button>
+    </template>
     <button v-if="life === 'Ativo'" class="button secondary" @click="store.publishItem(item.id)"><Send :size="14" /> Enviar ao Omie</button>
   </div>
   <p v-if="!canCycle && !catalog.deletedAt" class="cell-sub">Mudança de situação: {{ editorsLabel('ciclo') }}. Aprovações: cada papel na sua parte.</p>
-  <div v-if="pendencies.length" class="notice danger" style="margin-top:10px">
-    <b>Inativação bloqueada enquanto houver:</b>
+  <div v-if="(life === 'Inativação pendente' || life === 'Inativo') && pendencies.length" class="notice info" style="margin-top:10px">
+    <b>Isto continua até o fim. A inativação não cancela:</b>
     <div v-for="entry in pendencies" :key="entry">· {{ entry }}</div>
   </div>
+  <p v-if="life === 'Alteração pendente'" class="notice info" style="margin-top:10px">Há alteração aguardando aprovação. O cadastro vigente continua valendo em compra, produção e venda.</p>
+  <p v-if="life === 'Inativação pendente'" class="notice warning" style="margin-top:10px">A inativação aguarda aprovação. Ao aprovar, solicitações ainda pendentes são negadas com o aviso de item inativado.</p>
+  <section v-if="item.type === 'MP'" class="layer">
+    <h3 class="drawer-title">Retrato de homologação</h3>
+    <p class="cell-sub">Leitura do outro submódulo, por fornecedor. Não se edita nem se decide aqui.</p>
+    <div v-if="catalog.homologation" class="mini-stats">
+      <div class="mini-stat"><strong>{{ catalog.homologation.supplier }}</strong><span>fornecedor</span></div>
+      <div class="mini-stat"><strong>{{ catalog.homologation.status }}</strong><span>{{ catalog.homologation.reference }}<template v-if="catalog.homologation.validUntil"> · até {{ catalog.homologation.validUntil }}</template></span></div>
+      <div class="mini-stat"><strong>Testes de P&amp;D</strong><span>{{ catalog.homologation.tests }}</span></div>
+    </div>
+    <p v-else class="empty-note">Sem retrato de homologação para este fornecedor.</p>
+  </section>
   <p v-if="life === 'Bloqueado'" class="notice info" style="margin-top:10px">Bloqueado não entra em proposta, compra, pedido nem OP nova. Saldo e histórico ficam.</p>
   <p v-if="life === 'Obsoleto'" class="notice info" style="margin-top:10px">Obsoleto sai do planejamento. O saldo restante ainda pode ser consumido.</p>
 
   <h3 class="drawer-title">Exceções de campo-chave</h3>
   <div v-for="change in catalog.keyChanges" :key="change.id" class="list-row static">
     <div>
-      <strong>{{ change.field === 'ncm' ? 'NCM' : 'Unidade base' }}: {{ change.from || '—' }} → {{ change.to }}</strong>
-      <span>{{ change.reason }} · {{ change.requestedBy }} em {{ change.requestedAt.slice(0, 10) }}<template v-if="change.decidedBy"> · {{ change.status.toLowerCase() }} por {{ change.decidedBy }}{{ change.note ? `: ${change.note}` : '' }}</template></span>
+      <strong>{{ change.field }}: {{ change.from || '—' }} → {{ change.to }}</strong>
+      <span>{{ change.originModule }} {{ change.originId }} · {{ change.reason }} · {{ change.requestedBy }} em {{ change.requestedAt.slice(0, 10) }}<template v-if="change.decidedBy"> · {{ change.status.toLowerCase() }} por {{ change.decidedBy }}{{ change.note ? `: ${change.note}` : '' }}</template></span>
     </div>
     <div v-if="change.status === 'Pendente'" class="filter-row">
       <button class="button small" :disabled="!hasFullAccess(ui.role) || change.requestedBy === ui.userName" :title="change.requestedBy === ui.userName ? 'Quem solicitou não aprova' : !hasFullAccess(ui.role) ? 'Decisão da gestão do cadastro' : ''" @click="store.decideKeyChange(item.id, change.id, true, '')">Aprovar</button>

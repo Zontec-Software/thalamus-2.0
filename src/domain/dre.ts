@@ -164,6 +164,6 @@ export function dreReading(lines: DreLine[], period: DrePeriod, topCenter?: { co
   result.push(ebitda.realized >= ebitda.budget
     ? `O EBITDA realizado (${money(ebitda.realized)}) está acima do orçado (${money(ebitda.budget)}).`
     : `O EBITDA realizado (${money(ebitda.realized)}) está ${money(ebitda.budget - ebitda.realized)} abaixo do orçado.`)
-  if (topCenter) result.push(`O maior gasto pago está em ${topCenter.code} ${topCenter.name}${topCenter.company ? ` (${topCenter.company})` : ''}: ${money(topCenter.amount)}, ${pct(topCenter.share)} do pago.`)
+  if (topCenter) result.push(`O maior gasto pago está em ${topCenter.name}${topCenter.company ? ` (${topCenter.company})` : ''}: ${money(topCenter.amount)}, ${pct(topCenter.share)} do pago.`)
   return result
 }

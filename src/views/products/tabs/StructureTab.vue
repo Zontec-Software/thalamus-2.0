@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { CheckCircle2, GitBranch, GitCompare } from 'lucide-vue-next'
 import StatusBadge from '../../../components/StatusBadge.vue'
-import { catalogOf, hasRouting } from '../../../domain/catalog'
+import { catalogOf, hasRouting, inUse } from '../../../domain/catalog'
 import { revisionDiff } from '../../../domain/engineering'
 import { lineNeed, today } from '../../../domain/engine'
 import RoutingSection from '../sections/RoutingSection.vue'
@@ -38,7 +38,7 @@ const changeOf = (entry: ProductRevision) => entry.changeId ? store.state.engine
 
 const candidates = computed(() => store.state.items.filter(entry => {
   const catalog = catalogOf(entry)
-  return entry.id !== props.item.id && catalog.lifecycle === 'Ativo' && !catalog.deletedAt && (catalog.nature === 'Bem' || catalog.nature === 'Kit virtual')
+  return entry.id !== props.item.id && inUse(catalog.lifecycle) && !catalog.deletedAt && (catalog.nature === 'Bem' || catalog.nature === 'Kit virtual')
 }).sort((a, b) => a.code.localeCompare(b.code)))
 const line = reactive({ componentId: '', quantity: 1, loss: 0 })
 const notes = ref('')

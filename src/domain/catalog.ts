@@ -6,7 +6,7 @@ import type {
   ProductRevision, Role, UnitContext, UnitConversion,
 } from '../types/domain'
 
-export const LIFECYCLE: ItemLifecycle[] = ['Rascunho', 'Em homologação', 'Ativo', 'Bloqueado', 'Obsoleto', 'Inativo']
+export const LIFECYCLE: ItemLifecycle[] = ['Rascunho', 'Em homologação', 'Ativo', 'Alteração pendente', 'Inativação pendente', 'Bloqueado', 'Obsoleto', 'Inativo']
 
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   PA: 'Produto acabado', SE: 'Peça injetada', MP: 'Matéria-prima', CP: 'Componente', EM: 'Embalagem',
@@ -111,10 +111,15 @@ export function stockable(item: Item) {
   return catalogOf(item).nature === 'Bem' && !catalogOf(item).deletedAt
 }
 
+/** Ativo de fato: a alteração ou a inativação ainda não decididas não tiram o item de uso. */
+export function inUse(life: string) {
+  return life === 'Ativo' || life === 'Alteração pendente' || life === 'Inativação pendente'
+}
+
 /** Entra no planejamento de materiais. Obsoleto sai; bloqueado não gera transação nova. */
 export function plansMaterial(item: Item) {
   const catalog = catalogOf(item)
-  return ['SE', 'MP', 'CP', 'EM'].includes(item.type) && catalog.lifecycle === 'Ativo' && catalog.nature === 'Bem' && !catalog.deletedAt
+  return ['SE', 'MP', 'CP', 'EM'].includes(item.type) && inUse(catalog.lifecycle) && catalog.nature === 'Bem' && !catalog.deletedAt
 }
 
 export function needsStructure(item: Item) {
@@ -491,7 +496,8 @@ export function updateCore(state: ErpState, itemId: string, patch: CorePatch, ac
   const catalog = editable(item, role, 'nucleo')
   if (isLocked(item)) {
     if (patch.type !== item.type) throw new DomainError('O tipo não muda depois da ativação: ele define as camadas do item')
-    if (patch.unit.trim() !== item.unit) throw new DomainError('Depois da ativação, a unidade base muda só por solicitação de exceção')
+    if (patch.unit.trim() !== item.unit) throw new DomainError('Depois da ativação, a unidade base muda só por solicitação com origem externa')
+    if (patch.name.trim() !== item.name || patch.classId !== catalog.classId) throw new DomainError('Depois da ativação, descrição e classificação mudam por solicitação com origem externa')
   }
   if (!patch.name.trim()) throw new DomainError('A descrição não pode ficar vazia')
   if (!state.itemClasses.some(entry => entry.id === patch.classId)) throw new DomainError('Escolha um nó da classificação')
@@ -674,21 +680,33 @@ export function convertQuantity(item: Item, quantity: number, from: string, to: 
 
 /* ---------- Exceção de campo-chave ---------- */
 
-export function requestKeyChange(state: ErpState, itemId: string, field: KeyChangeRequest['field'], to: string, reason: string, actor: string, role: Role = 'Gestor') {
+const CHANGE_LABEL: Record<KeyChangeRequest['field'], string> = { ncm: 'NCM', unit: 'Unidade base', name: 'Descrição', class: 'Classificação' }
+
+export function requestKeyChange(state: ErpState, itemId: string, field: KeyChangeRequest['field'], to: string, reason: string, actor: string, role: Role = 'Gestor', origin?: { module: string; id: string }) {
   const item = findItem(state, itemId)
-  const catalog = editable(item, role, field === 'ncm' ? 'fiscal' : 'nucleo')
+  const catalog = ensure(item)
+  if (catalog.lifecycle === 'Inativo') throw new DomainError('Item inativo: novas solicitações não são aceitas')
+  if (catalog.lifecycle === 'Inativação pendente') throw new DomainError('A inativação está pendente. Novas alterações não são aceitas')
+  editable(item, role, field === 'ncm' ? 'fiscal' : 'nucleo')
   if (!isLocked(item)) throw new DomainError('Item ainda não ativado: edite o campo direto')
+  if (!origin?.module.trim() || !origin.id.trim()) throw new DomainError('A alteração precisa de uma origem externa: OS, OP, PAP, oportunidade ou outro documento')
   const value = field === 'ncm' ? to.replace(/\D/g, '') : to.trim()
-  const from = field === 'ncm' ? catalog.ncm : item.unit
+  const from = field === 'ncm' ? catalog.ncm : field === 'unit' ? item.unit : field === 'name' ? item.name : catalog.classId
   if (!value) throw new DomainError('Informe o novo valor')
   if (value === from) throw new DomainError('O valor proposto é igual ao atual')
   if (field === 'ncm' && !ncmInfo(value)) throw new DomainError('NCM não encontrado na tabela oficial')
+  if (field === 'class' && !state.itemClasses.some(entry => entry.id === value)) throw new DomainError('Classificação não encontrada')
   if (!reason.trim()) throw new DomainError('A justificativa é obrigatória')
   if (catalog.keyChanges.some(change => change.field === field && change.status === 'Pendente')) throw new DomainError('Já existe uma solicitação pendente para este campo')
-  const request: KeyChangeRequest = { id: nextId(state, 'EXC'), field, from, to: value, reason: reason.trim(), requestedBy: actor, requestedAt: now(), status: 'Pendente' }
+  const request: KeyChangeRequest = {
+    id: nextId(state, 'EXC'), field, from, to: value, reason: reason.trim(),
+    originModule: origin.module.trim(), originId: origin.id.trim(),
+    requestedBy: actor, requestedAt: now(), status: 'Pendente',
+  }
   catalog.keyChanges.unshift(request)
-  commit(catalog, actor, [{ field: field === 'ncm' ? 'NCM (exceção solicitada)' : 'Unidade base (exceção solicitada)', from, to: value, reason: request.reason }])
-  log(state, 'Produtos', actor, `${item.code}: exceção em ${field === 'ncm' ? 'NCM' : 'unidade base'} aguardando aprovação`, undefined, item.id)
+  commit(catalog, actor, [{ field: `${CHANGE_LABEL[field]} (solicitado)`, from, to: value, reason: `${request.originModule} ${request.originId}: ${request.reason}` }])
+  if (catalog.lifecycle === 'Ativo') transition(state, item, 'Alteração pendente', actor, 'Alteração solicitada. Os dados vigentes continuam até a aprovação')
+  log(state, 'Produtos', actor, `${item.code}: ${CHANGE_LABEL[field]} aguardando aprovação, origem ${request.originModule} ${request.originId}`, undefined, item.id)
   return request
 }
 
@@ -705,13 +723,18 @@ export function decideKeyChange(state: ErpState, itemId: string, requestId: stri
   request.decidedBy = actor
   request.decidedAt = now()
   request.note = note.trim() || undefined
-  const label = request.field === 'ncm' ? 'NCM' : 'Unidade base'
+  const label = CHANGE_LABEL[request.field]
   if (approve) {
     if (request.field === 'ncm') catalog.ncm = request.to
-    else item.unit = request.to
+    else if (request.field === 'unit') item.unit = request.to
+    else if (request.field === 'name') item.name = request.to
+    else catalog.classId = request.to
   }
-  commit(catalog, actor, [{ field: `${label} (${approve ? 'exceção aprovada' : 'exceção recusada'})`, from: request.from, to: approve ? request.to : request.from, reason: approve ? request.reason : request.note }])
-  log(state, 'Produtos', actor, `${item.code}: exceção em ${label} ${approve ? 'aprovada' : 'recusada'}`, undefined, item.id)
+  commit(catalog, actor, [{ field: `${label} (${approve ? 'alteração aprovada' : 'alteração recusada'})`, from: request.from, to: approve ? request.to : request.from, reason: approve ? request.reason : request.note }])
+  if (catalog.lifecycle === 'Alteração pendente' && !catalog.keyChanges.some(entry => entry.status === 'Pendente')) {
+    transition(state, item, 'Ativo', actor, 'Alteração decidida. Os dados vigentes seguem')
+  }
+  log(state, 'Produtos', actor, `${item.code}: ${label} ${approve ? 'aprovada' : 'recusada'}`, undefined, item.id)
 }
 
 /* ---------- Ciclo de vida ---------- */
@@ -803,19 +826,72 @@ export function openPendencies(state: ErpState, itemId: string): string[] {
   if (proposals.length) list.push(`${proposals.length} proposta(s) em aberto`)
   const sales = state.salesOrders.filter(order => order.shipment?.status !== 'Expedido' && order.shipment?.status !== 'Faturado' && (order.itemId === itemId || order.lines?.some(line => line.itemId === itemId)))
   if (sales.length) list.push(`${sales.length} pedido(s) de venda não expedidos`)
-  const parents = state.items.filter(entry => entry.id !== itemId && entry.catalog?.lifecycle === 'Ativo' && entry.bom?.some(line => line.itemId === itemId))
+  const parents = state.items.filter(entry => entry.id !== itemId && inUse(entry.catalog?.lifecycle ?? '') && entry.bom?.some(line => line.itemId === itemId))
   if (parents.length) list.push(`Componente da estrutura vigente de ${parents.map(entry => entry.code).join(', ')}`)
   return list
 }
 
-export function inactivateItem(state: ErpState, itemId: string, reason: string, actor: string, role: Role = 'Gestor') {
+export function requestInactivation(state: ErpState, itemId: string, reason: string, actor: string, role: Role = 'Gestor') {
   const item = findItem(state, itemId)
   const catalog = editable(item, role, 'ciclo')
-  if (catalog.lifecycle !== 'Obsoleto') throw new DomainError('Inativar é o último passo, depois de obsoletar')
+  if (!['Ativo', 'Alteração pendente', 'Bloqueado', 'Obsoleto'].includes(catalog.lifecycle)) throw new DomainError('A inativação parte de um item em uso')
   if (!reason.trim()) throw new DomainError('Informe o motivo')
-  const pendencies = openPendencies(state, itemId)
-  if (pendencies.length) throw new DomainError(`Desativação bloqueada: ${pendencies.join('; ')}`)
-  transition(state, item, 'Inativo', actor, `${reason.trim()}. O histórico permanece`)
+  transition(state, item, 'Inativação pendente', actor, reason.trim())
+}
+
+/** Aprova a inativação. Estoque, ordens e pedidos já abertos seguem. Solicitações pendentes são negadas. */
+export function approveInactivation(state: ErpState, itemId: string, actor: string, role: Role = 'Gestor') {
+  const item = findItem(state, itemId)
+  const catalog = editable(item, role, 'ciclo')
+  if (catalog.lifecycle !== 'Inativação pendente') throw new DomainError('Não há inativação pendente para aprovar')
+  for (const change of catalog.keyChanges.filter(entry => entry.status === 'Pendente')) {
+    change.status = 'Recusada'
+    change.decidedBy = actor
+    change.decidedAt = now()
+    change.note = 'Item inativado. A solicitação foi negada.'
+  }
+  transition(state, item, 'Inativo', actor, 'Inativado. Estoque, ordens e pedidos já abertos seguem. Novas solicitações ficam bloqueadas.')
+}
+
+export function rejectInactivation(state: ErpState, itemId: string, reason: string, actor: string, role: Role = 'Gestor') {
+  const item = findItem(state, itemId)
+  const catalog = editable(item, role, 'ciclo')
+  if (catalog.lifecycle !== 'Inativação pendente') throw new DomainError('Não há inativação pendente')
+  if (!reason.trim()) throw new DomainError('Informe o motivo da recusa')
+  const back = catalog.keyChanges.some(entry => entry.status === 'Pendente') ? 'Alteração pendente' : 'Ativo'
+  transition(state, item, back, actor, `Inativação recusada: ${reason.trim()}`)
+}
+
+export function inactivateItem(state: ErpState, itemId: string, reason: string, actor: string, role: Role = 'Gestor') {
+  const item = findItem(state, itemId)
+  if (ensure(item).lifecycle !== 'Inativação pendente') {
+    requestInactivation(state, itemId, reason, actor, role)
+  }
+  return approveInactivation(state, itemId, actor, role)
+}
+
+export type ItemUsage = { sellable: boolean; purchasable: boolean; stockable: boolean; manufacturable: boolean; assetizable: boolean }
+
+/** Indicadores de uso. Sem cadastro próprio, saem do tipo. */
+export function usageOf(item: Item): ItemUsage {
+  const saved = item.behaviors
+  if (saved) return { sellable: saved.sellable, purchasable: saved.purchasable, stockable: saved.stockable, manufacturable: saved.manufacturable, assetizable: saved.assetizable }
+  const type = item.type
+  return {
+    sellable: ['PA', 'KF', 'KT', 'SV'].includes(type),
+    purchasable: ['MP', 'CP', 'EM', 'IM', 'FE'].includes(type),
+    stockable: !['SV', 'KT'].includes(type),
+    manufacturable: ['PA', 'SE', 'KF'].includes(type),
+    assetizable: type === 'IM' || type === 'FE',
+  }
+}
+
+export function setItemUsage(state: ErpState, itemId: string, usage: ItemUsage, actor: string, role: Role = 'Gestor') {
+  const item = findItem(state, itemId)
+  const catalog = editable(item, role, 'nucleo')
+  if (isLocked(item)) throw new DomainError('Depois da ativação, os indicadores de uso mudam por solicitação com origem externa')
+  item.behaviors = { ...usage }
+  commit(catalog, actor, [{ field: 'Indicadores de uso', from: '', to: Object.entries(usage).filter(([, on]) => on).map(([key]) => key).join(', ') }])
 }
 
 /** Onde o item já foi usado. Item nunca referenciado pode ser apagado de verdade. */
@@ -897,7 +973,7 @@ export function setBomLine(state: ErpState, revisionId: string, componentId: str
   const component = findItem(state, componentId)
   if (component.id === item.id) throw new DomainError('O item não pode ser componente de si mesmo')
   if (containsInTree(state, component.id, item.id)) throw new DomainError(`${component.code} já usa ${item.code} na estrutura: isso criaria um ciclo`)
-  if (catalogOf(component).lifecycle !== 'Ativo') throw new DomainError(`${component.code} está ${catalogOf(component).lifecycle.toLowerCase()}: só componente ativo entra em versão nova`)
+  if (!inUse(catalogOf(component).lifecycle)) throw new DomainError(`${component.code} está ${catalogOf(component).lifecycle.toLowerCase()}: só componente em uso entra em versão nova`)
   if (catalogOf(component).nature === 'Serviço' || catalogOf(component).nature === 'Imobilizado') throw new DomainError('Serviço e imobilizado não entram em estrutura')
   revision.lines ??= []
   const line = revision.lines.find(entry => entry.itemId === componentId)
@@ -1002,7 +1078,10 @@ function typedDefaults(type: ItemType): Partial<ItemCatalog> {
 }
 
 const PRESET: Record<string, Partial<ItemCatalog>> = {
-  'mp-abs': { ncm: '39033090', branches: [{ branch: 'Filial · Itabira', enabled: true, location: 'Galpão 2 / R-04', minimum: 50 }] },
+  'mp-abs': {
+    ncm: '39033090', branches: [{ branch: 'Filial · Itabira', enabled: true, location: 'Galpão 2 / R-04', minimum: 50 }],
+    homologation: { supplier: 'Resinas do Vale', status: 'Homologado', reference: 'HOM-MP-ABS', validUntil: '2027-03-31', tests: 'Tração e fluidez, laudo P&D PD-118' },
+  },
   'mp-tpu': { ncm: '39095019', expiry: true },
   'mp-pc': { ncm: '39074090' },
   'cp-cabo': { ncm: '85444200', cest: '12.001.00' },

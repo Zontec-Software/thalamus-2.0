@@ -242,25 +242,26 @@ function baseState(): ErpState {
       { id: 'PRJ-26-014', name: 'Case Mining Galaxy Tab S10', kind: 'Produto novo', ownerId: 'u13', partnerId: 'c1', status: 'Em andamento', startDate: '2026-09-15', endDate: '2026-12-18', budgetId: 'ORC-PD-10', itemId: 'pa-s9-min', opportunityId: 'OPP-26042', memberIds: ['u13', 'u12', 'u5'], description: 'Nova versão do case Mining para o Galaxy Tab S10, puxada pela renovação da mina Norte. Reaproveita a borda do S9 e muda o encaixe da câmera.', risks: ['Ensaio IP65 depende de laboratório externo', 'Molde da tampa precisa de ajuste de 0,3 mm'], milestones: [{ id: 'm1', title: 'Requisitos aprovados', dueDate: '2026-09-30', done: true, doneAt: '2026-09-29' }, { id: 'm2', title: 'Protótipo funcional', dueDate: '2026-10-25', done: false }, { id: 'm3', title: 'Validação em campo', dueDate: '2026-11-20', done: false }] },
       { id: 'PRJ-26-011', name: 'Redução de setup molde A11', kind: 'Melhoria', ownerId: 'u5', memberIds: ['u5', 'u11'], description: 'Reduzir de 55 para 30 minutos a troca do molde do Tab A11 na Injetora 02.', status: 'Planejado', startDate: '2026-10-20', endDate: '2026-11-28', milestones: [{ id: 'm4', title: 'Medição do setup atual', dueDate: '2026-10-22', done: false }, { id: 'm5', title: 'Novo carrinho de troca', dueDate: '2026-11-10', done: false }] },
     ],
+    budgetGroups: [],
     budgetCategories: [
       { id: 'BC-ROB', tenantId: 'tenant-roboflex', code: '01.01', name: 'Receita Bruta de Vendas', group: '01. Receita Operacional Bruta', status: 'Ativa', nature: 'Receita', audit: [] },
       { id: 'BC-CMV', tenantId: 'tenant-roboflex', code: '03.01', name: 'Custo Mercadoria Vendida', group: '03. Custos', status: 'Ativa', audit: [] },
-      { id: 'BC-CMV-1', tenantId: 'tenant-roboflex', code: '03.01.01', name: 'Compras de Matéria Prima', group: '03. Custos', parentId: 'BC-CMV', status: 'Ativa', audit: [] },
-      { id: 'BC-CMV-2', tenantId: 'tenant-roboflex', code: '03.01.02', name: 'Compra de Serviços Terceirizados', group: '03. Custos', parentId: 'BC-CMV', status: 'Ativa', audit: [] },
+      { id: 'BC-CMV-1', tenantId: 'tenant-roboflex', code: '03.01.01', name: 'Compras de Matéria Prima', group: '03. Custos', parentId: 'BC-CMV', status: 'Ativa', responsibleUserId: 'u3', executorSectorId: 'sec-sup', audit: [] },
+      { id: 'BC-CMV-2', tenantId: 'tenant-roboflex', code: '03.01.02', name: 'Compra de Serviços Terceirizados', group: '03. Custos', parentId: 'BC-CMV', status: 'Ativa', responsibleUserId: 'u3', executorSectorId: 'sec-sup', audit: [] },
       { id: 'BC-CMV-3', tenantId: 'tenant-roboflex', code: '03.01.03', name: 'Compras de Mercadorias para Revenda', group: '03. Custos', parentId: 'BC-CMV', status: 'Ativa', audit: [] },
       { id: 'BC-CMV-4', tenantId: 'tenant-roboflex', code: '03.01.04', name: 'Embalagens', group: '03. Custos', parentId: 'BC-CMV', status: 'Ativa', audit: [] },
       { id: 'BC-CMV-5', tenantId: 'tenant-roboflex', code: '03.01.05', name: 'Materiais e Insumos para SaaS', group: '03. Custos', parentId: 'BC-CMV', status: 'Ativa', audit: [] },
-      { id: 'BC-OPER', tenantId: 'tenant-roboflex', code: '03.02', name: 'Custo Operacional', group: '03. Custos', status: 'Ativa', audit: [] },
+      { id: 'BC-OPER', tenantId: 'tenant-roboflex', code: '03.02', name: 'Custo Operacional', group: '03. Custos', status: 'Ativa', responsibleUserId: 'u5', executorSectorId: 'sec-pro', audit: [] },
       { id: 'BC-DEPREC', tenantId: 'tenant-roboflex', code: '03.03', name: 'Custo Máquinas - Depreciação', group: '03. Custos', status: 'Ativa', audit: [] },
       { id: 'BC-PESSOAL', tenantId: 'tenant-roboflex', code: '03.04', name: 'Custo de Pessoal', group: '03. Custos', status: 'Ativa', audit: [] },
       { id: 'BC-VENDAS', tenantId: 'tenant-roboflex', code: '03.05', name: 'Custo com Vendas e Marketing', group: '03. Custos', status: 'Ativa', audit: [] },
-      { id: 'BC-PD', tenantId: 'tenant-roboflex', code: '03.06', name: 'Custo com Pesquisa e Desenvolvimento', group: '03. Custos', status: 'Ativa', audit: [] },
+      { id: 'BC-PD', tenantId: 'tenant-roboflex', code: '03.06', name: 'Custo com Pesquisa e Desenvolvimento', group: '03. Custos', status: 'Ativa', responsibleUserId: 'u13', executorSectorId: 'sec-eng', audit: [] },
       { id: 'BC-MAT-PD', tenantId: 'tenant-roboflex', code: '03.07', name: 'Materiais Pesquisa e Desenvolvimento', group: '03. Custos', status: 'Ativa', audit: [] },
-      { id: 'BC-GARANTIA', tenantId: 'tenant-roboflex', code: '03.08', name: 'Custo com Garantia e Perdas', group: '03. Custos', status: 'Ativa', audit: [] },
-      { id: 'BC-PERDAS', tenantId: 'tenant-roboflex', code: '03.09', name: 'Perdas', group: '03. Custos', status: 'Ativa', audit: [] },
+      { id: 'BC-GARANTIA', tenantId: 'tenant-roboflex', code: '03.08', name: 'Custo com Garantia e Perdas', group: '03. Custos', status: 'Ativa', responsibleUserId: 'u11', executorSectorId: 'sec-ser', audit: [] },
+      { id: 'BC-PERDAS', tenantId: 'tenant-roboflex', code: '03.09', name: 'Perdas', group: '03. Custos', status: 'Ativa', responsibleUserId: 'u14', executorSectorId: 'sec-fin', audit: [] },
       { id: 'BC-IMPOSTOS', tenantId: 'tenant-roboflex', code: '02.01', name: 'Impostos e Taxas', group: '02. Deduções da Receita', status: 'Ativa', audit: [] },
       { id: 'BC-DEVOL', tenantId: 'tenant-roboflex', code: '02.02', name: 'Devoluções e Reembolsos', group: '02. Deduções da Receita', status: 'Ativa', audit: [] },
-      { id: 'BC-CAPEX', tenantId: 'tenant-roboflex', code: '09.01', name: 'Máquinas e Moldes', group: '09. Investimentos (CAPEX)', status: 'Ativa', isCapex: true, audit: [] },
+      { id: 'BC-CAPEX', tenantId: 'tenant-roboflex', code: '09.01', name: 'Máquinas e Moldes', group: '09. Investimentos (CAPEX)', status: 'Ativa', isCapex: true, responsibleUserId: 'u13', executorSectorId: 'sec-pro', audit: [] },
       // Empresa-irmã (tenant-roboflex-sul), árvore mínima só para o planejamento de grupo ter o que combinar.
       { id: 'BC-ROB-SUL', tenantId: 'tenant-roboflex-sul', code: '01.01', name: 'Receita Bruta de Vendas', group: '01. Receita Operacional Bruta', status: 'Ativa', nature: 'Receita', audit: [] },
       { id: 'BC-CMV-SUL', tenantId: 'tenant-roboflex-sul', code: '03.01', name: 'Custo Mercadoria Vendida', group: '03. Custos', status: 'Ativa', audit: [] },
@@ -268,16 +269,16 @@ function baseState(): ErpState {
     budgets: [
       { id: 'ORC-ROB-10', tenantId: 'tenant-roboflex', categoryId: 'BC-ROB', period: '2026', amount: 48000000, alertThreshold: 80, blockOnOverrun: false, audit: [] },
       { id: 'ORC-CMV-10', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV', period: '2026', amount: 2160000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
-      { id: 'ORC-CMV-1', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV-1', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-320', value: 100 }] } },
-      { id: 'ORC-CMV-2', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV-2', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-320', value: 100 }] } },
+      { id: 'ORC-CMV-1', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV-1', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-320', value: 100 }] }, sectorAllocations: [{ sectorId: 'sec-sup', amount: 432000 }] },
+      { id: 'ORC-CMV-2', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV-2', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-320', value: 100 }] }, sectorAllocations: [{ sectorId: 'sec-sup', amount: 400000 }] },
       { id: 'ORC-CMV-3', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV-3', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
       { id: 'ORC-CMV-4', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV-4', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
       { id: 'ORC-CMV-5', tenantId: 'tenant-roboflex', categoryId: 'BC-CMV-5', period: '2026', amount: 432000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
-      { id: 'ORC-OPER-10', tenantId: 'tenant-roboflex', categoryId: 'BC-OPER', period: '2026', amount: 384000, alertThreshold: 80, blockOnOverrun: true, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-400', value: 60 }, { costCenterId: 'cc-rob-310', value: 25 }, { costCenterId: 'cc-rob-320', value: 15 }] } },
-      { id: 'ORC-PD-10', tenantId: 'tenant-roboflex', categoryId: 'BC-PD', period: '2026', amount: 1440000, alertThreshold: 80, blockOnOverrun: true, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-310', value: 60 }, { costCenterId: 'cc-rob-700', value: 40 }] } },
-      { id: 'ORC-GAR-10', tenantId: 'tenant-roboflex', categoryId: 'BC-GARANTIA', period: '2026', amount: 264000, alertThreshold: 80, blockOnOverrun: false, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-500', value: 100 }] } },
+      { id: 'ORC-OPER-10', tenantId: 'tenant-roboflex', categoryId: 'BC-OPER', period: '2026', amount: 384000, alertThreshold: 80, blockOnOverrun: true, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-400', value: 60 }, { costCenterId: 'cc-rob-310', value: 25 }, { costCenterId: 'cc-rob-320', value: 15 }] }, sectorAllocations: [{ sectorId: 'sec-pro', amount: 230400 }, { sectorId: 'sec-eng', amount: 96000 }, { sectorId: 'sec-sup', amount: 57600 }] },
+      { id: 'ORC-PD-10', tenantId: 'tenant-roboflex', categoryId: 'BC-PD', period: '2026', amount: 1440000, alertThreshold: 80, blockOnOverrun: true, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-310', value: 60 }, { costCenterId: 'cc-rob-700', value: 40 }] }, sectorAllocations: [{ sectorId: 'sec-eng', amount: 864000 }, { sectorId: 'sec-pro', amount: 576000 }] },
+      { id: 'ORC-GAR-10', tenantId: 'tenant-roboflex', categoryId: 'BC-GARANTIA', period: '2026', amount: 264000, alertThreshold: 80, blockOnOverrun: false, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-500', value: 100 }] }, sectorAllocations: [{ sectorId: 'sec-ser', amount: 264000 }] },
       { id: 'ORC-PERDAS-10', tenantId: 'tenant-roboflex', categoryId: 'BC-PERDAS', period: '2026', amount: 144000, alertThreshold: 75, blockOnOverrun: true, audit: [] },
-      { id: 'ORC-CAPEX-10', tenantId: 'tenant-roboflex', categoryId: 'BC-CAPEX', period: '2026', amount: 600000, alertThreshold: 80, blockOnOverrun: false, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-410', value: 70 }, { costCenterId: 'cc-rob-330', value: 30 }] } },
+      { id: 'ORC-CAPEX-10', tenantId: 'tenant-roboflex', categoryId: 'BC-CAPEX', period: '2026', amount: 600000, alertThreshold: 80, blockOnOverrun: false, audit: [], costCenterSplit: { mode: 'percent', lines: [{ costCenterId: 'cc-rob-410', value: 70 }, { costCenterId: 'cc-rob-330', value: 30 }] }, sectorAllocations: [{ sectorId: 'sec-pro', amount: 420000 }, { sectorId: 'sec-eng', amount: 180000 }] },
       { id: 'ORC-ROB-SUL-10', tenantId: 'tenant-roboflex-sul', categoryId: 'BC-ROB-SUL', period: '2026', amount: 18000000, alertThreshold: 80, blockOnOverrun: false, audit: [] },
       { id: 'ORC-CMV-SUL-10', tenantId: 'tenant-roboflex-sul', categoryId: 'BC-CMV-SUL', period: '2026', amount: 820000, alertThreshold: 80, blockOnOverrun: true, audit: [] },
     ],
@@ -591,8 +592,10 @@ function prepareCatalog(s: ErpState) {
   }
   const film = s.items.find(item => item.id === 'cp-pelic')?.catalog
   if (film) {
+    film.lifecycle = 'Alteração pendente'
     film.keyChanges.unshift({
       id: 'EXC-0001', field: 'ncm', from: film.ncm, to: '39095019', reason: 'Película passou a ser de TPU, não de vidro temperado. O NCM de vidro não se aplica mais',
+      originModule: 'OP', originId: 'OP-441',
       requestedBy: 'Eduardo Freitas', requestedAt: '2026-10-16T14:20:00.000Z', status: 'Pendente',
     })
   }
@@ -708,6 +711,27 @@ function prepareEngineering(s: ErpState) {
     { key: 'Grau de proteção', label: 'Grau de proteção', kind: 'Lista', options: ['IP54', 'IP65', 'IP67'], required: true },
     { key: 'Altura de queda', label: 'Altura de queda', kind: 'Número', unit: 'm', required: false },
   ]
+  const families: Record<string, string[]> = {
+    CASE: ['Fixação', 'Conexões', 'Câmera', 'Botões', 'Áudio', 'Sensor', 'Armazenamento'],
+    CONSOLE: ['Sinal', 'Tamanho', 'Iluminação', 'Linha', 'Processamentos'],
+    BASE: ['Modelo', 'Fixação', 'Tamanho', 'Cores'],
+    'BRAÇO': ['Modelo', 'Tamanho', 'Cores', 'Modelo por instalação'],
+    CARREGADOR: ['Faixa de tensão de entrada', 'Faixa de tensão de saída', 'Corrente de saída', 'Cabo de saída', 'Capacidade de carga'],
+    HUB: ['Modelo', 'Conexões', 'Saída', 'Versão', 'Fixação'],
+    PLUG: ['Entrada', 'Saída', 'Linha'],
+    ADAPTADOR: ['Saída', 'Tamanho'],
+    CABO: ['Conexões', 'Modelo'],
+    DOCA: ['Tamanho', 'Conexões', 'Fixação'],
+    'ACESSÓRIO': ['Modelo', 'Versão'],
+  }
+  for (const [name, labels] of Object.entries(families)) {
+    const id = ensureClassPath(s, ['Produtos acabados', name])
+    const created = s.itemClasses.find(entry => entry.id === id)
+    if (created) created.attributes = labels.map(label => ({ key: label, label, kind: 'Texto' as const, required: false }))
+  }
+  for (const name of ['Matéria-prima', 'Produto em processo', 'Produto acabado', 'Componente', 'Embalagem', 'Consumível', 'Peça de reposição', 'Equipamento']) {
+    ensureClassPath(s, ['Taxonomia proposta', name])
+  }
   node(['Peças injetadas']).attributes = [
     { key: 'Peso da peça', label: 'Peso da peça', kind: 'Número', unit: 'g', required: true },
     { key: 'Acabamento', label: 'Acabamento', kind: 'Lista', options: ['Texturizado', 'Liso', 'Brilhante'], required: false },

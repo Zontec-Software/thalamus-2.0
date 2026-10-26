@@ -132,10 +132,10 @@ export function isDepreciationCategory(category: { name: string }) {
   return /deprecia/i.test(category.name)
 }
 
-/** Custo, despesa e investimento. Receita e dedução são meta, não destino de gasto. */
+/** Custo, despesa e investimento, e qualquer categoria mãe nova. Receita e dedução não recebem utilizador. */
 export function isCenterCategory(category: { group: string }) {
   const code = category.group.slice(0, 2)
-  return code === '03' || code === '04' || code === '05' || code === '09'
+  return code !== '01' && code !== '02'
 }
 
 /** Conta que recebe teto e pode ser repartida entre centros. A depreciação fica de fora. */
@@ -203,9 +203,15 @@ function audit(state: ErpState, actor: string, field: string, from: string, to: 
   return { id: nextId(state, 'BA'), at: now(), actor, field, from, to, reason }
 }
 
+/** Grupos fixos mais as categorias mãe criadas nesta empresa. */
+export function groupsFor(state: ErpState, tenantId: string) {
+  const custom = (state.budgetGroups ?? []).filter(entry => entry.tenantId === tenantId)
+  return [...BUDGET_GROUPS.map(entry => ({ code: entry.code, name: entry.name })), ...custom.map(entry => ({ code: entry.code, name: entry.name }))]
+}
+
 export function nextCategoryCode(state: ErpState, tenantId: string, group: string, parentId?: string) {
   const parent = parentId ? categoryOf(state, parentId) : undefined
-  const prefix = parent ? parent.code : BUDGET_GROUPS.find(entry => entry.name === group)?.code
+  const prefix = parent ? parent.code : groupsFor(state, tenantId).find(entry => entry.name === group)?.code
   if (!prefix) throw new DomainError('Escolha um grupo confirmado')
   const siblings = state.budgetCategories.filter(entry => entry.tenantId === tenantId && (parent ? entry.parentId === parent.id : !entry.parentId && entry.group === group))
   const last = siblings.reduce((max, entry) => Math.max(max, Number(entry.code.split('.').pop()) || 0), 0)
@@ -230,7 +236,7 @@ export function createBudgetCategory(state: ErpState, tenantId: string, input: P
   if (parent?.parentId) throw new DomainError('Subcategoria não pode ter outra subcategoria abaixo')
   if (parent?.status === 'Inativa') throw new DomainError('A categoria pai está inativa')
   const group = parent?.group ?? input.group
-  if (!BUDGET_GROUPS.some(entry => entry.name === group)) throw new DomainError('Escolha um grupo confirmado')
+  if (!groupsFor(state, tenantId).some(entry => entry.name === group)) throw new DomainError('Escolha um grupo confirmado')
   const siblings = state.budgetCategories.filter(entry => entry.tenantId === tenantId && (parent ? entry.parentId === parent.id : !entry.parentId && entry.group === group))
   if (siblings.some(entry => entry.name.toLowerCase() === input.name.trim().toLowerCase())) throw new DomainError('Já existe uma categoria com este nome neste nível')
   const category: BudgetCategory = {
@@ -278,6 +284,62 @@ function publishCategory(state: ErpState, category: BudgetCategory) {
     entity: 'Categoria', reference: category.code, direction: 'Thalamus → Omie', status: 'sincronizado',
     message: `${category.code} · ${category.name} enviada ao Omie (${category.omieId})${category.status === 'Inativa' ? ' · conta_inativa' : ''}`,
   })
+}
+
+/** Categoria mãe nova, no formato 06. Nome, só desta empresa. */
+export function createBudgetGroup(state: ErpState, tenantId: string, input: { code: string; name: string }, actor: string, role: Role) {
+  assertPlanner(role, 'cria categoria mãe')
+  const code = input.code.trim()
+  const label = input.name.trim()
+  if (!/^\d{2}$/.test(code)) throw new DomainError('O código da categoria mãe tem dois dígitos, como 06')
+  if (!label) throw new DomainError('Informe o nome da categoria mãe')
+  if (groupsFor(state, tenantId).some(entry => entry.code === code)) throw new DomainError('Já existe uma categoria mãe com este código')
+  const name = label.startsWith(`${code}.`) ? label : `${code}. ${label}`
+  const group = { id: nextId(state, 'BG'), tenantId, code, name }
+  state.budgetGroups.push(group)
+  log(state, 'Orçamentos', actor, `Categoria mãe ${name} criada`, undefined, group.id)
+  return group
+}
+
+/** Responsável da conta e setor que recebe a demanda. */
+export function setCategoryAssignment(state: ErpState, tenantId: string, id: string, patch: { responsibleUserId?: string; executorSectorId?: string }, actor: string, role: Role) {
+  assertPlanner(role, 'define responsável e executor')
+  const category = categoryOf(state, id)
+  assertCategoryTenant(category, tenantId)
+  if (patch.responsibleUserId) assertResponsible(state, patch.responsibleUserId, 'da categoria')
+  if (patch.executorSectorId && !state.sectors.some(entry => entry.id === patch.executorSectorId)) throw new DomainError('Setor executor não encontrado')
+  category.responsibleUserId = patch.responsibleUserId || undefined
+  category.executorSectorId = patch.executorSectorId || undefined
+  log(state, 'Orçamentos', actor, `${category.code}: responsável ${category.responsibleUserId ? userLabel(state, category.responsibleUserId) : 'sem pessoa'}`, undefined, category.id)
+  return category
+}
+
+/**
+ * Destina o valor da categoria a setores. Linha sem valor não entra.
+ * A soma pode ficar abaixo do valor; o que falta não libera demanda. Não pode passar.
+ */
+export function setSectorAllocations(state: ErpState, tenantId: string, categoryId: string, year: string, lines: { sectorId: string; amount: number }[], actor: string, role: Role) {
+  assertPlanner(role, 'destina o valor aos setores')
+  const category = categoryOf(state, categoryId)
+  assertCategoryTenant(category, tenantId)
+  if (!isSpendCategory(category)) throw new DomainError('Só custo, despesa e investimento recebem utilizador')
+  if (!isBudgetLeaf(state, categoryId)) throw new DomainError('O valor destinado é da categoria que recebe o valor')
+  const budget = allocationOf(state, categoryId, year)
+  if (!budget || !(budget.amount > 0)) throw new DomainError('Informe o valor da categoria antes de destinar aos setores')
+  if (lines.some(line => !(Number(line.amount) > 0))) throw new DomainError('Informe o valor destinado antes de liberar o setor')
+  const cleaned = lines.map(line => ({ sectorId: line.sectorId, amount: round2(Number(line.amount) || 0) }))
+  const seen = new Set<string>()
+  let sum = 0
+  for (const line of cleaned) {
+    if (seen.has(line.sectorId)) throw new DomainError('O mesmo setor não pode aparecer duas vezes')
+    seen.add(line.sectorId)
+    if (!state.sectors.some(entry => entry.id === line.sectorId)) throw new DomainError('Setor não encontrado')
+    sum += line.amount
+  }
+  if (round2(sum) > budget.amount + 0.001) throw new DomainError('A soma destinada não pode passar do valor da categoria')
+  budget.sectorAllocations = cleaned.length ? cleaned : undefined
+  log(state, 'Orçamentos', actor, `${category.code}: ${cleaned.length ? cleaned.map(line => `${state.sectors.find(entry => entry.id === line.sectorId)?.name ?? line.sectorId} ${money(line.amount)}`).join(', ') : 'sem utilizador'}`, undefined, category.id)
+  return budget
 }
 
 /**
@@ -452,7 +514,7 @@ export function setBudget(state: ErpState, tenantId: string, categoryId: string,
 /** Informa o total do grupo e divide em partes iguais entre as categorias que recebem valor. */
 export function setGroupBudget(state: ErpState, tenantId: string, group: string, period: string, amount: number, reason: string, actor: string, role: Role) {
   assertPlanner(role, 'informa orçamento')
-  if (!BUDGET_GROUPS.some(entry => entry.name === group)) throw new DomainError('Escolha um grupo confirmado')
+  if (!groupsFor(state, tenantId).some(entry => entry.name === group)) throw new DomainError('Escolha um grupo confirmado')
   if (!/^\d{4}$/.test(period)) throw new DomainError('Informe o ano do orçamento, no formato AAAA')
   if (!(amount > 0)) throw new DomainError('Informe um valor maior que zero para abrir o ano')
   if (!reason.trim()) throw new DomainError('Escolha o motivo')
@@ -730,6 +792,13 @@ export function applyBudgetSimulation(state: ErpState, tenantId: string, year: s
   return simulation
 }
 
+/** Financeiro e Administrador veem todas as categorias. Os demais veem só as contas em que são o responsável. */
+export function viewerCategoryScope(state: ErpState, tenantId: string, userId: string, role: Role) {
+  if (role === 'Administrador' || role === 'Financeiro') return { limited: false, categoryIds: [] as string[] }
+  const categoryIds = state.budgetCategories.filter(entry => entry.tenantId === tenantId && entry.responsibleUserId === userId).map(entry => entry.id)
+  return { limited: true, categoryIds }
+}
+
 /** Financeiro, Gestor e Administrador veem a empresa. Os demais veem os centros do seu nome, ou do papel em demonstração. */
 export function viewerCenterScope(state: ErpState, tenantId: string, userId: string, role: Role) {
   if (hasFullAccess(role) || role === 'Financeiro') return { limited: false, centerIds: [] as string[] }
@@ -891,25 +960,25 @@ export function financeSnapshot(state: ErpState, tenantIds: string[], year: stri
   const months = Array.from({ length: toMonth - fromMonth + 1 }, (_, index) => fromMonth + index)
   const paid = state.budgetEntries.filter(entry => uniqueTenants.includes(entry.tenantId) && entry.kind === 'Realizado pago' && entry.status !== 'Cancelado' && entryInWindow(entry.period, months, year))
   const realizedPaid = round2(paid.reduce((sum, entry) => sum + entry.amount, 0))
-  const byCenter = new Map<string, FinanceCenterUse>()
+  const bySector = new Map<string, FinanceCenterUse>()
   for (const entry of paid) {
-    if (!entry.costCenter) continue
-    const key = `${entry.tenantId}:${entry.costCenter}`
-    const current = byCenter.get(key)
+    const sector = entry.costCenter ? state.sectors.find(item => item.costCenters?.[entry.tenantId] === entry.costCenter) : undefined
+    if (!sector) continue
+    const key = `${entry.tenantId}:${sector.id}`
+    const current = bySector.get(key)
     if (current) current.amount = round2(current.amount + entry.amount)
     else {
-      const center = state.costCenters.find(item => item.tenantId === entry.tenantId && item.code === entry.costCenter)
-      byCenter.set(key, {
+      bySector.set(key, {
         tenantId: entry.tenantId,
         company: state.tenants.find(item => item.id === entry.tenantId)?.tradeName ?? entry.tenantId,
-        code: entry.costCenter,
-        name: center?.name ?? 'código já lançado',
+        code: sector.id,
+        name: sector.name,
         amount: entry.amount,
         share: 0,
       })
     }
   }
-  const centers = [...byCenter.values()].sort((a, b) => b.amount - a.amount || a.code.localeCompare(b.code)).slice(0, 5)
+  const centers = [...bySector.values()].sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name)).slice(0, 5)
   for (const center of centers) center.share = realizedPaid > 0 ? round2(center.amount / realizedPaid * 100) : 0
   const when = periodPhrase(year, fromMonth, toMonth)
   const lines = [
@@ -921,8 +990,8 @@ export function financeSnapshot(state: ErpState, tenantIds: string[], year: stri
   const top = centers[0]
   if (top) {
     const where = uniqueTenants.length > 1 ? ` (${top.company})` : ''
-    lines.push(`O maior gasto pago está em ${top.code} ${top.name}${where}: ${money(top.amount)}, ${pct(top.share)} do realizado pago.`)
-  } else lines.push('Nenhum pagamento do período traz centro de custo.')
+    lines.push(`O maior gasto pago está em ${top.name}${where}: ${money(top.amount)}, ${pct(top.share)} do realizado pago.`)
+  } else lines.push('Nenhum pagamento do período está num setor utilizador.')
   return { year, fromMonth, toMonth, receita, deducoes, liquida, custos, despesas, resultado, margem, usoGasto, realizedPaid, centers, lines }
 }
 
@@ -962,24 +1031,11 @@ export function applyGroupRevenueTarget(state: ErpState, groupId: string, year: 
 
 /* ---------- Alertas ---------- */
 
-/** Quem responde pela conta: o responsável de cada centro com fatia. A parte sem centro fica com o Financeiro. */
+/** Quem responde pela conta: a pessoa responsável da categoria, ou das filhas quando a conta é pai. */
 export function notifiedUsers(state: ErpState, categoryId: string, period: string) {
+  void period
   const leaves = isBudgetLeaf(state, categoryId) ? [categoryId] : activeChildren(state, categoryId).map(entry => entry.id)
-  const centers: string[] = []
-  let uncovered = !leaves.length
-  for (const id of leaves) {
-    const budget = allocationOf(state, id, period.slice(0, 4))
-    const lines = costCenterAmounts(budget?.amount ?? 0, budget?.costCenterSplit)
-    for (const line of lines) {
-      const owner = state.costCenters.find(entry => entry.id === line.costCenterId)?.responsibleUserId
-      if (owner) centers.push(owner)
-    }
-    if (round2(lines.reduce((sum, line) => sum + line.percent, 0)) < 99.95) uncovered = true
-  }
-  const finance = uncovered
-    ? state.users.filter(user => user.role === 'Financeiro' && user.active !== false && !user.platformMaster).map(user => user.id)
-    : []
-  return [...new Set([...centers, ...finance])]
+  return [...new Set(leaves.map(id => categoryOf(state, id).responsibleUserId).filter((id): id is string => Boolean(id)))]
 }
 
 function notified(state: ErpState, categoryId: string, period: string) {
@@ -1033,6 +1089,8 @@ export interface ForecastInput {
   description: string
   projectId?: string
   costCenter?: string
+  /** Setor utilizador da demanda. Sem valor destinado para ele, a demanda não segue. */
+  sectorId?: string
 }
 
 function event(state: ErpState, actor: string, type: BudgetEntry['events'][number]['type'], amount: number, note: string) {
@@ -1052,6 +1110,10 @@ export function upsertForecast(state: ErpState, input: ForecastInput, actor: str
   if (category.status === 'Inativa') throw new DomainError('A categoria não está disponível para novos fluxos')
   if (category.parentId && categoryOf(state, category.parentId).status === 'Inativa') throw new DomainError('A categoria pai está inativa')
   if (!(input.amount >= 0)) throw new DomainError('Valor estipulado inválido')
+  if (input.sectorId) {
+    const destined = allocationOf(state, input.categoryId, input.period.slice(0, 4))?.sectorAllocations?.find(line => line.sectorId === input.sectorId)
+    if (!destined || !(destined.amount > 0)) throw new DomainError('Este setor não tem valor destinado nesta categoria')
+  }
   const control = controlCategoryId(state, input.categoryId)
   let current = state.budgetEntries.find(entry => entry.kind === 'Previsão' && entry.sourceModule === input.sourceModule && entry.sourceId === input.sourceId)
   const summary = budgetSummary(state, control, input.period.slice(0, 4))
@@ -1192,6 +1254,19 @@ export function applyOmiePayment(state: ErpState, tenantId: string, payment: Omi
 
 export const canDecide = (exception: BudgetException, role: Role) =>
   exception.kind === 'Saldo excedido' ? APPROVER_ROLES.includes(role) : PLANNER_ROLES.includes(role)
+
+/** Sem categoria fica com o Financeiro. Sem vínculo fica com o setor executor. Saldo excedido fica com o responsável da conta. */
+export function seesBudgetException(state: ErpState, exception: BudgetException, userId: string, role: Role) {
+  if (role === 'Administrador') return true
+  const category = exception.categoryIds[0] ? state.budgetCategories.find(entry => entry.id === exception.categoryIds[0]) : undefined
+  if (exception.kind === 'Sem categoria' || exception.kind === 'Múltiplas categorias' || exception.kind === 'Duplicidade' || exception.kind === 'Erro de sincronização') return role === 'Financeiro'
+  if (exception.kind === 'Sem vínculo') {
+    const sector = state.sectors.find(entry => entry.id === category?.executorSectorId)
+    return Boolean(sector && state.users.find(entry => entry.id === userId)?.sector === sector.name)
+  }
+  if (exception.kind === 'Saldo excedido') return category?.responsibleUserId === userId
+  return false
+}
 
 /**
  * Saldo excedido: o Gestor libera ou recusa a previsão retida.

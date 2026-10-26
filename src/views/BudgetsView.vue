@@ -1,22 +1,22 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { CalendarDays, ChevronDown, ChevronRight, ListTree, PieChart, Plus, Sparkles, TrendingUp, X } from 'lucide-vue-next'
+import { CalendarDays, ChevronDown, ChevronRight, ListTree, Plus, TrendingUp, X } from 'lucide-vue-next'
+import BaseModal from '../components/BaseModal.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PeriodScopeBar from '../components/PeriodScopeBar.vue'
-import CostCentersPanel from '../components/budget/CostCentersPanel.vue'
 import { usePeriodScope } from '../composables/usePeriodScope'
 import { profileCan } from '../domain/access'
 import {
-  BUDGET_GROUPS, CAPEX_GROUP, RECEITA_GROUP, budgetSummary, childrenOf, costCenterAmounts, groupPriorYearRealized, growthForTarget, inMonthRange, viewerCenterScope,
-  isBudgetLeaf, isDepreciationCategory, isSpendCategory, leavesInGroup, linkableDocuments, nextCategoryCode, rangeSummary, realizedOfYear, sectorCostCenter, suggestCategoryCenters,
+  CAPEX_GROUP, RECEITA_GROUP, budgetSummary, childrenOf, groupPriorYearRealized, groupsFor, growthForTarget, inMonthRange, seesBudgetException, viewerCategoryScope,
+  isBudgetLeaf, isDepreciationCategory, isSpendCategory, leavesInGroup, linkableDocuments, nextCategoryCode, rangeSummary, realizedOfYear,
 } from '../domain/budget'
 import { assetDepreciation, periodLabel } from '../domain/dre'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
-import type { BudgetCategory, BudgetCategoryStatus, BudgetEntry, FunctionalityId, InvoiceLinkModule } from '../types/domain'
+import type { BudgetCategory, BudgetCategoryStatus, BudgetEntry, BudgetException, FunctionalityId, InvoiceLinkModule } from '../types/domain'
 import { fmtCurrency } from '../utils/format'
 
-type Screen = 'visao' | 'acoes' | 'categorias' | 'centros' | 'anual' | 'mensal' | 'capex'
+type Screen = 'visao' | 'acoes' | 'categorias' | 'anual' | 'mensal' | 'capex'
 interface Part { id: string; sign: 1 | -1 }
 interface StatementLine {
   kind: 'secao' | 'conta' | 'calculo'
@@ -41,10 +41,8 @@ const TOUR_SCREEN: [string, Screen][] = [
   ['budget-seasonality', 'mensal'],
   ['budget-plan', 'anual'],
   ['budget-summary', 'anual'],
+  ['budget-company', 'anual'],
   ['budget-tab-planejamento', 'anual'],
-  ['budget-sector', 'centros'],
-  ['budget-centers', 'centros'],
-  ['budget-tab-centros', 'centros'],
   ['budget-split', 'categorias'],
   ['budget-categories', 'categorias'],
   ['budget-tab-categorias', 'categorias'],
@@ -59,7 +57,7 @@ watch(() => ui.tourSteps[ui.tourIndex]?.target, target => {
   if (match) screen.value = match[1]
 })
 watch(() => ui.budgetTab, value => {
-  const map: Record<string, Screen> = { excecoes: 'acoes', acoes: 'acoes', categorias: 'categorias', configuracao: 'categorias', centros: 'centros', planejamento: 'anual', visao: 'visao' }
+  const map: Record<string, Screen> = { excecoes: 'acoes', acoes: 'acoes', categorias: 'categorias', configuracao: 'categorias', centros: 'categorias', planejamento: 'anual', visao: 'visao' }
   if (map[value]) {
     screen.value = map[value]
     ui.budgetTab = ''
@@ -90,10 +88,10 @@ function sectionTitle(group: { code: string; name: string }) {
 
 const statement = computed(() => {
   const control = screen.value === 'visao'
-  const hideDepreciation = control || screen.value === 'mensal'
-  const groups = BUDGET_GROUPS.filter(entry => {
+  const hideDepreciation = screen.value === 'mensal'
+  const groups = groupsFor(store.state, viewingTenantId.value || ui.activeTenantId).filter(entry => {
     if (screen.value === 'capex') return entry.code === '09'
-    if (control) return entry.code === '03' || entry.code === '04' || entry.code === '05' || entry.code === '09'
+    if (control) return entry.code !== '01' && entry.code !== '02'
     return entry.code !== '09'
   })
   const lines: StatementLine[] = []
@@ -234,11 +232,6 @@ function applySeasonality() {
 function depreciationLine(line: StatementLine) {
   return line.kind === 'conta' && line.parts.length > 0 && line.parts.every(part => depreciationId(part.id))
 }
-function spendLine(line: StatementLine) {
-  const id = line.editableId
-  const item = id ? category(id) : undefined
-  return Boolean(item && isSpendCategory(item))
-}
 const savedSimulation = computed(() => store.state.budgetSimulations.find(entry => entry.tenantId === ui.activeTenantId && entry.year === year.value))
 const readOnlyNote = computed(() => {
   if (!canManage.value || canEditHere.value) return ''
@@ -261,7 +254,13 @@ const capexTotals = computed(() => capexLines.value.reduce((sum, line) => ({ bud
 /* ---------- Visão geral: intervalo de meses ---------- */
 const periodText = computed(() => periodLabel({ year: year.value, fromMonth: fromMonth.value, toMonth: toMonth.value }))
 const figures = computed(() => new Map(categories.value.map(item => [item.id, rangeSummary(store.state, item.id, year.value, fromMonth.value, toMonth.value)])))
-const figure = (id: string) => figures.value.get(id) ?? { amount: 0, forecast: 0, realized: 0 }
+function figure(id: string) {
+  const base = figures.value.get(id) ?? { amount: 0, forecast: 0, realized: 0 }
+  const item = category(id)
+  if (!item || !isDepreciationCategory(item)) return base
+  const months = toMonth.value - fromMonth.value + 1
+  return { ...base, amount: round2(assetDepreciation(store.state, item.tenantId).total * months / 12) }
+}
 const viewBudget = (line: StatementLine) => sumParts(line.parts, id => figure(id).amount)
 const viewRealized = (line: StatementLine) => sumParts(line.parts, id => figure(id).realized)
 const viewForecast = (line: StatementLine) => sumParts(line.parts, id => figure(id).forecast)
@@ -276,18 +275,14 @@ function toneOf(line: StatementLine) {
   const use = lineUse(line)
   return use > 100 ? 'bad' : use >= 80 ? 'warn' : 'ok'
 }
-const centerScope = computed(() => viewerCenterScope(store.state, ui.activeTenantId, ui.sessionUserId, ui.role))
-const scopedCenters = computed(() => store.state.costCenters.filter(entry => centerScope.value.centerIds.includes(entry.id)))
-const scopedCategoryIds = computed(() => new Set(store.state.budgets
-  .filter(entry => entry.period === year.value && entry.costCenterSplit?.lines.some(line => centerScope.value.centerIds.includes(line.costCenterId)))
-  .map(entry => entry.categoryId)))
+const categoryScope = computed(() => viewerCategoryScope(store.state, ui.activeTenantId, ui.sessionUserId, ui.role))
+const scopedCategoryIds = computed(() => new Set(categoryScope.value.categoryIds))
 const overrunLines = computed(() => statement.value.filter(line => line.kind === 'conta' && line.editableId !== undefined && consumed(line) > 0 && lineUse(line) > 100))
 const overviewLines = computed(() => {
   const alive = new Set<string>()
   for (const line of statement.value) {
     if (line.kind !== 'conta') continue
-    if (viewBudget(line) === 0 && viewRealized(line) === 0 && viewForecast(line) === 0) continue
-    if (centerScope.value.limited && !line.parts.some(part => scopedCategoryIds.value.has(part.id))) continue
+    if (categoryScope.value.limited && !line.parts.some(part => scopedCategoryIds.value.has(part.id))) continue
     alive.add(line.key)
     for (const key of line.path) alive.add(key)
   }
@@ -304,15 +299,16 @@ const overviewTotals = computed(() => {
 
 /* ---------- Origem do desvio ---------- */
 const focusKey = ref('')
-const centerFilter = ref('')
+const sectorFilter = ref('')
 const focusLine = computed(() => statement.value.find(line => line.key === focusKey.value))
 function toggleFocus(line: StatementLine) {
   focusKey.value = focusKey.value === line.key ? '' : line.key
-  centerFilter.value = ''
+  sectorFilter.value = ''
 }
 watch(screen, () => { focusKey.value = '' })
-function centerIdOf(entry: BudgetEntry) {
-  return entry.costCenter ? store.state.costCenters.find(center => center.tenantId === entry.tenantId && center.code === entry.costCenter)?.id ?? '' : ''
+function sectorIdOf(entry: BudgetEntry) {
+  if (!entry.costCenter) return ''
+  return store.state.sectors.find(sector => sector.costCenters?.[entry.tenantId] === entry.costCenter)?.id ?? ''
 }
 const isUsage = (entry: BudgetEntry) => entry.kind === 'Previsão'
   ? entry.status === 'Ativo' || entry.status === 'Parcial'
@@ -327,17 +323,17 @@ const focusEntries = computed(() => {
   }
   return store.state.budgetEntries
     .filter(entry => ids.has(entry.categoryId) && scopeTenants.value.includes(entry.tenantId) && isUsage(entry) && inMonthRange(entry.period, year.value, fromMonth.value, toMonth.value))
-    .map(entry => ({ entry, value: entry.kind === 'Previsão' ? entry.openAmount : entry.amount, centerId: centerIdOf(entry) }))
+    .map(entry => ({ entry, value: entry.kind === 'Previsão' ? entry.openAmount : entry.amount, sectorId: sectorIdOf(entry) }))
 })
-interface CenterUse { id: string; label: string; owner: string; budget: number; used: number }
-const focusCenters = computed(() => {
+interface SectorUse { id: string; label: string; owner: string; budget: number; used: number }
+const focusSectors = computed(() => {
   const line = focusLine.value
-  if (!line) return [] as CenterUse[]
-  const rows = new Map<string, CenterUse>()
+  if (!line) return [] as SectorUse[]
+  const rows = new Map<string, SectorUse>()
   const row = (id: string) => {
     if (!rows.has(id)) {
-      const center = store.state.costCenters.find(entry => entry.id === id)
-      rows.set(id, { id, label: center ? `${center.code} ${center.name}` : id, owner: userName(center?.responsibleUserId), budget: 0, used: 0 })
+      const sector = store.state.sectors.find(entry => entry.id === id)
+      rows.set(id, { id, label: sector?.name ?? id, owner: 'Utilizador', budget: 0, used: 0 })
     }
     return rows.get(id)!
   }
@@ -347,34 +343,30 @@ const focusCenters = computed(() => {
     const amount = figure(part.id).amount
     total += amount
     const allocation = store.state.budgets.find(entry => entry.categoryId === part.id && entry.period === year.value)
-    for (const slice of costCenterAmounts(allocation?.amount ?? 0, allocation?.costCenterSplit)) {
-      const share = round2(amount * slice.percent / 100)
+    for (const slice of allocation?.sectorAllocations ?? []) {
+      const share = year.value ? slice.amount * (amount / (allocation?.amount || amount || 1)) : slice.amount
       covered += share
-      row(slice.costCenterId).budget += share
+      row(slice.sectorId).budget += share
     }
   }
   let unassigned = 0
   for (const item of focusEntries.value) {
-    if (item.centerId) row(item.centerId).used += item.value
+    if (item.sectorId && rows.has(item.sectorId)) row(item.sectorId).used += item.value
     else unassigned += item.value
   }
-  const visible = [...rows.values()]
-    .filter(entry => !centerScope.value.limited || centerScope.value.centerIds.includes(entry.id))
-    .map(entry => ({ ...entry, budget: round2(entry.budget), used: round2(entry.used) }))
-    .sort((a, b) => b.used - a.used || b.budget - a.budget)
+  const visible = [...rows.values()].map(entry => ({ ...entry, budget: round2(entry.budget), used: round2(entry.used) }))
   const free = round2(total - covered)
-  if (!centerScope.value.limited && (free > 0.009 || unassigned > 0)) visible.push({ id: 'none', label: 'Sem centro', owner: 'Financeiro', budget: free, used: round2(unassigned) })
-  return visible
+  if (free > 0.009 || unassigned > 0) visible.push({ id: 'none', label: 'Sem utilizador', owner: 'Não libera demanda', budget: free, used: round2(unassigned) })
+  return visible.sort((a, b) => b.used - a.used || b.budget - a.budget)
 })
-const usePct = (row: CenterUse) => row.budget ? Math.round(row.used / row.budget * 1000) / 10 : (row.used ? 100 : 0)
-const useTone = (row: CenterUse) => {
+const usePct = (row: SectorUse) => row.budget ? Math.round(row.used / row.budget * 1000) / 10 : (row.used ? 100 : 0)
+const useTone = (row: SectorUse) => {
   if (!row.budget) return row.used ? 'bad' : 'ok'
   const pct = usePct(row)
   return pct > 100 ? 'bad' : pct >= 80 ? 'warn' : 'ok'
 }
 const focusOrigins = computed(() => focusEntries.value
-  .filter(item => !centerScope.value.limited || centerScope.value.centerIds.includes(item.centerId))
-  .filter(item => !centerFilter.value || (centerFilter.value === 'none' ? !item.centerId : item.centerId === centerFilter.value))
+  .filter(item => !sectorFilter.value || (sectorFilter.value === 'none' ? !item.sectorId : item.sectorId === sectorFilter.value))
   .slice()
   .sort((a, b) => b.value - a.value))
 function openRecord(line: StatementLine) {
@@ -386,9 +378,9 @@ function openRecord(line: StatementLine) {
 
 /* ---------- Ações ---------- */
 const canResolve = (kind: string) => store.can(kind === 'Saldo excedido' ? 'orcamentos.liberar_saldo' : 'orcamentos.gerir')
-const tenantExceptions = computed(() => store.state.budgetExceptions.filter(entry => entry.tenantId === ui.activeTenantId))
-const pendingExceptions = computed(() => tenantExceptions.value.filter(entry => entry.status === 'Pendente' && canResolve(entry.kind)).length)
-const missingCenter = computed(() => store.state.budgetEntries.filter(entry => entry.tenantId === ui.activeTenantId && entry.period.startsWith(year.value) && (entry.kind === 'Realizado pago' || entry.kind === 'Previsão') && entry.status !== 'Cancelado' && !entry.costCenter))
+const seesException = (entry: BudgetException) => seesBudgetException(store.state, entry, ui.sessionUserId, ui.role)
+const tenantExceptions = computed(() => store.state.budgetExceptions.filter(entry => entry.tenantId === ui.activeTenantId && seesException(entry)))
+const pendingExceptions = computed(() => tenantExceptions.value.filter(entry => entry.status === 'Pendente').length)
 const usableCategories = computed(() => store.state.budgetCategories.filter(entry => entry.tenantId === ui.activeTenantId && entry.status !== 'Inativa').sort((a, b) => a.code.localeCompare(b.code)))
 const decisionNotes = reactive<Record<string, string>>({})
 const decisionCategory = reactive<Record<string, string>>({})
@@ -404,9 +396,20 @@ const waitingFor = (kind: string) => {
   return names.length ? `Aguardando ${names.join(' ou ')}` : 'Aguardando o Administrador da empresa'
 }
 
-/* ---------- Categorias e distribuição por centro ---------- */
+/* ---------- Categorias, responsável e setores utilizadores ---------- */
 const userName = (id?: string) => store.state.users.find(entry => entry.id === id)?.name ?? '—'
+const companyUsers = computed(() => store.state.users.filter(entry => entry.active !== false && !entry.platformMaster).sort((a, b) => a.name.localeCompare(b.name)))
+const sectorName = (id?: string) => store.state.sectors.find(entry => entry.id === id)?.name ?? '—'
+const groupOptions = computed(() => groupsFor(store.state, ui.activeTenantId))
 const categoryForm = reactive({ name: '', group: '03. Custos' as string, parentId: '' })
+const motherForm = reactive({ code: '', name: '' })
+const companyForm = reactive({ legalName: '', tradeName: '', document: '', city: '', adminName: '', adminEmail: '' })
+function createMother() {
+  if (store.createBudgetGroup(motherForm.code, motherForm.name)) Object.assign(motherForm, { code: '', name: '' })
+}
+function createCompany() {
+  if (store.createPlannedCompany({ ...companyForm })) Object.assign(companyForm, { legalName: '', tradeName: '', document: '', city: '', adminName: '', adminEmail: '' })
+}
 const parentCategory = computed(() => categoryForm.parentId ? category(categoryForm.parentId) : undefined)
 watch(() => categoryForm.group, groupName => {
   const parent = category(categoryForm.parentId)
@@ -428,7 +431,7 @@ function allocationFor(categoryId: string) {
 function groupAnnual(name: string) {
   return leavesInGroup(store.state, ui.activeTenantId, name).reduce((sum, entry) => sum + amountOf(entry.id), 0)
 }
-const tree = computed(() => BUDGET_GROUPS.map(entry => ({
+const tree = computed(() => groupOptions.value.map(entry => ({
   ...entry,
   rows: store.state.budgetCategories.filter(item => item.tenantId === ui.activeTenantId && !item.parentId && item.group === entry.name).sort((a, b) => a.code.localeCompare(b.code)).flatMap(item => {
     const kids = store.state.budgetCategories.filter(child => child.parentId === item.id).sort((a, b) => a.code.localeCompare(b.code))
@@ -436,97 +439,105 @@ const tree = computed(() => BUDGET_GROUPS.map(entry => ({
   }),
 })))
 const splittable = (item: BudgetCategory) => isSpendCategory(item) && isBudgetLeaf(store.state, item.id)
-function centersSummary(categoryId: string) {
-  const allocation = allocationFor(categoryId)
-  const lines = costCenterAmounts(allocation?.amount ?? 0, allocation?.costCenterSplit)
-  if (!lines.length) return { text: 'Sem centro', covered: 0 }
-  const covered = round2(lines.reduce((sum, line) => sum + line.percent, 0))
-  const names = lines.map(line => store.state.costCenters.find(entry => entry.id === line.costCenterId)?.code ?? '').filter(Boolean)
-  return { text: `${names.join(', ')} · ${covered}%`, covered }
+function allocationLines(categoryId: string) {
+  return allocationFor(categoryId)?.sectorAllocations ?? []
+}
+function sectorSummary(categoryId: string) {
+  const total = annualAbs(categoryId)
+  const lines = allocationLines(categoryId)
+  const covered = round2(lines.reduce((sum, line) => sum + line.amount, 0))
+  const pct = total ? Math.round(covered / total * 1000) / 10 : 0
+  return { lines, covered, pct, total }
+}
+function assignCategory(item: BudgetCategory, responsibleUserId: string, executorSectorId: string) {
+  store.setCategoryAssignment(item.id, responsibleUserId, executorSectorId)
 }
 
 const splitCategoryId = ref('')
-const splitMode = ref<'percent' | 'amount'>('percent')
-const splitRows = ref<{ costCenterId: string; value: number }[]>([])
-const addCenterId = ref('')
+const splitRows = ref<{ sectorId: string; amount: number }[]>([])
+const addSectorId = ref('')
+const addAmount = ref(0)
+const splitCategory = computed(() => splitCategoryId.value ? category(splitCategoryId.value) : undefined)
 const splitAmount = computed(() => splitCategoryId.value ? annualAbs(splitCategoryId.value) : 0)
-const suggestions = computed(() => {
-  if (!splitCategoryId.value) return []
-  try { return suggestCategoryCenters(store.state, ui.activeTenantId, splitCategoryId.value, year.value) } catch { return [] }
+const splitTitle = computed(() => splitCategory.value ? `Setores de ${splitCategory.value.code}` : 'Setores')
+const splitSubtitle = computed(() => splitCategory.value ? `${splitCategory.value.name} · ${fmtCurrency(splitAmount.value)} no ano` : '')
+const freeSectors = computed(() => store.state.sectors.filter(entry => !splitRows.value.some(row => row.sectorId === entry.id)))
+const splitSum = computed(() => round2(splitRows.value.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)))
+const splitGap = computed(() => round2(splitAmount.value - splitSum.value))
+const splitValid = computed(() => splitAmount.value > 0 && splitGap.value >= -0.01 && splitRows.value.every(row => row.amount > 0))
+const splitTone = computed(() => {
+  if (splitRows.value.some(row => !(row.amount > 0)) || splitGap.value < -0.01) return 'bad'
+  if (splitGap.value > 0.01) return 'mid'
+  return 'ok'
 })
-const activeCenters = computed(() => store.state.costCenters.filter(entry => entry.tenantId === ui.activeTenantId && entry.status === 'Ativo').sort((a, b) => a.code.localeCompare(b.code)))
-const freeCenters = computed(() => activeCenters.value.filter(entry => !splitRows.value.some(row => row.costCenterId === entry.id)))
-const splitSum = computed(() => round2(splitRows.value.reduce((sum, row) => sum + (Number(row.value) || 0), 0)))
-const splitTarget = computed(() => splitMode.value === 'percent' ? 100 : splitAmount.value)
-const splitGap = computed(() => round2(splitTarget.value - splitSum.value))
-const splitTolerance = computed(() => splitMode.value === 'percent' ? 0.05 : 0.01)
-const splitValid = computed(() => splitAmount.value > 0 && splitGap.value >= -splitTolerance.value)
-const centerOf = (id: string) => store.state.costCenters.find(entry => entry.id === id)
-function centerHint(code: string) {
-  const names = store.state.sectors.filter(entry => sectorCostCenter(entry, ui.activeTenantId) === code).map(entry => entry.name)
-  return names.length ? `padrão de ${names.join(', ')}` : ''
+const splitStatus = computed(() => {
+  if (!(splitAmount.value > 0)) return ''
+  if (splitRows.value.some(row => !(row.amount > 0))) return 'Cada setor precisa de um valor.'
+  if (splitGap.value < -0.01) return `A soma passa ${fmtCurrency(Math.abs(splitGap.value))} do valor da categoria.`
+  if (splitGap.value > 0.01) return `Faltam ${fmtCurrency(splitGap.value)}. Esse valor fica sem setor e não libera demanda.`
+  return 'Todo o valor tem setor.'
+})
+const canAddLine = computed(() => Boolean(addSectorId.value) && addAmount.value > 0 && round2(splitSum.value + addAmount.value) <= splitAmount.value + 0.01)
+const addBlockedTitle = computed(() => {
+  if (!addSectorId.value) return 'Escolha o setor'
+  if (!(addAmount.value > 0)) return 'Informe o valor ou o percentual'
+  if (round2(splitSum.value + addAmount.value) > splitAmount.value + 0.01) return 'A soma passaria do valor da categoria'
+  return 'Incluir este setor'
+})
+function pctOf(amount: number) {
+  return splitAmount.value ? Math.round((Number(amount) || 0) / splitAmount.value * 1000) / 10 : 0
 }
-function suggestionRows() {
-  const rows = suggestions.value.map(entry => ({ costCenterId: entry.costCenterId, value: entry.percent }))
-  const sum = round2(rows.reduce((total, row) => total + row.value, 0))
-  if (rows.length && sum > 100) rows[0].value = round2(rows[0].value - (sum - 100))
-  return rows
+function amountFromPercent(raw: string) {
+  const pct = Number(String(raw).replace(',', '.'))
+  if (!Number.isFinite(pct) || pct < 0 || !(splitAmount.value > 0)) return
+  return round2(splitAmount.value * pct / 100)
 }
 function openSplit(categoryId: string) {
-  if (splitCategoryId.value === categoryId) {
-    splitCategoryId.value = ''
-    return
-  }
   splitCategoryId.value = categoryId
-  addCenterId.value = ''
-  const existing = allocationFor(categoryId)?.costCenterSplit
-  splitMode.value = existing?.mode ?? 'percent'
-  splitRows.value = existing ? existing.lines.map(line => ({ ...line })) : suggestionRows()
+  addSectorId.value = ''
+  addAmount.value = 0
+  splitRows.value = allocationLines(categoryId).map(line => ({ ...line }))
 }
-function goToSplit(categoryId: string) {
-  screen.value = 'categorias'
+function closeSplit() {
   splitCategoryId.value = ''
-  openSplit(categoryId)
 }
-function useSuggestion() {
-  splitMode.value = 'percent'
-  splitRows.value = suggestionRows()
+function setRowAmount(row: { amount: number }, value: number) {
+  row.amount = round2(value)
 }
-function addCenter() {
-  if (!addCenterId.value) return
-  splitRows.value.push({ costCenterId: addCenterId.value, value: 0 })
-  addCenterId.value = ''
+function setRowPercent(row: { amount: number }, raw: string) {
+  const amount = amountFromPercent(raw)
+  if (amount !== undefined) row.amount = amount
+}
+function setAddPercent(raw: string) {
+  const amount = amountFromPercent(raw)
+  if (amount !== undefined) addAmount.value = amount
+}
+function addSector() {
+  if (!canAddLine.value || !addSectorId.value) return
+  splitRows.value.push({ sectorId: addSectorId.value, amount: round2(addAmount.value) })
+  addSectorId.value = ''
+  addAmount.value = 0
+}
+function addRemainder() {
+  if (!addSectorId.value || !(splitGap.value > 0.01)) return
+  addAmount.value = splitGap.value
+  addSector()
 }
 function removeRow(id: string) {
-  splitRows.value = splitRows.value.filter(row => row.costCenterId !== id)
+  splitRows.value = splitRows.value.filter(row => row.sectorId !== id)
 }
-function setSplitMode(mode: 'percent' | 'amount') {
-  if (mode === splitMode.value) return
-  const total = splitAmount.value
-  if (total > 0) {
-    for (const row of splitRows.value) {
-      const value = Number(row.value) || 0
-      row.value = mode === 'amount' ? Math.round(total * value) / 100 : Math.round(value / total * 10000) / 100
-    }
-  }
-  splitMode.value = mode
-}
-function shareOf(value: number) {
-  if (!splitAmount.value) return 0
-  return splitMode.value === 'percent' ? Math.round(splitAmount.value * (Number(value) || 0)) / 100 : Math.round((Number(value) || 0) / splitAmount.value * 10000) / 100
-}
-const suggestionFor = (centerId: string) => suggestions.value.find(entry => entry.costCenterId === centerId)
 function saveSplit() {
   if (!splitValid.value || !splitCategoryId.value) return
-  if (store.setCostCenterSplit(splitCategoryId.value, year.value, splitMode.value, splitRows.value)) splitCategoryId.value = ''
+  if (store.setSectorAllocations(splitCategoryId.value, year.value, splitRows.value)) splitCategoryId.value = ''
 }
+watch([year, screen], () => { splitCategoryId.value = '' })
 </script>
 
 <template>
   <div class="budget-top">
     <div>
       <h2>Orçamento {{ screen === 'visao' ? periodText : year }}</h2>
-      <p class="cell-sub">{{ screen === 'acoes' || screen === 'categorias' || screen === 'centros' ? store.state.tenants.find(entry => entry.id === ui.activeTenantId)?.tradeName : scopeLabel }}<template v-if="planning"> · base no realizado de {{ priorYear }}</template></p>
+      <p class="cell-sub">{{ screen === 'acoes' || screen === 'categorias' ? store.state.tenants.find(entry => entry.id === ui.activeTenantId)?.tradeName : scopeLabel }}<template v-if="planning"> · base no realizado de {{ priorYear }}</template></p>
     </div>
     <PeriodScopeBar v-model:year="year" v-model:from="fromMonth" v-model:to="toMonth" v-model:scope="scope" :months="screen === 'visao'" :companies="screen === 'visao' || planning" />
   </div>
@@ -535,7 +546,6 @@ function saveSplit() {
     <button type="button" :class="{ on: screen === 'visao' }" data-tour="budget-tab-visao" @click="screen = 'visao'">Visão geral</button>
     <button type="button" :class="{ on: screen === 'acoes' }" data-tour="budget-tab-acoes" @click="screen = 'acoes'">Ações <b v-if="pendingExceptions">{{ pendingExceptions }}</b></button>
     <button type="button" :class="{ on: screen === 'categorias' }" data-tour="budget-tab-categorias" @click="screen = 'categorias'">Categorias</button>
-    <button type="button" :class="{ on: screen === 'centros' }" data-tour="budget-tab-centros" @click="screen = 'centros'">Centros de custo</button>
     <button type="button" :class="{ on: planning }" data-tour="budget-tab-planejamento" @click="screen = planning ? screen : 'anual'">Planejamento</button>
   </nav>
 
@@ -553,11 +563,11 @@ function saveSplit() {
       <div class="orc-card-head">
         <div>
           <h2>Custo, despesa e investimento</h2>
-          <p>Clique numa conta para ver a origem do desvio por centro de custo. Receita e lucro ficam no DRE.</p>
+          <p>Clique numa conta para ver o gasto de cada setor utilizador. Receita e lucro ficam no DRE.</p>
         </div>
         <button type="button" class="button ghost small" :class="{ on: onlyOverrun }" @click="onlyOverrun = !onlyOverrun">Só o que estourou <b v-if="overrunLines.length">{{ overrunLines.length }}</b></button>
       </div>
-      <p v-if="centerScope.limited" class="notice info">Você vê só a parte {{ scopedCenters.map(entry => `${entry.code} ${entry.name}`).join(', ') || 'dos centros do seu papel' }}. O total da empresa fica com o Financeiro.</p>
+      <p v-if="categoryScope.limited" class="notice info">Você vê só as categorias em que é o responsável.</p>
       <p v-if="onlyOverrun && !overviewLines.length" class="empty-note">Nenhuma conta passou do orçamento neste período.</p>
       <div class="orc-scroll">
         <table class="statement orc-table">
@@ -579,7 +589,7 @@ function saveSplit() {
                   <button v-if="line.kind === 'conta'" type="button" class="linkish" @click="toggleFocus(line)">{{ line.code ? `${line.code} ` : '' }}{{ line.label }}</button>
                   <template v-else>{{ line.label }}</template>
                 </td>
-                <td class="num">{{ money(viewBudget(line)) }}</td>
+                <td class="num">{{ money(viewBudget(line)) }}<span v-if="depreciationLine(line)" class="cell-sub">Ativos</span></td>
                 <td class="num" :class="`num-${toneOf(line) || 'none'}`">{{ money(viewRealized(line)) }}</td>
                 <td class="num num-forecast">{{ money(viewForecast(line)) }}</td>
                 <td class="num" :class="lineGap(line) > 0 ? 'num-bad' : lineGap(line) < 0 ? 'num-ok' : ''">{{ lineGap(line) > 0 ? `+${fmtCurrency(lineGap(line))}` : money(lineGap(line)) }}</td>
@@ -592,29 +602,29 @@ function saveSplit() {
                       <strong>Origem do desvio · {{ line.label }}</strong>
                       <button v-if="line.editableId || line.parts.length === 1" type="button" class="button ghost small" @click="openRecord(line)">Abrir ficha</button>
                     </div>
-                    <p v-if="!focusCenters.length" class="cell-sub">Sem orçado nem lançamento por centro neste período.</p>
+                    <p v-if="!focusSectors.length" class="cell-sub">Sem valor destinado nem lançamento neste período.</p>
                     <div v-else class="center-cards">
-                      <button v-for="row in focusCenters" :key="row.id" type="button" class="center-card" :class="{ on: centerFilter === row.id, none: row.id === 'none' }" :title="centerFilter === row.id ? 'Mostrar todas as origens' : 'Filtrar as origens deste centro'" @click="centerFilter = centerFilter === row.id ? '' : row.id">
+                      <button v-for="row in focusSectors" :key="row.id" type="button" class="center-card" :class="{ on: sectorFilter === row.id, none: row.id === 'none' }" :title="sectorFilter === row.id ? 'Mostrar todas as origens' : 'Filtrar as origens deste setor'" @click="sectorFilter = sectorFilter === row.id ? '' : row.id">
                         <strong>{{ row.label }}</strong>
                         <span class="cell-sub">{{ row.owner }}</span>
                         <i class="bar"><b :class="useTone(row)" :style="{ width: `${Math.min(100, usePct(row))}%` }" /></i>
-                        <span class="figures"><span>{{ fmtCurrency(row.used) }} de {{ fmtCurrency(row.budget) }}</span><span class="tone" :class="useTone(row)">{{ row.budget ? `${usePct(row)}%` : 'sem fatia' }}</span></span>
+                        <span class="figures"><span>{{ fmtCurrency(row.used) }} de {{ fmtCurrency(row.budget) }}</span><span class="tone" :class="useTone(row)">{{ row.budget ? `${usePct(row)}%` : 'sem valor' }}</span></span>
                       </button>
                     </div>
                     <table v-if="focusOrigins.length" class="dense">
-                      <thead><tr><th class="num">Valor</th><th>Origem</th><th>Descrição</th><th>Centro</th><th>Tipo</th><th>Mês</th></tr></thead>
+                      <thead><tr><th class="num">Valor</th><th>Origem</th><th>Descrição</th><th>Setor</th><th>Tipo</th><th>Mês</th></tr></thead>
                       <tbody>
                         <tr v-for="item in focusOrigins" :key="item.entry.id">
                           <td class="num"><strong>{{ fmtCurrency(item.value) }}</strong></td>
                           <td>{{ item.entry.sourceModule }} · {{ item.entry.sourceId }}</td>
                           <td>{{ item.entry.description }}</td>
-                          <td>{{ item.entry.costCenter || 'sem centro' }}</td>
+                          <td>{{ sectorName(item.sectorId) }}</td>
                           <td><span :class="item.entry.kind === 'Previsão' ? 'num-forecast' : ''">{{ item.entry.kind === 'Previsão' ? 'Previsão' : 'Realizado' }}</span></td>
                           <td>{{ item.entry.period }}</td>
                         </tr>
                       </tbody>
                     </table>
-                    <p v-else class="cell-sub">Nenhum lançamento {{ centerFilter ? 'deste centro ' : '' }}neste período.</p>
+                    <p v-else class="cell-sub">Nenhum lançamento {{ sectorFilter ? 'deste setor ' : '' }}neste período.</p>
                   </div>
                 </td>
               </tr>
@@ -628,7 +638,7 @@ function saveSplit() {
   <!-- Ações -->
   <template v-else-if="screen === 'acoes'">
     <article class="card flush" data-tour="budget-actions">
-      <div class="orc-card-head"><div><h2>Decisões pendentes</h2><p>Saldo excedido, pagamento sem categoria e nota sem vínculo. Cada linha mostra quem decide.</p></div></div>
+      <div class="orc-card-head"><div><h2>Decisões pendentes</h2><p>Sem categoria fica com o Financeiro. Sem vínculo fica com o executor. Saldo excedido fica com o responsável da conta.</p></div></div>
       <table><thead><tr><th>Ação</th><th>Origem</th><th>Descrição</th><th>Valor</th><th>Período</th><th>Situação</th><th>Decisão</th></tr></thead>
         <tbody><tr v-for="entry in tenantExceptions" :key="entry.id">
           <td><span class="cell-main">{{ entry.kind }}</span></td><td>{{ entry.sourceModule }} · {{ entry.sourceId }}</td><td>{{ entry.description }}</td><td>{{ fmtCurrency(entry.amount) }}</td><td>{{ entry.period }}</td>
@@ -646,12 +656,6 @@ function saveSplit() {
         </tr></tbody>
       </table>
     </article>
-    <article v-if="missingCenter.length" class="card flush">
-      <div class="orc-card-head"><div><h2>Lançamentos sem centro de custo</h2><p>O gasto entrou na conta e ainda não diz o lugar. Esta parte fica com o Financeiro.</p></div></div>
-      <table class="dense"><thead><tr><th>Origem</th><th>Descrição</th><th class="num">Valor</th><th>Período</th></tr></thead>
-        <tbody><tr v-for="entry in missingCenter" :key="entry.id"><td>{{ entry.sourceModule }} · {{ entry.sourceId }}</td><td>{{ entry.description }}</td><td class="num">{{ fmtCurrency(entry.amount) }}</td><td>{{ entry.period }}</td></tr></tbody>
-      </table>
-    </article>
   </template>
 
   <!-- Categorias -->
@@ -659,13 +663,13 @@ function saveSplit() {
     <div class="orc-card-head">
       <div>
         <h2><ListTree :size="16" /> Categorias de {{ year }}</h2>
-        <p>Informe o valor do ano e, na mesma linha, os centros de custo que respondem por ele.</p>
+        <p>Valor, responsável, setores que usam o valor e o setor que recebe a demanda. A soma destinada não passa do valor da categoria.</p>
       </div>
     </div>
     <table class="dense">
-      <thead><tr><th>Código</th><th>Categoria</th><th class="num">Orçamento {{ year }}</th><th data-tour="budget-split">Centros de custo</th><th>Limiar</th><th>Saldo negativo</th><th>Situação</th></tr></thead>
+      <thead><tr><th>Código</th><th>Categoria</th><th class="num">Valor</th><th>Responsável</th><th>Valores destinados</th><th data-tour="budget-split">Utilizadores</th><th>Executor</th><th>Limiar</th><th>Saldo negativo</th><th>Situação</th></tr></thead>
       <tbody v-for="entry in tree" :key="entry.code">
-        <tr class="group-row"><td colspan="2"><strong>{{ entry.name }}</strong></td><td class="num"><strong>{{ fmtCurrency(groupAnnual(entry.name)) }}</strong></td><td colspan="4"></td></tr>
+        <tr class="group-row"><td colspan="2"><strong>{{ entry.name }}</strong></td><td class="num"><strong>{{ fmtCurrency(groupAnnual(entry.name)) }}</strong></td><td colspan="7"></td></tr>
         <template v-for="row in entry.rows" :key="row.category.id">
           <tr class="cat-row" :class="[`depth-${row.depth}`, { head: row.head }]">
             <td class="code">{{ row.category.code }}</td>
@@ -675,77 +679,50 @@ function saveSplit() {
               <template v-else>{{ fmtCurrency(amountOf(row.category.id)) }}<span v-if="isDepreciationCategory(row.category)" class="cell-sub">Vem dos ativos</span></template>
             </td>
             <td>
-              <button v-if="splittable(row.category)" type="button" class="button ghost small split-btn" :class="{ on: centersSummary(row.category.id).covered > 0 }" :disabled="!canManage && !centersSummary(row.category.id).covered" @click="openSplit(row.category.id)">
-                <PieChart :size="13" /> {{ centersSummary(row.category.id).text }}
-              </button>
+              <select v-if="canManage && splittable(row.category)" class="filter" :value="row.category.responsibleUserId ?? ''" @change="assignCategory(row.category, ($event.target as HTMLSelectElement).value, row.category.executorSectorId ?? '')">
+                <option value="">Pessoa</option>
+                <option v-for="user in companyUsers" :key="user.id" :value="user.id">{{ user.name }}</option>
+              </select>
+              <span v-else class="cell-sub">{{ row.category.responsibleUserId ? userName(row.category.responsibleUserId) : '—' }}</span>
+            </td>
+            <td>
+              <span v-if="splittable(row.category)" class="slice-links">
+                <span v-for="line in sectorSummary(row.category.id).lines" :key="line.sectorId">{{ sectorName(line.sectorId) }} · {{ fmtCurrency(line.amount) }} · {{ sectorSummary(row.category.id).total ? Math.round(line.amount / sectorSummary(row.category.id).total * 1000) / 10 : 0 }}%</span>
+                <span v-if="!sectorSummary(row.category.id).lines.length" class="cell-sub">Nenhum valor destinado</span>
+              </span>
               <span v-else class="cell-sub">{{ row.head ? 'Nas subcategorias' : '—' }}</span>
+            </td>
+            <td>
+              <button v-if="splittable(row.category)" type="button" class="button ghost small" title="Destinar o valor desta categoria aos setores que usam" @click="openSplit(row.category.id)">{{ sectorSummary(row.category.id).lines.length ? `${sectorSummary(row.category.id).pct}% destinado` : 'Destinar' }}</button>
+              <span v-else class="cell-sub">—</span>
+            </td>
+            <td>
+              <select v-if="canManage && splittable(row.category)" class="filter" :value="row.category.executorSectorId ?? ''" @change="assignCategory(row.category, row.category.responsibleUserId ?? '', ($event.target as HTMLSelectElement).value)">
+                <option value="">Setor</option>
+                <option v-for="sector in store.state.sectors" :key="sector.id" :value="sector.id">{{ sector.name }}</option>
+              </select>
+              <span v-else class="cell-sub">{{ row.category.executorSectorId ? sectorName(row.category.executorSectorId) : '—' }}</span>
             </td>
             <td><input v-if="allocationFor(row.category.id) && !isDepreciationCategory(row.category)" :value="allocationFor(row.category.id)!.alertThreshold" class="cell-input" type="number" min="1" max="100" :disabled="!canManage" @change="store.configureBudget(allocationFor(row.category.id)!.id, Number(($event.target as HTMLInputElement).value), allocationFor(row.category.id)!.blockOnOverrun)" /><span v-else class="cell-sub">—</span></td>
             <td><button v-if="allocationFor(row.category.id) && canManage && !isDepreciationCategory(row.category)" class="button ghost small" @click="store.configureBudget(allocationFor(row.category.id)!.id, allocationFor(row.category.id)!.alertThreshold, !allocationFor(row.category.id)!.blockOnOverrun)">{{ allocationFor(row.category.id)!.blockOnOverrun ? 'Retém até a liberação' : 'Somente alerta' }}</button><span v-else class="cell-sub">—</span></td>
             <td><select class="filter" :value="row.category.status" :disabled="!canManage" @change="changeStatus(row.category, ($event.target as HTMLSelectElement).value as BudgetCategoryStatus)"><option>Ativa</option><option>Inativa</option></select></td>
           </tr>
-          <tr v-if="splitCategoryId === row.category.id">
-            <td colspan="7" class="split-inline">
-              <p v-if="!(splitAmount > 0)" class="notice warning">Informe o orçamento do ano nesta linha antes de escolher os centros.</p>
-              <template v-else>
-                <div class="split-head">
-                  <div class="seg">
-                    <button type="button" :class="{ on: splitMode === 'percent' }" @click="setSplitMode('percent')">Porcentagem</button>
-                    <button type="button" :class="{ on: splitMode === 'amount' }" @click="setSplitMode('amount')">Valor</button>
-                  </div>
-                  <button v-if="canManage && suggestions.length" type="button" class="button ghost small" @click="useSuggestion"><Sparkles :size="13" /> Usar o realizado de {{ priorYear }}</button>
-                </div>
-                <table class="dense split-table">
-                  <thead><tr><th>Centro de custo</th><th>Responsável</th><th class="num">{{ splitMode === 'percent' ? '%' : 'Valor' }}</th><th class="num">{{ splitMode === 'percent' ? 'Valor' : '%' }}</th><th class="num">Realizado {{ priorYear }}</th><th></th></tr></thead>
-                  <tbody>
-                    <tr v-if="!splitRows.length"><td colspan="6" class="empty-note">Nenhum centro escolhido. Todo o valor fica com o Financeiro.</td></tr>
-                    <tr v-for="item in splitRows" :key="item.costCenterId">
-                      <td>{{ centerOf(item.costCenterId)?.code }} {{ centerOf(item.costCenterId)?.name }}<span v-if="centerHint(centerOf(item.costCenterId)?.code ?? '')" class="cell-sub">{{ centerHint(centerOf(item.costCenterId)?.code ?? '') }}</span></td>
-                      <td>{{ userName(centerOf(item.costCenterId)?.responsibleUserId) }}</td>
-                      <td class="num">
-                        <MoneyInput v-if="splitMode === 'amount'" compact :model-value="item.value" :disabled="!canManage" @update:model-value="item.value = $event" />
-                        <input v-else class="cell-input mini" type="number" min="0" step="0.01" :value="item.value" :disabled="!canManage" @input="item.value = Number(($event.target as HTMLInputElement).value)" />
-                      </td>
-                      <td class="num"><span class="muted">{{ splitMode === 'percent' ? fmtCurrency(shareOf(item.value)) : `${shareOf(item.value)}%` }}</span></td>
-                      <td class="num"><span class="muted">{{ suggestionFor(item.costCenterId) ? `${suggestionFor(item.costCenterId)!.percent}%` : '—' }}</span></td>
-                      <td><button v-if="canManage" type="button" class="icon-button tiny" title="Tirar este centro" @click="removeRow(item.costCenterId)"><X :size="13" /></button></td>
-                    </tr>
-                  </tbody>
-                </table>
-                <div v-if="canManage && freeCenters.length" class="filter-row center-add">
-                  <select v-model="addCenterId" class="filter">
-                    <option value="">Adicionar centro</option>
-                    <option v-for="center in freeCenters" :key="center.id" :value="center.id">{{ center.code }} · {{ center.name }}<template v-if="suggestionFor(center.id)"> · {{ suggestionFor(center.id)!.percent }}% em {{ priorYear }}</template></option>
-                  </select>
-                  <button type="button" class="button secondary small" :disabled="!addCenterId" @click="addCenter"><Plus :size="13" /> Adicionar</button>
-                </div>
-                <p class="split-sum" :class="{ ok: splitValid && splitGap <= splitTolerance, bad: !splitValid }">
-                  Soma {{ splitMode === 'percent' ? `${splitSum}%` : fmtCurrency(splitSum) }}
-                  <template v-if="splitGap < -splitTolerance"> · passa {{ splitMode === 'percent' ? `${Math.abs(splitGap)}%` : fmtCurrency(Math.abs(splitGap)) }} do orçamento</template>
-                  <template v-else-if="splitGap > splitTolerance"> · {{ splitMode === 'percent' ? `${splitGap}%` : fmtCurrency(splitGap) }} sem centro, com o Financeiro</template>
-                  <template v-else> · todo o valor tem centro responsável</template>
-                </p>
-                <div v-if="canManage" class="row-actions">
-                  <button type="button" class="button secondary small" @click="splitCategoryId = ''">Cancelar</button>
-                  <button type="button" class="button small" :disabled="!splitValid" @click="saveSplit">Salvar centros</button>
-                </div>
-              </template>
-            </td>
-          </tr>
         </template>
       </tbody>
     </table>
     <fieldset v-if="canManage" class="layer"><legend>Nova categoria ou subcategoria</legend><div class="filter-row">
-      <select v-model="categoryForm.group" class="filter"><option v-for="entry in BUDGET_GROUPS" :key="entry.code" :value="entry.name">{{ entry.name }}</option></select>
+      <select v-model="categoryForm.group" class="filter"><option v-for="entry in groupOptions" :key="entry.code" :value="entry.name">{{ entry.name }}</option></select>
       <select v-model="categoryForm.parentId" class="filter"><option value="">Nova categoria neste grupo</option><option v-for="entry in usableCategories.filter(item => item.group === categoryForm.group && !item.parentId)" :key="entry.id" :value="entry.id">Subcategoria de {{ entry.code }} · {{ entry.name }}</option></select>
       <input v-model="categoryForm.name" class="filter grow" placeholder="Nome" />
       <span class="cell-sub">Código {{ codePreview }}</span>
       <button class="button small" @click="createCategory"><Plus :size="14" /> Criar</button>
     </div></fieldset>
+    <fieldset v-if="canManage" class="layer"><legend>Nova categoria mãe</legend><div class="filter-row">
+      <input v-model="motherForm.code" class="filter" placeholder="Código, ex. 06" maxlength="2" />
+      <input v-model="motherForm.name" class="filter grow" placeholder="Nome, ex. Despesas com pessoal" />
+      <button class="button small" @click="createMother"><Plus :size="14" /> Criar categoria mãe</button>
+    </div></fieldset>
   </article>
-
-  <!-- Centros de custo -->
-  <CostCentersPanel v-else-if="screen === 'centros'" :year="year" @open-category="goToSplit" />
 
   <!-- Planejamento -->
   <template v-else>
@@ -768,6 +745,19 @@ function saveSplit() {
       </p>
       <button class="button small" :disabled="(groupView ? !canPlanGroup : !canEditHere) || !(metaValue > 0)" @click="applyMeta"><TrendingUp :size="14" /> Definir meta e aplicar %</button>
     </article>
+
+    <fieldset v-if="screen === 'anual' && canEditHere" class="layer" data-tour="budget-company"><legend>Nova empresa do grupo</legend>
+      <div class="filter-row">
+        <input v-model="companyForm.legalName" class="filter grow" placeholder="Razão social" />
+        <input v-model="companyForm.tradeName" class="filter" placeholder="Nome fantasia" />
+        <input v-model="companyForm.document" class="filter" placeholder="CNPJ" />
+        <input v-model="companyForm.city" class="filter" placeholder="Cidade/UF" />
+        <input v-model="companyForm.adminName" class="filter" placeholder="Administrador" />
+        <input v-model="companyForm.adminEmail" class="filter" placeholder="E-mail" />
+        <button class="button small" @click="createCompany"><Plus :size="14" /> Cadastrar empresa</button>
+      </div>
+      <p class="cell-sub">A empresa entra no grupo com o orçamento vazio e também aparece na Plataforma.</p>
+    </fieldset>
 
     <article v-if="screen === 'anual'" class="card flush">
       <div class="orc-card-head">
@@ -799,9 +789,6 @@ function saveSplit() {
                   <button v-if="foldable(line)" type="button" class="fold" :title="collapsed[line.key] ? 'Expandir' : 'Recolher'" @click="toggleFold(line.key)"><ChevronDown v-if="!collapsed[line.key]" :size="14" /><ChevronRight v-else :size="14" /></button>
                   <button v-if="line.kind === 'conta'" type="button" class="linkish" @click="openRecord(line)">{{ line.code ? `${line.code} ` : '' }}{{ line.label }}</button>
                   <template v-else>{{ line.label }}</template>
-                  <span v-if="line.editableId && canEditHere && spendLine(line)" class="conta-tools">
-                    <button type="button" class="button ghost small split-btn" :class="{ on: centersSummary(line.editableId).covered > 0 }" title="Escolher os centros de custo desta conta" @click.stop="goToSplit(line.editableId)"><PieChart :size="13" /> Centros</button>
-                  </span>
                 </div>
               </td>
               <td class="num">{{ money(linePrior(line)) }}</td>
@@ -872,7 +859,6 @@ function saveSplit() {
                 <div class="conta-line">
                   <button v-if="foldable(line)" type="button" class="fold" :title="collapsed[line.key] ? 'Expandir' : 'Recolher'" @click="toggleFold(line.key)"><ChevronDown v-if="!collapsed[line.key]" :size="14" /><ChevronRight v-else :size="14" /></button>
                   <span>{{ line.code }} {{ line.label }}</span>
-                  <button v-if="line.editableId && canEditHere && spendLine(line)" type="button" class="button ghost small split-btn" :class="{ on: centersSummary(line.editableId).covered > 0 }" title="Escolher os centros de custo desta conta" @click.stop="goToSplit(line.editableId)"><PieChart :size="13" /> Centros</button>
                 </div>
               </td>
               <td class="num">
@@ -895,4 +881,54 @@ function saveSplit() {
       </div>
     </article>
   </template>
+
+  <BaseModal :open="!!splitCategory" :title="splitTitle" :subtitle="splitSubtitle" width="680px" @close="closeSplit">
+    <p v-if="!(splitAmount > 0)" class="notice warning">Informe o valor da categoria antes de destinar aos setores.</p>
+    <div v-else class="split-editor">
+      <div class="split-meter">
+        <div class="figures"><span><strong>{{ fmtCurrency(splitSum) }}</strong> de {{ fmtCurrency(splitAmount) }}</span><span>{{ pctOf(splitSum) }}%</span></div>
+        <i class="track" aria-hidden="true"><b :class="splitTone" :style="{ width: `${Math.min(100, pctOf(splitSum))}%` }" /></i>
+      </div>
+      <table class="dense split-table">
+        <thead><tr><th>Setor utilizador</th><th class="num">Valor</th><th class="num pct">%</th><th class="x"></th></tr></thead>
+        <tbody>
+          <tr v-if="!splitRows.length"><td colspan="4" class="empty-note">Nenhum setor destinado.</td></tr>
+          <tr v-for="item in splitRows" :key="item.sectorId">
+            <td>{{ sectorName(item.sectorId) }}</td>
+            <td class="num">
+              <MoneyInput v-if="canManage" compact :model-value="item.amount" @update:model-value="setRowAmount(item, $event)" />
+              <template v-else>{{ fmtCurrency(item.amount) }}</template>
+            </td>
+            <td class="num pct">
+              <template v-if="canManage"><input class="cell-input mini pct-input" type="number" min="0" max="100" step="0.1" :value="pctOf(item.amount)" @change="setRowPercent(item, ($event.target as HTMLInputElement).value)" /><span class="unit">%</span></template>
+              <template v-else>{{ pctOf(item.amount) }}%</template>
+            </td>
+            <td class="x"><button v-if="canManage" type="button" class="icon-button tiny" title="Tirar este setor" @click="removeRow(item.sectorId)"><X :size="13" /></button></td>
+          </tr>
+          <tr v-if="canManage && freeSectors.length">
+            <td>
+              <select v-model="addSectorId" class="filter">
+                <option value="">Setor</option>
+                <option v-for="sector in freeSectors" :key="sector.id" :value="sector.id">{{ sector.name }}</option>
+              </select>
+            </td>
+            <td class="num"><MoneyInput compact :model-value="addAmount" @update:model-value="addAmount = $event" /></td>
+            <td class="num pct"><input class="cell-input mini pct-input" type="number" min="0" max="100" step="0.1" :value="pctOf(addAmount)" @change="setAddPercent(($event.target as HTMLInputElement).value)" /><span class="unit">%</span></td>
+            <td class="x"><button type="button" class="button secondary small" :disabled="!canAddLine" :title="addBlockedTitle" @click="addSector">Incluir</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <button v-if="canManage && addSectorId && splitGap > 0.01" type="button" class="button ghost small split-extra" @click="addRemainder">Incluir o restante · {{ fmtCurrency(splitGap) }}</button>
+    </div>
+    <template #footer>
+      <div class="split-footer">
+        <p v-if="splitAmount > 0" class="split-sum" :class="splitTone">{{ splitStatus }}</p>
+        <span v-else></span>
+        <div class="row-actions">
+          <button type="button" class="button secondary small" @click="closeSplit">{{ canManage && splitAmount > 0 ? 'Cancelar' : 'Fechar' }}</button>
+          <button v-if="canManage && splitAmount > 0" type="button" class="button small" :disabled="!splitValid" @click="saveSplit">Salvar setores</button>
+        </div>
+      </div>
+    </template>
+  </BaseModal>
 </template>

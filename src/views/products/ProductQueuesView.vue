@@ -13,7 +13,7 @@ const store = useErpStore()
 const ui = useUiStore()
 const router = useRouter()
 
-type Queue = 'mine' | 'homologation' | 'drafts' | 'exceptions' | 'flags' | 'blocked' | 'obsolete'
+type Queue = 'mine' | 'homologation' | 'changes' | 'inactivation' | 'drafts' | 'exceptions' | 'flags' | 'blocked' | 'obsolete'
 interface Row { item: Item; info: string; extra?: string }
 
 const live = computed(() => store.state.items.filter(item => !catalogOf(item).deletedAt))
@@ -26,12 +26,20 @@ const QUEUES = computed<{ id: Queue; label: string; hint: string; rows: Row[] }[
       .map(item => ({ item, info: myPending(item).map(role => APPROVAL_LABEL[role]).join(', '), extra: myPending(item).flatMap(role => approvalIssues(item, role)).join(' · ') })),
   },
   {
-    id: 'homologation', label: 'Em homologação', hint: 'Todos os itens aguardando aprovação, com o que falta.',
+    id: 'homologation', label: 'Em análise', hint: 'Cadastros novos aguardando a análise. A homologação de fornecedor não fica nesta tela.',
     rows: live.value.filter(item => catalogOf(item).lifecycle === 'Em homologação')
       .map(item => ({ item, info: requiredApprovals(item).map(role => `${APPROVAL_LABEL[role]} ${catalogOf(item).approvals[role] ? '✓' : '…'}`).join(' · ') })),
   },
   {
-    id: 'drafts', label: 'Rascunhos', hint: 'Cadastros iniciados que ainda não foram para homologação.',
+    id: 'changes', label: 'Alteração pendente', hint: 'O valor vigente continua. A mudança só entra depois da aprovação.',
+    rows: live.value.filter(item => catalogOf(item).lifecycle === 'Alteração pendente').map(item => ({ item, info: catalogOf(item).keyChanges.filter(change => change.status === 'Pendente').map(change => `${change.originModule} ${change.originId}`).join(' · ') })),
+  },
+  {
+    id: 'inactivation', label: 'Inativação pendente', hint: 'Ao aprovar, o item para de aceitar solicitação nova. Estoque, ordens e pedidos já abertos seguem.',
+    rows: live.value.filter(item => catalogOf(item).lifecycle === 'Inativação pendente').map(item => ({ item, info: 'Aguardando aprovação' })),
+  },
+  {
+    id: 'drafts', label: 'Rascunhos', hint: 'Cadastros iniciados que ainda não foram para análise.',
     rows: live.value.filter(item => catalogOf(item).lifecycle === 'Rascunho').map(item => ({ item, info: `Criado por ${catalogOf(item).createdBy} em ${catalogOf(item).createdAt.slice(0, 10)}` })),
   },
   {

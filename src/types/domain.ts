@@ -3,7 +3,7 @@ export type SyncStatus = 'sincronizado' | 'pendente' | 'erro'
 /** PA acabado, SE semiacabado injetado, MP matéria-prima, CP componente, EM embalagem, SV serviço, KF kit físico, KT kit virtual, IM imobilizado */
 export type ItemType = 'PA' | 'SE' | 'MP' | 'CP' | 'EM' | 'SV' | 'KF' | 'KT' | 'IM' | 'FE'
 
-export type ItemLifecycle = 'Rascunho' | 'Em homologação' | 'Ativo' | 'Bloqueado' | 'Obsoleto' | 'Inativo'
+export type ItemLifecycle = 'Rascunho' | 'Em homologação' | 'Ativo' | 'Alteração pendente' | 'Inativação pendente' | 'Bloqueado' | 'Obsoleto' | 'Inativo'
 export type ItemNature = 'Bem' | 'Serviço' | 'Kit virtual' | 'Imobilizado'
 export type UnitContext = 'Compra' | 'Produção' | 'Estoque' | 'Venda'
 export type ApprovalRole = 'fiscal' | 'pcp' | 'comercial' | 'tecnica'
@@ -132,16 +132,28 @@ export interface CatalogAudit {
 
 export interface KeyChangeRequest {
   id: string
-  field: 'unit' | 'ncm'
+  field: 'unit' | 'ncm' | 'name' | 'class'
   from: string
   to: string
   reason: string
+  /** Documento de outra área. Sem origem a solicitação não entra. */
+  originModule: string
+  originId: string
   requestedBy: string
   requestedAt: string
   status: 'Pendente' | 'Aprovada' | 'Recusada'
   decidedBy?: string
   decidedAt?: string
   note?: string
+}
+
+/** Leitura do submódulo de homologação. Só matéria-prima, por fornecedor, e não se edita aqui. */
+export interface HomologationPortrait {
+  supplier: string
+  status: string
+  reference: string
+  validUntil?: string
+  tests: string
 }
 
 export interface BranchStock {
@@ -276,6 +288,8 @@ export interface ItemCatalog {
   conversions: UnitConversion[]
   approvals: Partial<Record<ApprovalRole, string>>
   keyChanges: KeyChangeRequest[]
+  /** Retrato consultivo. Presente só em matéria-prima. */
+  homologation?: HomologationPortrait
   audit: CatalogAudit[]
   deletedAt?: string
   deletedBy?: string
@@ -921,6 +935,10 @@ export interface BudgetCategory {
   parentId?: string
   status: BudgetCategoryStatus
   audit: BudgetAudit[]
+  /** Pessoa que responde pela conta e vê o saldo excedido. */
+  responsibleUserId?: string
+  /** Setor que recebe a demanda desta conta. Pode ser outro que os setores que usam o valor. */
+  executorSectorId?: string
   /** Identificador da mesma categoria no Omie. A conciliação é dos dois lados. */
   omieId?: string
   /** Receita soma para a meta de faturamento; sem isto a categoria é despesa, como sempre foi. */
@@ -946,6 +964,16 @@ export interface Budget {
     mode: 'percent' | 'amount'
     lines: { costCenterId: string; value: number }[]
   }
+  /** Valor destinado a cada setor utilizador. A soma pode ficar abaixo do valor da categoria; o que falta não libera demanda. Não pode passar do valor. */
+  sectorAllocations?: { sectorId: string; amount: number }[]
+}
+
+/** Categoria mãe criada pela empresa, no formato 06. Nome. Os grupos 01 a 05 e 09 continuam fixos. */
+export interface BudgetGroupDef {
+  id: string
+  tenantId: string
+  code: string
+  name: string
 }
 
 export interface BudgetEntryEvent {

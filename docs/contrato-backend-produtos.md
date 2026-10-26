@@ -45,6 +45,7 @@ Todo request mutável exige validação explícita e usa o tenant da sessão; `t
 7. Fiscal em mão dupla: alteração local em item não rascunho marca `Enviar ao Omie`; evento do Omie em item sincronizado aplica e audita; evento com envio pendente vira `Conflito` e não sobrescreve nada. O evento tem id externo com índice único por tenant (idempotente).
 8. Custo da engenharia é consulta derivada: material (necessidade com perda), máquina (custo-hora do posto), mão de obra (taxa × equipe), preparação rateada no lote e desgaste do ferramental próprio (valor ÷ vida ÷ cavidades ativas).
 9. Item, camada, auditoria e evento de integração são persistidos na mesma transação.
+10. Alteração de descrição, classificação, unidade base ou NCM de item que já saiu do rascunho só vale depois de aprovada. A solicitação aponta origem externa (OS, OP, PAP, oportunidade ou outro documento), motivo e valores antes/depois. Enquanto pendente, o dado vigente continua e o item pode ser usado. A inativação também é solicitada e aprovada: estoque, ordens e pedidos já abertos não são cancelados; solicitações ainda pendentes são negadas. Item inativo não aceita solicitação nova. O retrato de homologação é leitura, por fornecedor, e só existe em matéria-prima. A convenção do código e os papéis de aprovação continuam pendentes.
 
 ## Dependências com outros schemas
 
