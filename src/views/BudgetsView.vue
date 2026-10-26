@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { CalendarDays, ChevronDown, ChevronRight, ListTree, Plus, TrendingUp, X } from 'lucide-vue-next'
+import { CalendarDays, ChevronDown, ChevronRight, CircleAlert, LayoutDashboard, ListTree, Plus, TrendingUp, X } from 'lucide-vue-next'
 import BaseModal from '../components/BaseModal.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PeriodScopeBar from '../components/PeriodScopeBar.vue'
@@ -549,6 +549,17 @@ watch([year, screen], () => { splitCategoryId.value = '' })
 </script>
 
 <template>
+  <div class="module-layout">
+    <aside class="module-side" data-tour="budget-tabs">
+      <p class="module-side-title">Orçamentos</p>
+      <span class="nav-label">Acompanhamento</span>
+      <button type="button" class="nav-link" :class="{ active: screen === 'visao' }" data-tour="budget-tab-visao" @click="screen = 'visao'"><LayoutDashboard :size="15" /> Visão geral</button>
+      <button type="button" class="nav-link" :class="{ active: screen === 'acoes' }" data-tour="budget-tab-acoes" @click="screen = 'acoes'"><CircleAlert :size="15" /> Ações <b v-if="pendingExceptions" class="alert">{{ pendingExceptions }}</b></button>
+      <span class="nav-label">Definição</span>
+      <button type="button" class="nav-link" :class="{ active: screen === 'categorias' }" data-tour="budget-tab-categorias" @click="screen = 'categorias'"><ListTree :size="15" /> Categorias</button>
+      <button type="button" class="nav-link" :class="{ active: planning }" data-tour="budget-tab-planejamento" @click="screen = planning ? screen : 'anual'"><CalendarDays :size="15" /> Planejamento</button>
+    </aside>
+    <div class="module-content">
   <div class="budget-top">
     <div>
       <h2>Orçamento {{ screen === 'visao' ? periodText : year }}</h2>
@@ -556,13 +567,6 @@ watch([year, screen], () => { splitCategoryId.value = '' })
     </div>
     <PeriodScopeBar v-model:year="year" v-model:from="fromMonth" v-model:to="toMonth" v-model:scope="scope" :months="screen === 'visao'" :companies="screen === 'visao' || planning" />
   </div>
-
-  <nav class="orc-tabs" data-tour="budget-tabs">
-    <button type="button" :class="{ on: screen === 'visao' }" data-tour="budget-tab-visao" @click="screen = 'visao'">Visão geral</button>
-    <button type="button" :class="{ on: screen === 'acoes' }" data-tour="budget-tab-acoes" @click="screen = 'acoes'">Ações <b v-if="pendingExceptions">{{ pendingExceptions }}</b></button>
-    <button type="button" :class="{ on: screen === 'categorias' }" data-tour="budget-tab-categorias" @click="screen = 'categorias'">Categorias</button>
-    <button type="button" :class="{ on: planning }" data-tour="budget-tab-planejamento" @click="screen = planning ? screen : 'anual'">Planejamento</button>
-  </nav>
 
   <p v-if="readOnlyNote && (screen === 'visao' || planning)" class="notice">{{ readOnlyNote }}</p>
 
@@ -956,4 +960,6 @@ watch([year, screen], () => { splitCategoryId.value = '' })
       </div>
     </template>
   </BaseModal>
+    </div>
+  </div>
 </template>

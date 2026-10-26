@@ -9,13 +9,12 @@ import PersonRecord from './PersonRecord.vue'
 import ProjectRecord from './ProjectRecord.vue'
 import ProposalRecord from './ProposalRecord.vue'
 import PurchaseRecord from './PurchaseRecord.vue'
-import ServiceRecord from './ServiceRecord.vue'
 import TechnicalRecord from './TechnicalRecord.vue'
 
 const ui = useUiStore()
 const VIEWS: Record<RecordKind, Component> = {
   opportunity: OpportunityRecord, proposal: ProposalRecord, demand: DemandRecord, purchase: PurchaseRecord, technical: TechnicalRecord,
-  project: ProjectRecord, budget: BudgetRecord, person: PersonRecord, service: ServiceRecord, asset: AssetRecord,
+  project: ProjectRecord, budget: BudgetRecord, person: PersonRecord, asset: AssetRecord,
 }
 const view = computed(() => ui.record ? VIEWS[ui.record.kind] : undefined)
 </script>

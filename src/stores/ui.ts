@@ -10,7 +10,7 @@ export interface Toast {
   text?: string
 }
 
-export type RecordKind = 'opportunity' | 'proposal' | 'demand' | 'purchase' | 'technical' | 'project' | 'budget' | 'person' | 'service' | 'asset'
+export type RecordKind = 'opportunity' | 'proposal' | 'demand' | 'purchase' | 'technical' | 'project' | 'budget' | 'person' | 'asset'
 export interface RecordRef { kind: RecordKind; id: string; context?: Record<string, string> }
 
 const TOUR_KEY = 'thalamus-tours-v3'

@@ -2,60 +2,59 @@
 import { computed, ref } from 'vue'
 import { Plus } from 'lucide-vue-next'
 import BaseModal from '../../components/BaseModal.vue'
-import { CHANGE_STAGES } from '../../domain/engineering'
 import { useErpStore } from '../../stores/erp'
+import type { ChangeStage } from '../../types/domain'
 import ChangeDetail from './ChangeDetail.vue'
 import ChangeFormModal from './ChangeFormModal.vue'
 
 const store = useErpStore()
-const showRefused = ref(false)
-const columns = computed(() => [...CHANGE_STAGES, ...(showRefused.value ? ['Recusada' as const] : [])].map(stage => ({
-  stage,
-  cards: store.state.engineeringChanges.filter(change => change.stage === stage).sort((a, b) => (a.priority === 'Urgente' ? 0 : 1) - (b.priority === 'Urgente' ? 0 : 1) || a.effectiveDate.localeCompare(b.effectiveDate)),
-})))
-const refused = computed(() => store.state.engineeringChanges.filter(change => change.stage === 'Recusada').length)
+const showClosed = ref(false)
 const selectedId = ref('')
-const selected = computed(() => store.state.engineeringChanges.find(change => change.id === selectedId.value))
 const creating = ref(false)
-const HINT: Record<string, string> = {
-  Solicitada: 'Problema descrito, aguardando a engenharia.',
-  'Em análise': 'Impacto avaliado e versões abertas em rascunho.',
-  Aprovada: 'Pronta para liberar na data de efetividade.',
-  Implementada: 'Versões liberadas; histórico preservado.',
-  Recusada: 'Encerrada com motivo.',
+const TONE: Record<ChangeStage, string> = {
+  Solicitada: 'warning',
+  'Em análise': 'info',
+  Aprovada: 'warning',
+  Implementada: 'success',
+  Recusada: 'danger',
 }
+const closed = (stage: ChangeStage) => stage === 'Implementada' || stage === 'Recusada'
+const rows = computed(() => store.state.engineeringChanges
+  .filter(change => showClosed.value || !closed(change.stage))
+  .sort((a, b) => (a.priority === 'Urgente' ? 0 : 1) - (b.priority === 'Urgente' ? 0 : 1) || a.effectiveDate.localeCompare(b.effectiveDate)))
+const openCount = computed(() => store.state.engineeringChanges.filter(change => !closed(change.stage)).length)
+const selected = computed(() => store.state.engineeringChanges.find(change => change.id === selectedId.value))
+const dateOf = (value: string) => value.split('-').reverse().join('/')
 const drafts = (itemIds: string[], changeId: string) => store.state.productRevisions.filter(entry => itemIds.includes(entry.itemId) && entry.changeId === changeId).length
 </script>
 
 <template>
-  <section class="card">
-    <div class="section-head" style="margin-top:0">
+  <article class="card flush" data-tour="changes-board">
+    <div class="orc-card-head">
       <div>
-        <h2>Mudanças de engenharia</h2>
-        <p>Toda alteração de estrutura, roteiro ou ferramental com impacto em estoque, OP ou pedido passa por aqui. A versão só vale depois da implementação.</p>
+        <h2>Mudanças em aberto</h2>
+        <p>Uma linha por mudança. Abra para ver o impacto, aprovar ou implementar. A versão só vale depois da implementação.</p>
       </div>
       <div class="filter-row" style="margin:0">
-        <label v-if="refused" class="cell-sub"><input v-model="showRefused" type="checkbox" /> Recusadas ({{ refused }})</label>
+        <label class="cell-sub"><input v-model="showClosed" type="checkbox" /> Encerradas</label>
         <button class="button" data-tour="changes-new" @click="creating = true"><Plus :size="14" /> Solicitar mudança</button>
       </div>
     </div>
-    <div class="kanban-board" data-tour="changes-board">
-      <div v-for="column in columns" :key="column.stage" class="kanban-column">
-        <header><b>{{ column.stage }}</b><span>{{ column.cards.length }}</span></header>
-        <small class="cell-sub">{{ HINT[column.stage] }}</small>
-        <button v-for="change in column.cards" :key="change.id" class="kanban-card" :class="{ urgent: change.priority === 'Urgente' }" @click="selectedId = change.id">
-          <span class="eyebrow">{{ change.id }}<template v-if="change.priority === 'Urgente'"> · urgente</template></span>
-          <strong>{{ change.title }}</strong>
-          <span class="cell-sub">{{ change.itemIds.map(id => store.item(id).code).join(', ') }}</span>
-          <footer>
-            <span>efetiva {{ change.effectiveDate.split('-').reverse().join('/') }}</span>
-            <span v-if="column.stage !== 'Solicitada'">{{ drafts(change.itemIds, change.id) }}/{{ change.itemIds.length }} versões</span>
-          </footer>
-        </button>
-        <p v-if="!column.cards.length" class="empty-note">Nada aqui.</p>
-      </div>
-    </div>
-  </section>
+    <table v-if="rows.length">
+      <thead><tr><th>Mudança</th><th>Itens</th><th>Prioridade</th><th>Efetiva</th><th>Versões</th><th>Situação</th></tr></thead>
+      <tbody>
+        <tr v-for="change in rows" :key="change.id" class="clickable" @click="selectedId = change.id">
+          <td><span class="cell-main">{{ change.title }}</span><span class="cell-sub code">{{ change.id }}</span></td>
+          <td>{{ change.itemIds.map(id => store.item(id).code).join(', ') }}</td>
+          <td>{{ change.priority }}</td>
+          <td>{{ dateOf(change.effectiveDate) }}</td>
+          <td>{{ change.stage === 'Solicitada' ? '—' : `${drafts(change.itemIds, change.id)}/${change.itemIds.length}` }}</td>
+          <td><span class="status" :class="TONE[change.stage]">{{ change.stage }}</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p v-else class="empty-note">{{ openCount ? 'Nenhuma mudança encerrada.' : 'Nenhuma mudança em aberto.' }}</p>
+  </article>
 
   <BaseModal :open="!!selected" :title="selected?.id ?? ''" width="min(980px, 94vw)" @close="selectedId = ''">
     <ChangeDetail v-if="selected" :change="selected" />

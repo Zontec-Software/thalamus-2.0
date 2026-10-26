@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { Boxes, GitBranch, Receipt, ShieldCheck, Tags, Warehouse, Workflow, Wrench } from 'lucide-vue-next'
+import { Boxes, GitBranch, Receipt, ShieldCheck, Tags, Workflow } from 'lucide-vue-next'
 import { canApprove, catalogOf, itemFlags, requiredApprovals } from '../../domain/catalog'
 import { hasFullAccess } from '../../domain/access'
 import { useErpStore } from '../../stores/erp'
@@ -22,7 +22,6 @@ const draftVersions = computed(() => store.state.productRevisions.filter(entry =
 const activeChanges = computed(() => store.state.engineeringChanges.filter(change => change.stage !== 'Implementada' && change.stage !== 'Recusada'))
 const openChanges = computed(() => activeChanges.value.length)
 const urgentChanges = computed(() => activeChanges.value.filter(change => change.priority === 'Urgente').length)
-const tooling = computed(() => live.value.filter(item => item.type === 'FE').length)
 
 interface MenuLink { to: string; label: string; icon: typeof Boxes; count: number; exact?: boolean; alert?: boolean }
 const MENU = computed<{ group: string; links: MenuLink[] }[]>(() => [
@@ -33,10 +32,8 @@ const MENU = computed<{ group: string; links: MenuLink[] }[]>(() => [
   { group: 'Engenharia', links: [
     { to: '/produtos/estruturas', label: 'Estruturas e roteiros', icon: GitBranch, count: draftVersions.value, alert: draftVersions.value > 0 },
     { to: '/produtos/mudancas', label: 'Mudanças', icon: Workflow, count: openChanges.value, alert: urgentChanges.value > 0 },
-    { to: '/produtos/ferramental', label: 'Ferramental', icon: Wrench, count: tooling.value },
   ] },
   { group: 'Camadas', links: [
-    { to: '/produtos/estoque', label: 'Estoque e unidades', icon: Warehouse, count: 0 },
     { to: '/produtos/fiscal', label: 'Fiscal', icon: Receipt, count: fiscalPending.value, alert: fiscalPending.value > 0 },
   ] },
   { group: 'Governança', links: [

@@ -29,7 +29,7 @@ export const router = createRouter({
     },
     { path: '/pessoas', component: () => import('../views/PeopleView.vue'), meta: { title: 'Pessoas e organograma', eyebrow: 'Cadastros' } },
     { path: '/parceiros/:id?', component: () => import('../views/PartnersView.vue'), meta: { title: 'Parceiros', eyebrow: 'Cadastros' } },
-    { path: '/servicos', component: () => import('../views/ServicesCatalogView.vue'), meta: { title: 'Catálogo de serviços', eyebrow: 'Cadastros' } },
+    { path: '/servicos/:id?', component: () => import('../views/ServicesCatalogView.vue'), meta: { title: 'Serviços', eyebrow: 'Cadastros' } },
     { path: '/postos/:id?', component: () => import('../views/PostsView.vue'), meta: { title: 'Postos', eyebrow: 'Cadastros' } },
     { path: '/ativos', component: () => import('../views/AssetsView.vue'), meta: { title: 'Ativos', eyebrow: 'Cadastros' } },
     { path: '/programacao', component: () => import('../views/ScheduleView.vue'), meta: { title: 'Planejamento e programação', eyebrow: 'Operações' } },

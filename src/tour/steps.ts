@@ -1,5 +1,5 @@
 /** Painel que o passo precisa aberto. `close` volta para a tela. */
-export type TourPanel = 'opportunity' | 'proposal' | 'demand' | 'purchase' | 'technical' | 'project' | 'budget' | 'person' | 'service' | 'asset' | 'close'
+export type TourPanel = 'opportunity' | 'proposal' | 'demand' | 'purchase' | 'technical' | 'project' | 'budget' | 'person' | 'asset' | 'close'
 
 export interface TourStep {
   target?: string
@@ -33,6 +33,8 @@ export const ORDER_DRAWER_TOUR: TourStep[] = [
 export function tourKey(path: string): string {
   if (path.startsWith('/produtos/item/')) return '/produtos/item'
   if (path.startsWith('/postos')) return '/postos'
+  if (path.startsWith('/servicos')) return '/servicos'
+  if (path.startsWith('/parceiros')) return '/parceiros'
   return path
 }
 
@@ -64,7 +66,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('plan-btn', 'Planejar com um clique', 'O sistema olha a estrutura: peça injetada em falta vira OP de injeção; componente comprado em falta vira requisição; o case vira a OP de montagem.'),
   ],
   '/produtos': [
-    t('product-side', 'O menu é do módulo', 'Produtos tem o próprio menu à esquerda: itens, classificação, estruturas, mudanças, ferramental, estoque, fiscal e a análise do cadastro. Ao abrir um item, este menu some e fica o da ficha.'),
+    t('product-side', 'O menu é do módulo', 'Produtos tem o próprio menu à esquerda: itens, classificação, estruturas, mudanças, fiscal e a análise do cadastro. Ferramental e estoque ficam na página do item. Ao abrir um item, este menu some e fica o da ficha.'),
     t('product-list', 'Lista feita para milhares de itens', 'A faixa acima da tabela filtra o tipo: todos, produto acabado, matéria-prima e os demais. Busque por código, descrição, EAN ou NCM e refine situação, classificação ou pendência. Marque vários itens para agir em lote.'),
     t('new-record', 'Um código por item', 'O item nasce em rascunho, com código sequencial e sem significado. O sistema avisa se já existe descrição parecida. Rascunho não entra em pedido, compra nem produção.'),
   ],
@@ -79,7 +81,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('class-attributes', 'Atributos da classe', 'Defina tipo, unidade, opções e se é obrigatório ou eixo de variação da grade. Os herdados de nós acima aparecem marcados.'),
   ],
   '/produtos/mudancas': [
-    t('changes-board', 'Quadro de mudanças', 'Cada cartão é uma mudança de engenharia. Ela anda de Solicitada a Implementada; a versão nova da estrutura e do roteiro só vale depois da implementação.'),
+    t('changes-board', 'Lista de mudanças', 'Cada linha é uma mudança em aberto. Ela anda de Solicitada a Implementada; a versão nova da estrutura e do roteiro só vale depois da implementação. Clique na linha para decidir.'),
     t('changes-new', 'Solicitar mudança', 'Descreva o problema, escolha os itens, o destino do estoque atual e a data de efetividade. O impacto (saldo, OPs, pedidos e compras) é calculado na hora.'),
   ],
   '/produtos/ferramental': [
@@ -107,10 +109,11 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('person-team', 'Equipe e pendências', 'Quem gere um setor vê a equipe aqui. Abaixo ficam as tarefas que este papel tem agora, as mesmas de Minhas tarefas.', 'person'),
   ],
   '/servicos': [
-    t('record-list', 'Um cadastro, vários usos', 'Venda, ordem de serviço e roteiro podem valer juntos. O local não define quem executa: equipe própria no cliente continua sendo execução própria.', 'close'),
-    t('new-record', 'Novo serviço', 'Informe os usos, o local e quem executa. Terceirizado só grava com o datasheet. A categoria oficial ainda não foi definida.', 'close'),
-    t('service-form', 'O que aparece depende do uso', 'Equipe própria pede setor e instrução. Venda ou ordem de serviço abre preço e cenário fiscal, sem lista e sem cálculo. O tempo médio não é calculado.', 'service'),
-    t('service-usage', 'Onde este serviço aparece', 'Propostas, demandas e as revisões de roteiro que apontam para ele. Alterar abre um rascunho no produto e não troca ordem já criada.', 'service'),
+    t('service-idea', 'Um cadastro, vários usos', 'Venda, ordem de serviço e roteiro podem valer juntos. O local não define quem executa.'),
+    t('new-record', 'Novo serviço', 'A página pede os usos, o local e quem executa. Terceirizado só grava com o datasheet. A categoria oficial ainda não foi definida.'),
+    t('record-list', 'A lista abre a página', 'Clique num serviço para abrir a página dele, com as abas Cadastro, Uso e Histórico. A seta volta para a lista.'),
+    t('service-form', 'Cadastro', 'Equipe própria pede setor e instrução. Venda ou ordem de serviço abre preço e cenário fiscal, sem lista e sem cálculo.'),
+    t('service-usage', 'Uso', 'Propostas, demandas e as revisões de roteiro. Alterar abre um rascunho no produto e não troca ordem já criada.'),
   ],
   '/postos': [
     t('post-idea', 'A vaga da fábrica', 'O posto é onde a ordem entra e o que o operador escolhe no tablet. A máquina física continua em Ativos e aponta para este posto.'),
@@ -157,7 +160,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('project-costs', 'Orçamento do projeto', 'A previsão mostra custos ainda abertos. O realizado só aparece quando o Omie confirma o pagamento.', 'project'),
   ],
   '/orcamentos': [
-    t('budget-tabs', 'Quatro abas, na ordem do trabalho', 'Visão geral acompanha. Ações decide. Categorias define o valor, o responsável e os setores. Planejamento monta o ano. O guia passa por uma de cada vez.', 'close'),
+    t('budget-tabs', 'O menu é do módulo', 'À esquerda: Visão geral acompanha, Ações decide, Categorias define o valor e os setores, Planejamento monta o ano. O guia passa por uma de cada vez.', 'close'),
     t('period-scope', 'Período e empresa', 'Escolha o ano e o intervalo de meses. Quem tem a consulta consolidada também escolhe a empresa do grupo ou a soma do grupo, só para leitura.', 'close'),
     t('record-list', 'Visão geral', 'Custo, despesa e investimento no período: orçado, realizado, previsão, desvio e uso, com a cor da situação. Financeiro e Administrador veem todas as contas, inclusive sem movimento. Os demais veem só as categorias em que são o responsável. Clique numa conta para ver o valor e o percentual de cada setor utilizador. Clique num setor para filtrar as origens, da maior para a menor.', 'close'),
     t('budget-detail', 'A ficha da conta', 'O realizado é a nota do Omie. A linha diz a compra, o projeto ou a ordem. Sem esse vínculo, a ação aparece para o setor executor.', 'budget'),

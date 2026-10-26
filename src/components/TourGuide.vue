@@ -50,7 +50,6 @@ function recordId(panel: Exclude<TourPanel, 'close'>): string | null {
     const manager = state.users.find(user => state.sectors.some(sector => sector.managerId === user.id && state.users.some(member => member.id !== user.id && sectorOf(state, member)?.id === sector.id)))
     return manager?.id ?? state.users[0]?.id ?? null
   }
-  if (panel === 'service') return pick(state.services, state.services.find(service => state.proposals.some(proposal => proposal.lines.some(line => line.serviceId === service.id)) || state.demands.some(demand => demand.serviceId === service.id)))
   const asset = state.assets.find(entry => state.maintenanceOrders.some(order => order.assetId === entry.id && order.status !== 'Concluída'))
   return asset?.id ?? state.assets[0]?.id ?? null
 }
