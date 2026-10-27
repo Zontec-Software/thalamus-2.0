@@ -10,8 +10,8 @@ const ui = useUiStore()
 
 const reason = computed(() => {
   const catalog = catalogOf(props.item)
-  if (catalog.deletedAt) return 'Item excluído: restaure para editar.'
-  if (catalog.lifecycle === 'Inativo') return 'Item inativo: só leitura.'
+  if (catalog.deletedAt) return 'Produto excluído: restaure para editar.'
+  if (catalog.lifecycle === 'Inativo') return 'Produto inativo: só leitura.'
   if (!canEdit(ui.role, props.layer)) return `Somente leitura para ${ui.role}. Quem edita esta camada: ${editorsLabel(props.layer)}.`
   return ''
 })

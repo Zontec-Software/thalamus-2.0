@@ -26,7 +26,7 @@ function link() {
 
 <template>
   <PermHint :item="item" layer="projetos" />
-  <p class="cell-sub">Item ligado a projeto passa a exigir aprovação técnica. Cada vínculo aponta a atividade da EAP que o justifica e acumula o custo de compras e demandas do item naquele projeto.</p>
+  <p class="cell-sub">Produto ligado a projeto passa a exigir aprovação técnica. Cada vínculo aponta a atividade da EAP que o justifica e acumula o custo de compras e demandas do produto naquele projeto.</p>
 
   <div v-for="(entry, index) in trace" :key="entry.link.projectId + (entry.link.milestoneId ?? '')" class="card" style="margin:10px 0;background:#F8FAFC">
     <div class="section-head" style="margin-bottom:6px">
@@ -50,16 +50,16 @@ function link() {
       <div><strong>{{ order.id }}</strong><span>{{ order.quantity }} {{ item.unit }} × {{ fmtCurrency(order.unitPrice) }} · {{ order.status }}</span></div>
     </div>
   </div>
-  <p v-if="!trace.length" class="empty-note">Item sem projeto vinculado.</p>
+  <p v-if="!trace.length" class="empty-note">Produto sem projeto vinculado.</p>
 
   <h3 class="drawer-title">Vincular a projeto</h3>
   <form class="filter-row" @submit.prevent="link">
     <fieldset class="layer filter-row" :disabled="disabled">
       <select v-model="form.projectId" class="filter" required @change="form.milestoneId = ''"><option value="" disabled>Projeto…</option><option v-for="project in open" :key="project.id" :value="project.id">{{ project.id }} · {{ project.name }}</option></select>
       <select v-model="form.milestoneId" class="filter" :disabled="!form.projectId"><option value="">Atividade da EAP…</option><option v-for="milestone in milestones" :key="milestone.id" :value="milestone.id">{{ milestone.title }}</option></select>
-      <input v-model="form.note" class="filter grow" placeholder="Por que o item está no projeto" />
+      <input v-model="form.note" class="filter grow" placeholder="Por que o produto está no projeto" />
       <button class="button small" type="submit">Vincular</button>
     </fieldset>
   </form>
-  <p v-if="lifecycle === 'Em homologação'" class="cell-sub">Mudar vínculo com o item em homologação zera a aprovação técnica.</p>
+  <p v-if="lifecycle === 'Em homologação'" class="cell-sub">Mudar vínculo com o produto em homologação zera a aprovação técnica.</p>
 </template>

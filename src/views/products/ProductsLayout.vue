@@ -21,7 +21,7 @@ const draftVersions = computed(() => store.state.productRevisions.filter(entry =
 const openChanges = computed(() => store.state.engineeringChanges.filter(change => change.stage !== 'Implementada' && change.stage !== 'Recusada').length)
 
 const links = computed(() => [
-  { to: '/produtos', label: 'Itens', exact: true, count: 0 },
+  { to: '/produtos', label: 'Produtos', exact: true, count: 0 },
   { to: '/produtos/classificacao', label: 'Classificação', count: 0 },
   { to: '/produtos/estruturas', label: 'Estruturas e roteiros', count: draftVersions.value },
   { to: '/produtos/mudancas', label: 'Mudanças', count: openChanges.value },

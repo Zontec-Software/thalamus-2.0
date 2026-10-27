@@ -30,7 +30,7 @@ function save() {
 
 <template>
   <div class="section-head" style="margin-top:18px" data-tour="class-attributes">
-    <div><h3 class="drawer-title" style="margin:0">Atributos</h3><p>Valem para os itens deste nó e de todos os filhos.</p></div>
+    <div><h3 class="drawer-title" style="margin:0">Atributos</h3><p>Valem para os produtos deste nó e de todos os filhos.</p></div>
     <button class="button secondary small" :disabled="!editable" @click="edit()"><Plus :size="13" /> Atributo</button>
   </div>
   <div v-for="def in defs" :key="def.key" class="attr-row">
@@ -53,7 +53,7 @@ function save() {
         <div v-if="form.kind === 'Lista'" class="field wide"><label>Opções (separadas por vírgula)</label><input v-model="form.options" /></div>
         <div v-if="form.kind === 'Número'" class="field"><label>Unidade</label><input v-model="form.unit" placeholder="g, mm, m…" /></div>
       </div>
-      <label class="check-line"><input v-model="form.required" type="checkbox" /> Obrigatório para homologar o item</label>
+      <label class="check-line"><input v-model="form.required" type="checkbox" /> Obrigatório para homologar o produto</label>
       <label v-if="form.kind === 'Lista'" class="check-line"><input v-model="form.variantAxis" type="checkbox" /> Pode ser eixo da grade de variantes</label>
       <div class="filter-row" style="margin-top:8px">
         <button class="button small" type="submit">Salvar atributo</button>

@@ -42,7 +42,7 @@ const { page, size, pages, slice, range } = usePager(rows)
       </div>
     </div>
     <table class="dense">
-      <thead><tr><th>Item</th><th>Situação</th><th>Versão vigente</th><th>Vigência</th><th>Componentes</th><th>Rascunho</th><th>OPs abertas</th></tr></thead>
+      <thead><tr><th>Produto</th><th>Situação</th><th>Versão vigente</th><th>Vigência</th><th>Componentes</th><th>Rascunho</th><th>OPs abertas</th></tr></thead>
       <tbody>
         <tr v-for="row in slice" :key="row.item.id" class="clickable" @click="router.push({ path: `/produtos/item/${row.item.id}`, query: { aba: 'manufatura' } })">
           <td><span class="cell-main code">{{ row.item.code }}</span><span class="cell-sub">{{ row.item.name }}</span></td>

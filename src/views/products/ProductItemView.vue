@@ -173,18 +173,18 @@ function remove(reason: string) {
 
 <template>
   <nav class="crumb-bar" aria-label="Caminho">
-    <RouterLink to="/produtos" class="crumb-back" title="Voltar para Itens"><ArrowLeft :size="16" /></RouterLink>
-    <RouterLink to="/produtos" class="crumb">Itens</RouterLink>
+    <RouterLink to="/produtos" class="crumb-back" title="Voltar para Produtos"><ArrowLeft :size="16" /></RouterLink>
+    <RouterLink to="/produtos" class="crumb">Produtos</RouterLink>
     <ChevronRight :size="14" class="sep" />
     <button v-if="item && section !== 'nucleo'" type="button" class="crumb" :title="item.name" @click="section = 'nucleo'">{{ item.code }} · {{ item.name }}</button>
-    <span v-else class="crumb here">{{ item ? `${item.code} · ${item.name}` : 'Item não encontrado' }}</span>
+    <span v-else class="crumb here">{{ item ? `${item.code} · ${item.name}` : 'Produto não encontrado' }}</span>
     <template v-if="item && section !== 'nucleo'">
       <ChevronRight :size="14" class="sep" />
       <span class="crumb here">{{ sectionLabel }}</span>
     </template>
   </nav>
   <div v-if="!item || !catalog" class="card empty-note">
-    Item não encontrado. Ele pode ter sido apagado por nunca ter sido usado.
+    Produto não encontrado. Ele pode ter sido apagado por nunca ter sido usado.
     <div style="margin-top:10px"><RouterLink to="/produtos" class="button secondary">Voltar à lista</RouterLink></div>
   </div>
   <template v-else>

@@ -5,6 +5,7 @@ import { AlertTriangle, ClipboardList, Gauge, PackageSearch, Tablet } from 'luci
 import MetricCard from '../components/MetricCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { plansMaterial } from '../domain/catalog'
+import { directoryFailures } from '../domain/directory'
 import { FLOW_STAGES } from '../domain/engine'
 import { showOnFloor } from '../domain/resources'
 import { useErpStore } from '../stores/erp'
@@ -28,6 +29,10 @@ const attention = computed(() => {
   for (const alert of store.state.alerts.filter(entry => !entry.resolved)) list.push({ text: `Chamado: ${alert.message}`, detail: `${store.resourceName(alert.resourceId)} · ${alert.operator} · ${fmtTime(alert.at)}`, action: () => store.resolveAlert(alert.id) })
   for (const maintenance of store.state.maintenanceOrders.filter(entry => entry.type === 'Corretiva' && entry.status !== 'Concluída')) list.push({ text: `${maintenance.id}: ${maintenance.description}`, detail: `Manutenção corretiva · ${maintenance.status}`, red: true, action: () => router.push('/manutencao') })
   for (const sync of store.state.syncLogs.filter(entry => entry.status === 'erro')) list.push({ text: `Falha Omie: ${sync.entity} ${sync.reference}`, detail: sync.message, red: true, action: () => router.push('/integracao') })
+  for (const account of directoryFailures(store.state, ui.activeTenantId)) {
+    const name = store.state.persons.find(entry => entry.id === account.personId)?.fullName ?? account.email
+    list.push({ text: `Falha Google: ${name}`, detail: account.failure ?? account.email, red: true, action: () => router.push(`/pessoas/pessoa/${account.personId}?aba=acesso`) })
+  }
   return list
 })
 

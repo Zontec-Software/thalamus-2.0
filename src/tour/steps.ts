@@ -14,10 +14,10 @@ export const WELCOME_KEY = 'welcome-areas'
 
 export const WELCOME_TOUR: TourStep[] = [
   t(undefined, 'Bem-vindo ao Thalamus 2.0', 'O sistema é dividido em sete áreas: cadastros, suprimentos, comercial, operações, serviços, gestão e finanças. Cada uma mostra apenas o trabalho daquele contexto.'),
-  t('home-blocks', 'A tela inicial é o mapa', 'Cada bloco é uma área. Dentro dele estão só as telas daquele trabalho. Os atalhos abrem a tela direto; Entrar abre a primeira dela.'),
+  t('home-blocks', 'A tela inicial é o mapa', 'Cada bloco é uma área. O clique abre o mapa dos módulos liberados para o seu perfil. Os atalhos abrem a tela direto. Quem só tem um módulo entra nele sem passar pelo mapa.'),
   t('home-producao', 'Operações', 'Aqui ficam o painel da fábrica, o fluxo, o planejamento, a produção, a qualidade e o tablet. Ao entrar, a barra de módulos no topo mostra apenas isso.'),
   t('home-cadastros', 'Cadastros', 'Produtos e revisões, pessoas, serviços e ativos formam a base compartilhada dos demais fluxos.'),
-  t('search', 'Busca', 'De qualquer área, encontre pedidos, OPs, itens, oportunidades, demandas, projetos, chamados ou pessoas. O resultado abre o detalhe à direita.'),
+  t('search', 'Busca', 'De qualquer área, encontre pedidos, OPs, produtos, oportunidades, demandas, projetos, chamados ou pessoas. Produto e pessoa abrem a página do cadastro; o restante abre o detalhe à direita.'),
   t('role', 'Visualizar perfis', 'Só o Administrador vê este seletor. Ele mostra como outro perfil enxerga a interface sem trocar a identidade real. Perfis recebem funcionalidades, não apenas módulos.'),
   t('help', 'Guia de cada tela', 'Depois de entrar numa área, cada tela explica a si mesma na primeira visita. Este botão reabre o guia.'),
 ]
@@ -35,10 +35,15 @@ export function tourKey(path: string): string {
   if (path.startsWith('/postos')) return '/postos'
   if (path.startsWith('/servicos')) return '/servicos'
   if (path.startsWith('/parceiros')) return '/parceiros'
+  if (path.startsWith('/pessoas')) return '/pessoas'
+  if (path.startsWith('/area/')) return '/area'
   return path
 }
 
 export const PAGE_TOURS: Record<string, TourStep[]> = {
+  '/area': [
+    t('area-modules', 'Módulos da área', 'Cada cartão é um módulo que o seu perfil pode abrir. O nome da área, no topo, traz de volta para este mapa. A seta ao lado troca de área.'),
+  ],
   '/': [
     t('home-blocks', 'As áreas do sistema', 'Entre em uma área por vez. O menu lateral acompanha a área em que você está.'),
     t('home-producao', 'Produção', 'Painel, fluxo, planejamento, injeção, montagem e tablet ficam juntos neste bloco.'),
@@ -66,23 +71,23 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('plan-btn', 'Planejar com um clique', 'O sistema olha a estrutura: peça injetada em falta vira OP de injeção; componente comprado em falta vira requisição; o case vira a OP de montagem.'),
   ],
   '/produtos': [
-    t('product-side', 'As abas do módulo', 'Itens, classificação, estruturas, mudanças, fiscal e a análise do cadastro ficam na faixa do topo. O número marca o que pede ação. Ferramental e estoque ficam na página do item. Ao abrir um item, estas abas somem e as seções da ficha entram na mesma faixa.'),
-    t('product-list', 'Lista feita para milhares de itens', 'A faixa acima da tabela filtra o tipo: todos, produto acabado, matéria-prima e os demais. Busque por código, descrição, EAN ou NCM e refine situação, classificação ou pendência. Marque vários itens para agir em lote.'),
-    t('new-record', 'Um código por item', 'O item nasce em rascunho, com código sequencial e sem significado. O sistema avisa se já existe descrição parecida. Rascunho não entra em pedido, compra nem produção.'),
+    t('product-side', 'As abas do módulo', 'Produtos, classificação, estruturas, mudanças, fiscal e a análise do cadastro ficam na faixa do topo. O número marca o que pede ação. Ferramental e estoque ficam na página do produto. Ao abrir um produto, estas abas somem e as seções da ficha entram na mesma faixa.'),
+    t('product-list', 'Lista feita para milhares de produtos', 'A faixa acima da tabela filtra o tipo: todos, produto acabado, matéria-prima e os demais. Busque por código, descrição, EAN ou NCM e refine situação, classificação ou pendência. Marque vários produtos para agir em lote.'),
+    t('new-record', 'Um código por produto', 'O produto nasce em rascunho, com código sequencial e sem significado. O sistema avisa se já existe descrição parecida. Rascunho não entra em pedido, compra nem produção.'),
   ],
   '/produtos/item': [
-    t('product-header', 'A ficha do item', 'Foto, código, tipo, classificação e versão vigente. As etiquetas abaixo apontam pendências, como atributo obrigatório vazio ou fiscal em conflito com o Omie.'),
+    t('product-header', 'A ficha do produto', 'Foto, código, tipo, classificação e versão vigente. As etiquetas abaixo apontam pendências, como atributo obrigatório vazio ou fiscal em conflito com o Omie.'),
     t('product-kpis', 'Indicadores clicáveis', 'Custo, saldo, lead time, roteiro, onde é usado e mudanças abertas. Cada indicador leva à seção que explica o número. No ferramental, mostram cavidades, ciclo e vida útil.'),
-    t('product-layers', 'Seções na faixa do topo', 'Geral, engenharia, logística, comercial, documentos e governança ficam na mesma faixa horizontal do orçamento. Só aparecem as seções que o tipo do item usa. O número marca o que pede ação.'),
+    t('product-layers', 'Seções na faixa do topo', 'Geral, engenharia, logística, comercial, documentos e governança ficam na mesma faixa horizontal do orçamento. Só aparecem as seções que o tipo do produto usa. O número marca o que pede ação.'),
     t('product-attributes', 'Atributos herdados', 'Os atributos vêm da classificação. Os marcados com asterisco são obrigatórios para homologar.'),
   ],
   '/produtos/classificacao': [
-    t('class-tree', 'Árvore e atributos', 'Selecione um nó para ver os itens, criar filhos e definir atributos. O que é definido num nó vale para todos os nós abaixo.'),
+    t('class-tree', 'Árvore e atributos', 'Selecione um nó para ver os produtos, criar filhos e definir atributos. O que é definido num nó vale para todos os nós abaixo.'),
     t('class-attributes', 'Atributos da classe', 'Defina tipo, unidade, opções e se é obrigatório ou eixo de variação da grade. Os herdados de nós acima aparecem marcados.'),
   ],
   '/produtos/mudancas': [
     t('changes-board', 'Lista de mudanças', 'Cada linha é uma mudança em aberto. Ela anda de Solicitada a Implementada; a versão nova da estrutura e do roteiro só vale depois da implementação. Clique na linha para decidir.'),
-    t('changes-new', 'Solicitar mudança', 'Descreva o problema, escolha os itens, o destino do estoque atual e a data de efetividade. O impacto (saldo, OPs, pedidos e compras) é calculado na hora.'),
+    t('changes-new', 'Solicitar mudança', 'Descreva o problema, escolha os produtos, o destino do estoque atual e a data de efetividade. O impacto (saldo, OPs, pedidos e compras) é calculado na hora.'),
   ],
   '/produtos/ferramental': [
     t('tooling-list', 'Moldes e gabaritos', 'Cavidades ativas, ciclo, postos compatíveis, vida útil e dono. O ativo de manutenção é opcional: sem ele, o contador de golpes fica em zero. A barra fica vermelha acima de 85% da vida quando o ativo está vinculado.'),
@@ -101,12 +106,13 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('partner-list', 'Perfis depois de abrir', 'Clique em um parceiro para abrir a página dele, com as abas Cadastro, Contatos e endereços, Cliente, Fornecedor e Histórico. A aba Cliente mostra a base de vendas e a classe ABC. O do fornecedor mostra os recebimentos e o retrato da homologação. Ticket médio e nota não têm fórmula definida, então o número não é publicado.'),
   ],
   '/pessoas': [
-    t('org-chart', 'Organograma', 'Cada setor tem gestor e o código do centro padrão, usado na demanda e na compra. O orçamento acompanha pelo setor utilizador. Clique em um setor para filtrar as pessoas dele.', 'close'),
-    t('record-list', 'A lista abre a ficha', 'Clique em uma pessoa para abrir a ficha à direita. O guia entra nela agora.', 'close'),
-    t('new-record', 'Nova pessoa', 'O cadastro gera o PIN do tablet e aplica as permissões do papel escolhido.', 'close'),
-    t('person-role', 'Papel, setor e acesso', 'O papel define o que a pessoa vê no sistema. Desativar o acesso tira a pessoa do tablet e das telas, sem apagar o histórico.', 'person'),
-    t('person-access', 'O que este papel enxerga', 'Cada área listada aqui é um grupo de telas liberado para o papel. O ajuste fino, módulo a módulo, fica em Gestão → Organização e acessos.', 'person'),
-    t('person-team', 'Equipe e pendências', 'Quem gere um setor vê a equipe aqui. Abaixo ficam as tarefas que este papel tem agora, as mesmas de Minhas tarefas.', 'person'),
+    t('people-areas', 'Cinco abas', 'Colaboradores, Admissão e Desligamento cuidam das pessoas. Organograma e Cargos cuidam da estrutura da empresa.'),
+    t('record-list', 'Quem trabalha aqui', 'Os filtros mostram quem está sem posição, em desligamento ou com a conta bloqueada. Outras empresas do grupo abre o diretório: dali a pessoa entra num projeto, recebe acesso ou é contratada aqui também.', 'close'),
+    t('new-record', 'Nova pessoa', 'Só nome, setor, posição, turno e o perfil da Gestão de acesso. O resto da ficha vem depois. O PIN do tablet é gerado e não fica à mostra.', 'close'),
+    t('org-chart', 'Organograma', 'À esquerda, os setores. Clique num deles para dizer onde ele fica, quem lidera e quantas vagas cada posição tem. O cargo vem do catálogo em Cargos.', 'close'),
+    t('person-file', 'Dados pessoais', 'A foto fica no topo. Sem arquivo, aparecem as iniciais. O resto é uma página só, por seções, com um botão de salvar. Documento, endereço, família e saúde aparecem só para o RH e para a própria pessoa.'),
+    t('person-role', 'Vínculo e trajetória', 'Posição, gestor, contrato e o histórico de mudanças. Mudar de posição tem data e não mexe no acesso.'),
+    t('person-access', 'A conta, não o catálogo', 'Os perfis são os da Gestão de acesso, por empresa. Eles definem o que a pessoa vê. A conta Google é criada aqui, com o e-mail confirmado, e suspensa na data do desligamento. A senha não aparece.'),
   ],
   '/servicos': [
     t('service-idea', 'Um cadastro, vários usos', 'Venda, ordem de serviço e roteiro podem valer juntos. O local não define quem executa.'),
@@ -166,8 +172,9 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('budget-detail', 'A ficha da conta', 'O realizado é a nota do Omie. A linha diz a compra, o projeto ou a ordem. Sem esse vínculo, a ação aparece para o setor executor.', 'budget'),
     t('budget-actions', 'Ações', 'Sem categoria fica com o Financeiro. Sem vínculo fica com o executor da categoria. Saldo excedido fica com o responsável da conta.', 'close'),
     t('budget-categories', 'Categorias', 'O valor do ano, a pessoa responsável, os setores que usam o valor e o setor que recebe a demanda. Nova categoria abre o formulário. A categoria mãe usa um código de dois dígitos.', 'close'),
-    t('budget-split', 'Setores da conta', 'O botão abre a destinação desta conta. Informe o valor ou o percentual de cada setor. A soma não passa do valor da categoria. O que ficar sem utilizador não libera demanda.', 'close'),
-    t('budget-plan-modes', 'Planejamento', 'Anual monta o ano sobre o realizado anterior, Mensal reparte pelos meses e CAPEX trata o investimento à parte. Aqui também se cadastra uma empresa nova do grupo, com orçamento vazio.', 'close'),
+    t('budget-split', 'Setores da conta', 'Clique nos valores destinados para abrir a destinação desta conta. Informe o valor ou o percentual de cada setor. A soma não passa do valor da categoria. O que ficar sem utilizador não libera demanda.', 'close'),
+    t('budget-plan-modes', 'Planejamento', 'Anual monta o ano sobre o realizado anterior, Mensal reparte pelos meses e CAPEX trata o investimento à parte.', 'close'),
+    t('budget-assistant', 'Assistente de planejamento', 'Três abordagens a partir do realizado do ano anterior. Mercado, internet e atas são um dossiê de demonstração: a tela não acessa a web nem arquivo de reunião. Usar uma delas grava o crescimento de cada conta sobre o próprio realizado.', 'close'),
     t('budget-summary', 'Meta de faturamento', 'O realizado do ano anterior e o percentual necessário para a meta. Definir meta aplica esse percentual a todas as contas. A coluna Cresc. % ajusta conta por conta.', 'close'),
     t('budget-seasonality', 'Sazonalidade em um clique', 'No Mensal, este botão reparte o ano de cada conta pelo peso de cada mês no realizado do ano anterior. Conta sem base fica como está.', 'close'),
   ],

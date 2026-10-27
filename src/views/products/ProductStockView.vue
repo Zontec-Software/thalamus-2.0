@@ -38,7 +38,7 @@ const nextExpiry = (id: string) => store.state.items.find(item => item.id === id
       </div>
     </div>
     <table class="dense">
-      <thead><tr><th>Item</th><th>Endereço</th><th>Saldo</th><th>Disponível</th><th>Mínimo</th><th>Controles</th><th>Próx. validade</th><th>Conversões</th><th>Filiais</th></tr></thead>
+      <thead><tr><th>Produto</th><th>Endereço</th><th>Saldo</th><th>Disponível</th><th>Mínimo</th><th>Controles</th><th>Próx. validade</th><th>Conversões</th><th>Filiais</th></tr></thead>
       <tbody>
         <tr v-for="item in slice" :key="item.id" class="clickable" @click="router.push({ path: `/produtos/item/${item.id}`, query: { aba: 'estoque' } })">
           <td><span class="cell-main code">{{ item.code }}</span><span class="cell-sub">{{ item.name }}</span></td>

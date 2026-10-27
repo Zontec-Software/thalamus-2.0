@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { ArrowRight, BellRing, CircleAlert, Clock3, Factory, PackageCheck, Sparkles, Tablet, TriangleAlert } from 'lucide-vue-next'
 import { FLOW_STAGES } from '../domain/engine'
 import { showOnFloor } from '../domain/resources'
-import { AREAS, moduleFeature } from '../navigation'
+import { AREAS, areaDestination, moduleFeature } from '../navigation'
 import { useErpStore } from '../stores/erp'
 import { useUiStore, type RecordKind } from '../stores/ui'
 import { fmtTime } from '../utils/format'
@@ -68,6 +68,12 @@ const todo = computed(() => {
 
 const events = computed(() => store.state.events.slice(0, 6))
 
+function openArea(id: string) {
+  const found = AREAS.find(entry => entry.id === id)
+  const to = found && areaDestination(found, allowed)
+  if (to) router.push(to)
+}
+
 function openTodo(event: MouseEvent, record?: { kind: RecordKind; id: string }) {
   if (!record) return
   event.preventDefault()
@@ -105,7 +111,7 @@ function openTodo(event: MouseEvent, record?: { kind: RecordKind; id: string }) 
       </div>
     </section>
     <section class="tiles" data-tour="home-blocks">
-      <div v-for="area in areas" :key="area.id" class="tile" :class="area.id" role="link" tabindex="0" :data-tour="area.id === 'operacoes' ? 'home-producao' : area.id === 'cadastros' ? 'home-cadastros' : undefined" @click="router.push(area.items[0].to)" @keydown.enter="router.push(area.items[0].to)">
+      <div v-for="area in areas" :key="area.id" class="tile" :class="area.id" role="link" tabindex="0" :data-tour="area.id === 'operacoes' ? 'home-producao' : area.id === 'cadastros' ? 'home-cadastros' : undefined" @click="openArea(area.id)" @keydown.enter="openArea(area.id)">
         <span class="tile-badge"><b>{{ area.badge.value }}</b> {{ area.badge.label }}</span>
         <span class="tile-icon">
           <component :is="area.icon" :size="22" />
@@ -168,6 +174,9 @@ function openTodo(event: MouseEvent, record?: { kind: RecordKind; id: string }) 
     </section>
     <p v-if="store.state.syncLogs.some(log => log.status === 'erro')" class="home-foot">
       <CircleAlert :size="14" /> Há falhas na integração com o Omie. <RouterLink to="/integracao">Revisar</RouterLink>
+    </p>
+    <p v-if="store.state.directoryAccounts.some(account => account.status === 'Falha')" class="home-foot">
+      <CircleAlert :size="14" /> Há conta Google que o sistema não conseguiu criar ou suspender. <RouterLink to="/pessoas/desligamento">Revisar</RouterLink>
     </p>
   </div>
 </template>

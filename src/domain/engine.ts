@@ -1,8 +1,9 @@
 import type {
-  AccessProfile, Asset, Budget, BudgetAlert, BudgetCategory, BudgetEntry, BudgetException, BudgetGroupDef, BudgetSimulation, BusinessPartner, CostCenter, Customer, Demand, Downtime, EconomicGroup, EngineeringChange, FiscalRule, FlowEvent, FlowStage, Functionality, Item, ItemClass, ItemModel, JobPosition, OmieConnection,
+  AccessProfile, AccessRevocation, Asset, Assignment, Budget, BudgetAlert, BudgetCategory, BudgetEntry, BudgetException, BudgetGroupDef, BudgetSimulation, BusinessPartner, Candidate, CandidateBriefing, CostCenter, Customer, Demand, Downtime, EconomicGroup, Employment, EngineeringChange, FiscalRule, FlowEvent, FlowStage, Functionality, IdentityLink, Interview, Item, ItemClass, ItemModel, JobCatalog, JobOpening, JobPosition, Offboarding, OmieConnection, PeopleChecklist, PerformanceReview, Person, Application, ProjectParticipation, SelectionReview,
   MachineState, MaintenanceOrder, NonConformity, Opportunity, OpMaterial, Operation, PriceTable, ProductRevision, ProductionOrder, Project,
   OmieCategory, OmiePayment, Proposal, PurchaseOrder, Requisition, RequisitionStatus, Resource, SalesOrder, Sector, ServiceCatalogItem,
   ShopAlert, StockMovement, SupplierHomologation, SyncLog, TechnicalServiceOrder, Tenant, User, UserProfileAssignment,
+  DirectoryAccount, WorkspaceConnection,
 } from '../types/domain'
 
 export interface ErpState {
@@ -12,6 +13,24 @@ export interface ErpState {
   resources: Resource[]
   assets: Asset[]
   users: User[]
+  jobOpenings: JobOpening[]
+  candidates: Candidate[]
+  applications: Application[]
+  interviews: Interview[]
+  selectionReviews: SelectionReview[]
+  peopleChecklists: PeopleChecklist[]
+  candidateBriefings: CandidateBriefing[]
+  assignments: Assignment[]
+  performanceReviews: PerformanceReview[]
+  offboardings: Offboarding[]
+  accessRevocations: AccessRevocation[]
+  persons: Person[]
+  workspaceConnections: WorkspaceConnection[]
+  directoryAccounts: DirectoryAccount[]
+  employments: Employment[]
+  jobs: JobCatalog[]
+  identityLinks: IdentityLink[]
+  projectParticipations: ProjectParticipation[]
   sectors: Sector[]
   costCenters: CostCenter[]
   positions: JobPosition[]

@@ -13,6 +13,7 @@
 - Marca, linha, categoria e curva ABC são dimensões de análise, separadas da classificação e sem significado no código do item.
 - Curva ABC e custo calculado pela estrutura são derivados do movimento, nunca digitados.
 - Pessoas internas e parceiros de negócio são cadastros separados. O parceiro é um registro só, como no Omie: Cliente e Fornecedor são papéis, e inativar um não inativa o outro.
+- Pessoa, vínculo, cargo, posição e conta são registros diferentes. A pessoa e o vínculo pertencem a uma empresa. O cargo descreve o trabalho e não forma hierarquia. A posição é a vaga do setor, com headcount e ocupante. A conta autentica, recebe perfis e usa o PIN. Entre empresas do grupo há três caminhos: participação em projeto, segundo vínculo ligado por confirmação humana, ou acesso sem pessoa. CPF e e-mail só sugerem a correspondência. Dado sensível não atravessa a empresa. No mockup a restrição é de tela; a API é que autoriza o campo.
 - O catálogo de serviços é um cadastro mestre por empresa. Venda, ordem de serviço e roteiro são usos do mesmo registro, independentes do local e de quem executa. Serviço terceirizado exige datasheet. A mudança no roteiro abre versão nova no produto; a média de tempo não é calculada enquanto a fórmula não existir.
 - Projetos agregam marcos, demandas, compras e orçamento; não substituem o PCP.
 - Finanças controla o DRE de leitura e o orçamento, com os centros de custo dentro dele. Contas a pagar e a receber estão em estruturação; por enquanto o título, o fiscal, o banco e a contabilidade ficam no Omie.
@@ -44,7 +45,7 @@ Pedido aprovado → OP com revisão congelada → reserva → separação → ex
 
 ## Persistência do protótipo
 
-O estado fica no `localStorage`, na chave `thalamus-erp-v41`. Não há banco de dados nem API nesta fase. Restaurar a demonstração recria o seed completo.
+O estado fica no `localStorage`, na chave `thalamus-erp-v47`. Não há banco de dados nem API nesta fase. Restaurar a demonstração recria o seed completo.
 
 Campo novo no estado exige subir a chave. Não há migração: a chave nova nasce do seed, e a antiga é descartada.
 
@@ -55,6 +56,7 @@ Campo novo no estado exige subir a chave. Não há migração: a chave nova nasc
 - Arquivos em armazenamento de objetos, vinculados por metadados. No protótipo, a mídia do item fica no navegador, com limite por arquivo.
 - Consulta ao cadastro nacional de GTIN (CCG) para o cruzamento GTIN × NCM. No protótipo é uma tabela fixa.
 - Integração Omie assíncrona, idempotente e observável.
+- Conta Google por empresa, no mesmo desenho: o domínio fica na conexão, o segredo no cofre e a senha da pessoa nunca volta. No protótipo o Admin SDK é simulado. A criação pede confirmação do e-mail; a suspensão corre na data efetiva do desligamento e a falha fica visível.
 - Persistência transacional do ledger orçamentário, com chave única para eventos Omie, trilha imutável e controle de concorrência na categoria/período.
 - Autenticação corporativa; PIN do tablet limitado ao contexto do posto.
 - Eventos de domínio para tarefas, alertas, integrações e indicadores.

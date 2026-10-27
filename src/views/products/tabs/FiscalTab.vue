@@ -54,7 +54,7 @@ const br = (date?: string) => date ? date.split('-').reverse().join('/') : '—'
 <template>
   <PermHint :item="item" layer="fiscal" />
   <FiscalSyncSection v-if="catalog.lifecycle !== 'Rascunho'" :item="item" />
-  <p v-if="!service && !catalog.ncm && locked" class="notice warning">Item ativo sem NCM: o envio ao Omie falha até o fiscal completar. Como o item já está ativo, o NCM entra por exceção.</p>
+  <p v-if="!service && !catalog.ncm && locked" class="notice warning">Produto ativo sem NCM: o envio ao Omie falha até o fiscal completar. Como o produto já está ativo, o NCM entra por exceção.</p>
   <p v-if="conflict" class="notice warning">GTIN × NCM: o CCG registra o EAN {{ catalog.gtin }} com NCM {{ conflict }}. A NF-e é rejeitada quando os dois não batem. Corrija o NCM (por exceção) ou o EAN.</p>
   <fieldset class="layer" :disabled="disabled">
     <div class="form-grid">
@@ -142,7 +142,7 @@ const br = (date?: string) => date ? date.split('-').reverse().join('/') : '—'
     </tbody>
   </table>
 
-  <h3 class="drawer-title">SPED · registros do item</h3>
+  <h3 class="drawer-title">SPED · registros do produto</h3>
   <pre v-if="sped" class="code-block">{{ sped.lines.join('\n') }}</pre>
   <p v-else class="empty-note">Rascunho, homologação e kit virtual não entram no Bloco 0 do SPED.</p>
   <p v-if="sped?.issues.length" class="notice warning">{{ sped.issues.join(' · ') }}</p>

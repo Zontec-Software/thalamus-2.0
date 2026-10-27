@@ -105,7 +105,7 @@ const canReturn = computed(() => (APPROVER[ui.role] ?? []).some(role => required
         <span>{{ portrait.reference }}<template v-if="portrait.validUntil"> · até {{ portrait.validUntil }}</template><template v-if="portrait.tests"> · {{ portrait.tests }}</template></span>
       </div>
     </div>
-    <p v-if="!portraits.length" class="empty-note">Sem retrato de homologação para este item. A decisão fica no submódulo de homologação.</p>
+    <p v-if="!portraits.length" class="empty-note">Sem retrato de homologação para este produto. A decisão fica no submódulo de homologação.</p>
   </section>
   <p v-if="life === 'Bloqueado'" class="notice info" style="margin-top:10px">Bloqueado não entra em proposta, compra, pedido nem OP nova. Saldo e histórico ficam.</p>
   <p v-if="life === 'Obsoleto'" class="notice info" style="margin-top:10px">Obsoleto sai do planejamento. O saldo restante ainda pode ser consumido.</p>

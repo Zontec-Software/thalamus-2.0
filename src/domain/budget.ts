@@ -593,6 +593,110 @@ export function applyRevenueTarget(state: ErpState, tenantId: string, year: stri
   return { growthPct, base, applied }
 }
 
+export type BudgetApproachId = 'conservadora' | 'media' | 'agressiva'
+type ApproachBucket = 'revenue' | 'cost' | 'expense' | 'capex'
+
+/** Receita e dedução seguem a receita. Custo, despesa e investimento têm ritmos próprios. Depreciação fica de fora. */
+function approachBucket(category: BudgetCategory): ApproachBucket | null {
+  if (isDepreciationCategory(category)) return null
+  if (category.isCapex || category.group === CAPEX_GROUP) return 'capex'
+  const code = category.group.slice(0, 2)
+  if (code === '01' || code === '02' || natureOf(category) === 'Receita') return 'revenue'
+  if (code === '03') return 'cost'
+  return 'expense'
+}
+
+const APPROACH_PRESETS: { id: BudgetApproachId; label: string; thesis: string; revenue: number; cost: number; expense: number; capex: number }[] = [
+  { id: 'conservadora', label: 'Conservadora', revenue: 4, cost: 2, expense: 1, capex: 0, thesis: 'Cresce abaixo do mercado de exemplo e segura custo e investimento, para proteger a margem.' },
+  { id: 'media', label: 'Média', revenue: 8, cost: 6, expense: 5, capex: 8, thesis: 'Acompanha o mercado de exemplo e deixa o custo subir um pouco menos que a receita.' },
+  { id: 'agressiva', label: 'Agressiva', revenue: 16, cost: 11, expense: 14, capex: 30, thesis: 'Acelera a receita e o investimento em capacidade, aceitando mais despesa no ano.' },
+]
+
+export interface PlanSource { id: 'historico' | 'mercado' | 'internet' | 'atas'; label: string; simulated: boolean; text: string }
+export interface BudgetApproach {
+  id: BudgetApproachId
+  label: string
+  thesis: string
+  revenueGrowth: number
+  costGrowth: number
+  expenseGrowth: number
+  capexGrowth: number
+  revenueBase: number
+  revenueTarget: number
+}
+
+/** Mantém a participação de cada setor quando o valor do ano muda. */
+function rescaleSectorAllocations(state: ErpState, categoryId: string, year: string) {
+  const allocation = allocationOf(state, categoryId, year)
+  const lines = allocation?.sectorAllocations
+  if (!allocation || !lines?.length) return
+  const before = lines.reduce((sum, line) => sum + line.amount, 0)
+  if (!(before > 0)) return
+  const next = lines.map(line => ({ sectorId: line.sectorId, amount: round2(allocation.amount * line.amount / before) }))
+  next[next.length - 1].amount = round2(allocation.amount - next.slice(0, -1).reduce((sum, line) => sum + line.amount, 0))
+  allocation.sectorAllocations = next
+}
+
+function priorBucket(state: ErpState, tenantId: string, priorYear: string, bucket: ApproachBucket) {
+  return round2(state.budgetCategories
+    .filter(category => category.tenantId === tenantId && category.status !== 'Inativa' && isBudgetLeaf(state, category.id) && approachBucket(category) === bucket)
+    .reduce((sum, category) => sum + realizedOfYear(state, category.id, priorYear), 0))
+}
+
+/**
+ * Três planos sobre o realizado do ano anterior. Mercado, internet e atas são um dossiê fixo de
+ * demonstração: não há consulta externa. O histórico usa os lançamentos desta empresa.
+ */
+export function budgetPlanBriefing(state: ErpState, tenantId: string, year: string): { year: string; priorYear: string; sources: PlanSource[]; approaches: BudgetApproach[] } {
+  const priorYear = /^\d{4}$/.test(year) ? String(Number(year) - 1) : ''
+  const revenueBase = priorYear ? priorBucket(state, tenantId, priorYear, 'revenue') : 0
+  const costBase = priorYear ? priorBucket(state, tenantId, priorYear, 'cost') : 0
+  const expenseBase = priorYear ? priorBucket(state, tenantId, priorYear, 'expense') : 0
+  const capexBase = priorYear ? priorBucket(state, tenantId, priorYear, 'capex') : 0
+  const sources: PlanSource[] = [
+    { id: 'historico', label: 'Histórico da empresa', simulated: false, text: priorYear ? `Receita realizada em ${priorYear}: ${money(revenueBase)}. Custos ${money(costBase)}. Despesas ${money(expenseBase)}. Investimentos ${money(capexBase)}.` : 'Informe o ano do orçamento para ler o realizado anterior.' },
+    { id: 'mercado', label: 'Mercado', simulated: true, text: 'Leitura de demonstração do setor de cases e injeção: volume perto de 6% ao ano e resina acompanhando o câmbio. Não há consulta a uma fonte externa.' },
+    { id: 'internet', label: 'Internet', simulated: true, text: 'Indicadores de exemplo usados só nesta tela: inflação perto de 4,5% e crescimento industrial moderado. O sistema não acessa a web.' },
+    { id: 'atas', label: 'Atas de reunião', simulated: true, text: 'Não há atas gravadas no Thalamus. O exemplo usado aqui é uma nota de planejamento: proteger a margem num cenário e, noutro, acelerar capacidade.' },
+  ]
+  const approaches = APPROACH_PRESETS.map(preset => ({
+    id: preset.id,
+    label: preset.label,
+    thesis: preset.thesis,
+    revenueGrowth: preset.revenue,
+    costGrowth: preset.cost,
+    expenseGrowth: preset.expense,
+    capexGrowth: preset.capex,
+    revenueBase,
+    revenueTarget: round2(revenueBase * (1 + preset.revenue / 100)),
+  }))
+  return { year, priorYear, sources, approaches }
+}
+
+/** Grava a abordagem escolhida: cada conta cresce sobre o próprio realizado, no ritmo do seu grupo. */
+export function applyBudgetApproach(state: ErpState, tenantId: string, year: string, approachId: BudgetApproachId, actor: string, role: Role) {
+  assertPlanner(role, 'aplica uma abordagem de planejamento')
+  if (!/^\d{4}$/.test(year)) throw new DomainError('Informe o ano do orçamento, no formato AAAA')
+  const approach = budgetPlanBriefing(state, tenantId, year).approaches.find(entry => entry.id === approachId)
+  if (!approach) throw new DomainError('Abordagem não encontrada')
+  if (!(approach.revenueBase > 0)) throw new DomainError('Sem realizado de receita no ano anterior para montar a abordagem')
+  const buckets: Record<ApproachBucket, string[]> = { revenue: [], cost: [], expense: [], capex: [] }
+  for (const category of state.budgetCategories) {
+    if (category.tenantId !== tenantId || category.status === 'Inativa' || !isBudgetLeaf(state, category.id)) continue
+    const bucket = approachBucket(category)
+    if (bucket) buckets[bucket].push(category.id)
+  }
+  const rates: Record<ApproachBucket, number> = { revenue: approach.revenueGrowth, cost: approach.costGrowth, expense: approach.expenseGrowth, capex: approach.capexGrowth }
+  const note = `Abordagem ${approach.label}: receita ${approach.revenueGrowth}%, custos ${approach.costGrowth}%, despesas ${approach.expenseGrowth}%, investimentos ${approach.capexGrowth}%`
+  const applied = (Object.keys(buckets) as ApproachBucket[]).flatMap(bucket => buckets[bucket].length
+    ? applyGrowthToCategories(state, tenantId, buckets[bucket], year, rates[bucket], note, actor, role)
+    : [])
+  if (!applied.length) throw new DomainError('Nenhuma conta com realizado no ano anterior para esta abordagem')
+  for (const line of applied) rescaleSectorAllocations(state, line.categoryId, year)
+  log(state, 'Orçamentos', actor, `Abordagem ${approach.label} aplicada em ${year}: meta de receita ${money(approach.revenueTarget)}`)
+  return approach
+}
+
 /** Define a distribuição mês a mês; a soma dos 12 meses passa a ser o orçado anual da categoria-folha. */
 export function setMonthlyBudget(state: ErpState, tenantId: string, categoryId: string, year: string, monthlyAmounts: number[], reason: string, actor: string, role: Role) {
   assertPlanner(role, 'distribui o orçamento mês a mês')

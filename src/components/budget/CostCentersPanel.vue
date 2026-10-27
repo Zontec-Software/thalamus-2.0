@@ -63,7 +63,7 @@ function save(id: string, name: string, status: EntityStatus, responsibleUserId:
     <div class="orc-card-head">
       <div>
         <h2>Centros desta empresa</h2>
-        <p>O responsável do centro recebe os alertas das contas em que o centro tem fatia. As fatias são definidas na aba Categorias.</p>
+        <p>A conta do responsável recebe os alertas. Quando há posição, ela responde pelo gasto e não muda o perfil. As fatias ficam na aba Categorias.</p>
       </div>
     </div>
     <table class="dense fit-table">

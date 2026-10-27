@@ -41,7 +41,7 @@ const drafts = (itemIds: string[], changeId: string) => store.state.productRevis
       </div>
     </div>
     <table v-if="rows.length">
-      <thead><tr><th>Mudança</th><th>Itens</th><th>Prioridade</th><th>Efetiva</th><th>Versões</th><th>Situação</th></tr></thead>
+      <thead><tr><th>Mudança</th><th>Produtos</th><th>Prioridade</th><th>Efetiva</th><th>Versões</th><th>Situação</th></tr></thead>
       <tbody>
         <tr v-for="change in rows" :key="change.id" class="clickable" @click="selectedId = change.id">
           <td><span class="cell-main">{{ change.title }}</span><span class="cell-sub code">{{ change.id }}</span></td>

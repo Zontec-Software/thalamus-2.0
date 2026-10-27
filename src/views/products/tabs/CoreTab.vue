@@ -46,7 +46,7 @@ watch(() => [props.item.id, catalog.value.version], load, { immediate: true })
       <div class="field"><label>Tipo</label>
         <select v-model="form.type" :disabled="locked"><option v-for="(label, id) in ITEM_TYPE_LABEL" :key="id" :value="id">{{ label }}</option></select>
         <small v-if="form.type === 'SE'">Peça em processo tem cadastro próprio quando é armazenada, movimentada, inspecionada ou reutilizada. Etapa só de passagem fica na ordem de produção.</small>
-        <small>{{ locked ? 'Congelado: o tipo define as camadas do item.' : 'Mudar o tipo zera as aprovações já registradas.' }}</small>
+        <small>{{ locked ? 'Congelado: o tipo define as camadas do produto.' : 'Mudar o tipo zera as aprovações já registradas.' }}</small>
       </div>
       <div class="field wide">
         <div class="field-head"><label>Descrição</label><button v-if="locked" class="ask-link" type="button" @click="ask = 'name'">Solicitar alteração</button></div>

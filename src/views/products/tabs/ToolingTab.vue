@@ -78,7 +78,7 @@ function save() {
 
   <h3 class="drawer-title">Roteiros que usam este ferramental</h3>
   <table v-if="users.length" class="dense">
-    <thead><tr><th>Item</th><th>Operação</th><th>Posto</th><th>Tempo por peça</th></tr></thead>
+    <thead><tr><th>Produto</th><th>Operação</th><th>Posto</th><th>Tempo por peça</th></tr></thead>
     <tbody>
       <template v-for="user in users" :key="user.id">
         <tr v-for="step in user.routing!.filter(entry => entry.toolId === item.id)" :key="`${user.id}-${step.id}`">

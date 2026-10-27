@@ -6,7 +6,11 @@ import * as engine from '../domain/engine'
 import * as enterprise from '../domain/enterprise'
 import * as engineering from '../domain/engineering'
 import * as budget from '../domain/budget'
+import type { BudgetApproachId } from '../domain/budget'
 import * as partners from '../domain/partners'
+import * as people from '../domain/people'
+import * as organization from '../domain/organization'
+import * as directory from '../domain/directory'
 import * as resources from '../domain/resources'
 import * as serviceCatalog from '../domain/services'
 import { profileCan } from '../domain/access'
@@ -18,7 +22,7 @@ import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NonConformity, Resource, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v41'
+const STORAGE_KEY = 'thalamus-erp-v47'
 
 function load(): ErpState {
   const seed = createSeedState()
@@ -29,11 +33,13 @@ function load(): ErpState {
       /** Recarga a quente pode gravar o estado antigo na chave nova; faltando coleção, o seed regenera. */
       if (Object.keys(seed).some(key => !(key in state))) throw new Error('Estado salvo de outra versão')
       engine.applyDueRevisions(state)
+      directory.applyDueSuspensions(state)
       return state
     } catch {
       localStorage.removeItem(STORAGE_KEY)
     }
   }
+  directory.applyDueSuspensions(seed)
   return seed
 }
 
@@ -315,6 +321,8 @@ export const useErpStore = defineStore('erp', () => {
     run(() => { requireFeature('orcamentos.gerir'); return budget.applyGrowthToCategories(state, tenantId(), categoryIds, year, growthPct, reason, actor(), ui.role) }, applied => `${applied.length} categoria(s) atualizada(s) com ${growthPct}% sobre o realizado`)
   const applyRevenueTarget = (year: string, targetRevenue: number, reason = '') =>
     run(() => { requireFeature('orcamentos.gerir'); return budget.applyRevenueTarget(state, tenantId(), year, targetRevenue, reason, actor(), ui.role) }, result => `Meta aplicada: ${result.growthPct >= 0 ? '+' : ''}${result.growthPct}% sobre ${year === '' ? '' : Number(year) - 1}`)
+  const applyBudgetApproach = (year: string, approachId: BudgetApproachId) =>
+    run(() => { requireFeature('orcamentos.gerir'); return budget.applyBudgetApproach(state, tenantId(), year, approachId, actor(), ui.role) }, result => `Abordagem ${result.label} aplicada. Meta de receita ${result.revenueTarget.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`)
   const applyPriorSeasonality = (categoryIds: string[], year: string) =>
     run(() => { requireFeature('orcamentos.gerir'); return budget.applyPriorSeasonality(state, tenantId(), categoryIds, year, actor(), ui.role) }, applied => `Sazonalidade de ${Number(year) - 1} aplicada a ${applied.length} conta(s)`)
   const setMonthlyBudget = (categoryId: string, year: string, monthlyAmounts: number[], reason = '') =>
@@ -355,8 +363,83 @@ export const useErpStore = defineStore('erp', () => {
     run(() => { requireGroupPlanning(); return budget.applyGroupGrowth(state, groupId, year, growthPct, reason, actor(), ui.role) }, perTenant => `Planejamento aplicado a ${perTenant.length} empresa(s) do grupo`)
   const applyGroupRevenueTarget = (groupId: string, year: string, targetRevenue: number, reason = '') =>
     run(() => { requireGroupPlanning(); return budget.applyGroupRevenueTarget(state, groupId, year, targetRevenue, reason, actor(), ui.role) }, result => `Meta do grupo aplicada: ${result.growthPct >= 0 ? '+' : ''}${result.growthPct}% a cada empresa`)
-  const createUser = bind(enterprise.createUser, user => `${user.name} cadastrado · PIN ${user.pin}`)
+  const createUser = (input: Omit<Parameters<typeof enterprise.createUser>[1], 'role'> & { profileId: string }) => run(() => {
+    const profile = state.accessProfiles.find(entry => entry.id === input.profileId && entry.tenantId === tenantId())
+    if (!profile) throw new Error('Escolha um perfil desta empresa')
+    const user = enterprise.createUser(state, { name: input.name, email: input.email, sector: input.sector, positionId: input.positionId, shift: input.shift, role: profile.simulatedRole ?? 'Operador' }, actor())
+    people.ensureOpeningAssignment(state, user.id, engine.today(), actor())
+    organization.ensurePerson(state, user, tenantId(), actor())
+    organization.grantCompanyAccess(state, user.id, tenantId(), profile.id, actor())
+    return user
+  }, user => `${user.name} cadastrado`)
+  const updatePerson = bind(organization.updatePerson, 'Ficha atualizada')
+  const setPersonPhoto = bind(organization.setPersonPhoto, person => person.photo ? 'Foto atualizada' : 'Foto removida')
+  const updateEmployment = bind(organization.updateEmployment, 'Vínculo atualizado')
+  const createSector = bind(organization.createSector, sector => `Setor ${sector.name} criado`)
+  const createJob = bind(organization.createJob, job => `Cargo ${job.name} no catálogo`)
+  const createPosition = bind(organization.createPosition, position => `Posição ${position.name} aberta`)
+  const placeSector = bind(organization.placeSector, 'Lugar do setor atualizado')
+  const setSectorLeadership = bind(organization.setSectorLeadership, 'Liderança do setor atualizada')
+  const suggestIdentity = bind(organization.suggestIdentity, 'Sugestão registrada. Os cadastros não foram unidos.')
+  const confirmIdentity = bind(organization.confirmIdentity, 'Ligação confirmada')
+  const refuseIdentity = bind(organization.refuseIdentity, 'Sugestão recusada')
+  const addProjectParticipation = bind(organization.addProjectParticipation, 'Participação registrada sem levar dado sensível')
+  const grantCompanyAccess = bind(organization.grantCompanyAccess, 'Acesso concedido sem novo vínculo')
+  const openLinkedEmployment = bind(organization.openLinkedEmployment, result => `${result.person.fullName} com vínculo na empresa`)
+  const resetPin = bind(organization.resetPin, 'PIN redefinido. O valor não é exibido.')
+  function provisionDirectoryAccount(personId: string, email: string) {
+    try {
+      const account = directory.provisionDirectoryAccount(state, tenantId(), personId, email, actor())
+      if (account.status === 'Falha') ui.notify('error', 'Conta Google não criada', account.failure)
+      else ui.notify('success', `Conta Google ${account.email} criada`)
+      return account
+    } catch (error) {
+      ui.notify('error', 'Ação não concluída', error instanceof Error ? error.message : String(error))
+      return undefined
+    }
+  }
+  function retryDirectoryAccount(accountId: string) {
+    try {
+      const account = directory.retryDirectoryAccount(state, accountId, actor())
+      if (account.status === 'Falha') ui.notify('error', 'O Google recusou de novo', account.failure)
+      else ui.notify('success', account.status === 'Suspensa' ? `Conta Google ${account.email} suspensa` : `Conta Google ${account.email} criada`)
+      return account
+    } catch (error) {
+      ui.notify('error', 'Ação não concluída', error instanceof Error ? error.message : String(error))
+      return undefined
+    }
+  }
   const updateUser = bind(enterprise.updateUser, 'Cadastro atualizado')
+  const createJobOpening = bind(people.createJobOpening, job => `Vaga aberta: ${job.title}`)
+  const updateJobOpening = bind(people.updateJobOpening, 'Vaga atualizada')
+  const setJobStatus = bind(people.setJobStatus, 'Situação da vaga atualizada')
+  const addPeopleChecklistItem = bind(people.addChecklistItem, 'Item incluído no checklist')
+  const registerCandidate = bind(people.registerCandidate, result => `${result.candidate.name} entrou na vaga`)
+  const noteCandidateView = bind(people.noteCandidateView)
+  const prepareBriefing = bind(people.prepareBriefing, 'Leitura assistida pronta para revisão humana')
+  const reviewBriefing = bind(people.reviewBriefing, 'Revisão humana registrada')
+  const scheduleInterview = bind(people.scheduleInterview, 'Entrevista registrada. Nenhum convite externo é enviado.')
+  const setInterviewConfirmation = bind(people.setInterviewConfirmation, 'Confirmação atualizada')
+  const recordSelectionResult = bind(people.recordSelectionResult, 'Resultado da etapa registrado')
+  const setApplicationStage = bind(people.setApplicationStage, application => `Etapa: ${application.stage}`)
+  const setPeopleChecklistItem = bind(people.setChecklistItem, 'Checklist atualizado')
+  const hireCandidate = (applicationId: string, input: Omit<Parameters<typeof people.hireCandidate>[2], 'role'> & { profileId: string }) => run(() => {
+    const application = state.applications.find(entry => entry.id === applicationId)
+    const profile = state.accessProfiles.find(entry => entry.id === input.profileId && entry.tenantId === application?.tenantId)
+    if (!profile) throw new Error('Escolha um perfil da empresa da vaga')
+    const person = people.hireCandidate(state, applicationId, { sector: input.sector, shift: input.shift, positionId: input.positionId, linkUserId: input.linkUserId, role: profile.simulatedRole ?? 'Operador' }, actor(), created => enterprise.createUser(state, created, actor()))
+    if (!state.userProfileAssignments.some(entry => entry.userId === person.id && entry.profileId === profile.id && entry.tenantId === profile.tenantId)) organization.grantCompanyAccess(state, person.id, profile.tenantId, profile.id, actor())
+    return person
+  }, person => `${person.name} efetivado`)
+  const changeAssignment = bind(people.changeAssignment, 'Mudança registrada. O período anterior fica no histórico.')
+  const recordReview = bind(people.recordReview, 'Avaliação registrada')
+  const startOffboarding = (tenant: string, userId: string, input: { effectiveOn: string; reason: string }) => run(() => {
+    const process = people.startOffboarding(state, tenant, userId, input, actor())
+    directory.applyDueSuspensions(state)
+    return process
+  }, 'Desligamento iniciado')
+  const revokeAccess = bind(people.revokeAccess, record => record.result === 'Concluído' ? 'Acesso revogado. Nenhuma senha foi registrada.' : 'Falha de revogação registrada')
+  const closeOffboarding = bind(people.closeOffboarding, 'Desligamento concluído')
   const createPartner = bind(partners.createPartner, partner => `${partner.name} cadastrado`)
   const updatePartnerMaster = bind(partners.updatePartnerMaster, 'Dados gerais salvos')
   const addPartnerContact = bind(partners.addContact, 'Contato incluído')
@@ -593,7 +676,7 @@ export const useErpStore = defineStore('erp', () => {
     createTechnicalOrder, scheduleTechnicalOrder, updateTechnicalOrder, addTechnicalPart, advanceTechnicalOrder, cancelTechnicalOrder,
     createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk,
     createBudget, distributeGroupBudget, setAnnualBudget, adjustBudget, createBudgetCategory, updateBudgetCategory, configureBudget, decideBudgetException, acknowledgeBudgetAlert, linkBudgetInvoice,
-    applyBudgetGrowth, applyRevenueTarget, applyPriorSeasonality, setMonthlyBudget, setSectorAllocations, setCategoryAssignment, createBudgetGroup, createPlannedCompany, setCostCenterSplit, applyCategorySuggestion, saveBudgetSimulation, applyBudgetSimulation, createCostCenter, updateCostCenter, setSectorDefaultCostCenter, applyGroupGrowth, applyGroupRevenueTarget,
-    createUser, updateUser, createPartner, updatePartnerMaster, addPartnerContact, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, setServiceStatus, openServiceRoutingChange, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
+    applyBudgetGrowth, applyRevenueTarget, applyBudgetApproach, applyPriorSeasonality, setMonthlyBudget, setSectorAllocations, setCategoryAssignment, createBudgetGroup, createPlannedCompany, setCostCenterSplit, applyCategorySuggestion, saveBudgetSimulation, applyBudgetSimulation, createCostCenter, updateCostCenter, setSectorDefaultCostCenter, applyGroupGrowth, applyGroupRevenueTarget,
+    createUser, updateUser, updatePerson, setPersonPhoto, updateEmployment, createSector, createJob, createPosition, placeSector, setSectorLeadership, suggestIdentity, confirmIdentity, refuseIdentity, addProjectParticipation, grantCompanyAccess, openLinkedEmployment, resetPin, provisionDirectoryAccount, retryDirectoryAccount, createJobOpening, updateJobOpening, setJobStatus, addPeopleChecklistItem, registerCandidate, noteCandidateView, prepareBriefing, reviewBriefing, scheduleInterview, setInterviewConfirmation, recordSelectionResult, setApplicationStage, setPeopleChecklistItem, hireCandidate, changeAssignment, recordReview, startOffboarding, revokeAccess, closeOffboarding, createPartner, updatePartnerMaster, addPartnerContact, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, setServiceStatus, openServiceRoutingChange, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
   }
 })

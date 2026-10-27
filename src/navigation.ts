@@ -33,7 +33,7 @@ export const AREAS: Area[] = [
     id: 'cadastros', label: 'Cadastros', description: 'Produtos, pessoas, postos, serviços e patrimônio em uma fonte única.', icon: Building2,
     groups: [
       { label: 'Engenharia', items: [{ label: 'Produtos', to: '/produtos', icon: Boxes, module: 'Produtos' }, { label: 'Serviços', to: '/servicos', icon: BriefcaseBusiness, module: 'Serviços' }] },
-      { label: 'Organização', items: [{ label: 'Pessoas', to: '/pessoas', icon: Users, module: 'Pessoas' }, { label: 'Parceiros', to: '/parceiros', icon: Handshake, module: 'Parceiros' }, { label: 'Postos', to: '/postos', icon: Cog, module: 'Postos' }, { label: 'Ativos', to: '/ativos', icon: Factory, module: 'Ativos' }] },
+      { label: 'Organização', items: [{ label: 'Pessoas', to: '/pessoas', icon: Users, module: 'Pessoas' }, { label: 'Parceiros', to: '/parceiros', icon: Handshake, module: 'Parceiros' }, { label: 'Postos', to: '/postos', icon: Cog, module: 'Postos' }, { label: 'Ativos', to: '/ativos', icon: Factory, module: 'Ativos' }, { label: 'Gestão de acesso', to: '/organizacao', icon: UserRoundCog, module: 'Organização' }] },
     ],
   },
   {
@@ -83,7 +83,7 @@ export const AREAS: Area[] = [
     id: 'gestao', label: 'Gestão', description: 'Indicadores, projetos, integração e governança.', icon: BarChart3,
     groups: [
       { label: 'Gestão', items: [{ label: 'Indicadores', to: '/indicadores', icon: BarChart3, module: 'Indicadores' }, { label: 'Projetos', to: '/projetos', icon: FolderKanban, module: 'Projetos' }] },
-      { label: 'Sistema', items: [{ label: 'Organização e acessos', to: '/organizacao', icon: UserRoundCog, module: 'Organização' }, { label: 'Integração Omie', to: '/integracao', icon: Unplug, module: 'Integração Omie' }, { label: 'Central de ajuda', to: '/ajuda', icon: LifeBuoy }] },
+      { label: 'Sistema', items: [{ label: 'Integração Omie', to: '/integracao', icon: Unplug, module: 'Integração Omie' }, { label: 'Central de ajuda', to: '/ajuda', icon: LifeBuoy }] },
     ],
   },
   {
@@ -109,7 +109,29 @@ export const ROUTE_MODULE: Record<string, string | undefined> = Object.fromEntri
 
 export const owns = (to: string, path: string) => path === to || path.startsWith(`${to}/`)
 
-export const areaOf = (path: string) => AREAS.find(area => area.groups.some(group => group.items.some(item => owns(item.to, path))))
+export const areaHubPath = (areaId: string) => `/area/${areaId}`
+
+/** Módulos da área que o perfil pode abrir. Item sem módulo fica visível para todos. */
+export function areaItems(area: Area, can: (module?: string) => boolean) {
+  return area.groups.flatMap(group => group.items).filter(item => can(item.module))
+}
+
+/**
+ * Destino do clique na área. Um único módulo abre direto.
+ * Dois ou mais abrem o mapa da área.
+ */
+export function areaDestination(area: Area, can: (module?: string) => boolean): string | undefined {
+  const items = areaItems(area, can)
+  if (items.length === 1) return items[0].to
+  if (items.length > 1) return areaHubPath(area.id)
+  return undefined
+}
+
+export const areaOf = (path: string) => {
+  const hub = path.match(/^\/area\/([^/]+)/)?.[1]
+  if (hub) return AREAS.find(area => area.id === hub)
+  return AREAS.find(area => area.groups.some(group => group.items.some(item => owns(item.to, path))))
+}
 
 export const moduleOf = (path: string) => NAVIGATION.flatMap(group => group.items).find(item => owns(item.to, path))?.module
 

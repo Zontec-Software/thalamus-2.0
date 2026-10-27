@@ -141,7 +141,7 @@ function create() {
 <template>
   <article class="card flush" data-tour="product-list">
     <div class="section-head">
-      <div><h2>Itens</h2><p>Um código por item. Filtre, ordene e abra a página do item para editar as camadas.</p></div>
+      <div><h2>Produtos</h2><p>Um código por produto. Filtre, ordene e abra a página do produto para editar as camadas.</p></div>
       <div class="filter-row">
         <div class="column-menu">
           <button class="button secondary" @click="columnsOpen = !columnsOpen"><Columns3 :size="14" /> Colunas</button>
@@ -149,7 +149,7 @@ function create() {
             <label v-for="column in LIST_COLUMNS" :key="column.id"><input v-model="listState.columns" type="checkbox" :value="column.id" /> {{ column.label }}</label>
           </div>
         </div>
-        <button class="button" data-tour="new-record" :disabled="!canEdit(ui.role, 'nucleo')" :title="canEdit(ui.role, 'nucleo') ? '' : `Quem cadastra: ${editorsLabel('nucleo')}`" @click="openCreate"><Plus :size="14" /> Novo item</button>
+        <button class="button" data-tour="new-record" :disabled="!canEdit(ui.role, 'nucleo')" :title="canEdit(ui.role, 'nucleo') ? '' : `Quem cadastra: ${editorsLabel('nucleo')}`" @click="openCreate"><Plus :size="14" /> Novo produto</button>
       </div>
     </div>
 
@@ -163,7 +163,7 @@ function create() {
       <select v-model="listState.abc" class="filter"><option value="">Curva ABC</option><option value="A">Classe A</option><option value="B">Classe B</option><option value="C">Classe C</option></select>
     </div>
     <div class="list-meta">
-      <span>{{ filtered.length }} item(ns) encontrados<template v-if="activeFilters"> · {{ activeFilters }} filtro(s) <button class="button ghost small" @click="clearFilters"><X :size="12" /> limpar</button></template></span>
+      <span>{{ filtered.length === 1 ? '1 produto encontrado' : `${filtered.length} produtos encontrados` }}<template v-if="activeFilters"> · {{ activeFilters }} filtro(s) <button class="button ghost small" @click="clearFilters"><X :size="12" /> limpar</button></template></span>
       <label class="filter-row"><input v-model="listState.showDeleted" type="checkbox" /> Mostrar só excluídos logicamente</label>
     </div>
 
@@ -232,15 +232,15 @@ function create() {
         </tr>
       </tbody>
     </table>
-    <p v-if="!filtered.length" class="empty-note">Nenhum item com esses filtros.</p>
+    <p v-if="!filtered.length" class="empty-note">Nenhum produto com esses filtros.</p>
     <TablePager v-model:page="page" v-model:size="size" :pages="pages" :range="range" />
   </article>
 
-  <ReasonModal :open="askReason !== ''" :title="askReason === 'block' ? `Bloquear ${picked.length} item(ns)` : `Obsoletar ${picked.length} item(ns)`"
-    subtitle="Cada item passa pelas mesmas regras da tela individual. Os que não puderem mudar voltam com o motivo." :tone="askReason === 'block' ? 'danger' : 'warning'"
+  <ReasonModal :open="askReason !== ''" :title="askReason === 'block' ? `Bloquear ${picked.length === 1 ? '1 produto' : `${picked.length} produtos`}` : `Obsoletar ${picked.length === 1 ? '1 produto' : `${picked.length} produtos`}`"
+    subtitle="Cada produto passa pelas mesmas regras da tela individual. Os que não puderem mudar voltam com o motivo." :tone="askReason === 'block' ? 'danger' : 'warning'"
     :confirm="askReason === 'block' ? 'Bloquear' : 'Obsoletar'" @close="askReason = ''" @confirm="reason => askReason && bulk(askReason, reason)" />
 
-  <BaseModal :open="creating" title="Novo item" subtitle="Nasce em rascunho. Rascunho não entra em pedido, compra nem produção." @close="creating = false">
+  <BaseModal :open="creating" title="Novo produto" subtitle="Nasce em rascunho. Rascunho não entra em pedido, compra nem produção." @close="creating = false">
     <form id="new-item" @submit.prevent="create">
       <div class="field"><label>Descrição</label><input v-model="draft.name" required minlength="3" placeholder="Ex.: ABS cinza UV" /></div>
       <div class="form-grid">
@@ -252,14 +252,14 @@ function create() {
         <small>O código sai sequencial e sem significado. A classificação é que organiza.</small>
       </div>
       <div v-if="similar.length" class="notice warning">
-        <b>Itens parecidos já cadastrados:</b>
+        <b>Produtos parecidos já cadastrados:</b>
         <div v-for="entry in similar" :key="entry.id">{{ entry.code }} · {{ entry.name }} ({{ catalogOf(entry).lifecycle }})</div>
-        <span v-if="confirmSimilar">Confirme que é outro item para continuar.</span>
+        <span v-if="confirmSimilar">Confirme que é outro produto para continuar.</span>
       </div>
     </form>
     <template #footer>
       <button class="button secondary" type="button" @click="creating = false">Cancelar</button>
-      <button class="button" type="submit" form="new-item">{{ confirmSimilar ? 'É outro item, criar' : 'Criar rascunho' }}</button>
+      <button class="button" type="submit" form="new-item">{{ confirmSimilar ? 'É outro produto, criar' : 'Criar rascunho' }}</button>
     </template>
   </BaseModal>
 </template>

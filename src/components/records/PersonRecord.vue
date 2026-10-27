@@ -1,18 +1,21 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
+import { useRouter } from 'vue-router'
 import RecordHeader from './RecordHeader.vue'
 import RecordTimeline from './RecordTimeline.vue'
 import StatusBadge from '../StatusBadge.vue'
 import { sectorOf, tasksForRole } from '../../domain/enterprise'
+import { reviewsShareScale } from '../../domain/people'
 import { AREAS, moduleFeature } from '../../navigation'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import type { Role, User } from '../../types/domain'
-import { fmtDateTime } from '../../utils/format'
+import { fmtDate, fmtDateTime } from '../../utils/format'
 
 const props = defineProps<{ id: string; context: Record<string, string> }>()
 const store = useErpStore()
 const ui = useUiStore()
+const router = useRouter()
 
 const ROLES: Role[] = ['Administrador', 'Gestor', 'Comercial', 'Engenharia', 'PCP', 'Compras', 'Almoxarifado', 'Líder de produção', 'Operador', 'Qualidade', 'Expedição', 'Manutenção', 'Assistência', 'Financeiro']
 const isNew = computed(() => props.id === 'new')
@@ -24,8 +27,13 @@ const positionsOf = (sectorName: string) => {
 }
 
 function create() {
-  const created = store.createUser({ ...form, email: form.email || undefined, positionId: form.positionId || undefined })
-  if (created && created !== true) ui.openRecord('person', created.id)
+  const profile = store.state.accessProfiles.find(entry => entry.tenantId === ui.activeTenantId && (entry.simulatedRole === form.role || entry.name === form.role))
+  if (!profile) return
+  const created = store.createUser({ name: form.name, email: form.email || undefined, sector: form.sector, shift: form.shift, positionId: form.positionId || undefined, profileId: profile.id })
+  if (created && created !== true) {
+    ui.closeRecord()
+    router.push(`/pessoas/pessoa/${created.id}`)
+  }
 }
 
 const access = computed(() => person.value ? AREAS.map(area => ({
@@ -42,8 +50,30 @@ const team = computed(() => store.state.users.filter(entry => managed.value.some
 const tasks = computed(() => person.value ? tasksForRole(store.state, person.value.role, person.value.id) : [])
 const activity = computed(() => person.value ? store.state.events.filter(event => event.actor === person.value!.name).slice(0, 8) : [])
 
-function update(patch: Partial<Pick<User, 'role' | 'sector' | 'shift' | 'positionId' | 'active'>>) {
+function update(patch: Partial<Pick<User, 'role' | 'shift' | 'active'>>) {
   store.updateUser(props.id, patch)
+}
+
+const assignmentForm = reactive({ sector: '', positionId: '', validFrom: '2026-10-27' })
+const reviewForm = reactive({ scoreLabel: '', scale: '', period: '', origin: '' })
+const assignments = computed(() => store.state.assignments.filter(entry => entry.userId === props.id).sort((a, b) => a.validFrom.localeCompare(b.validFrom)))
+const reviews = computed(() => store.state.performanceReviews.filter(entry => entry.userId === props.id).sort((a, b) => a.at.localeCompare(b.at)))
+const comparable = computed(() => reviewsShareScale(reviews.value))
+const offboarding = computed(() => store.state.offboardings.find(entry => entry.userId === props.id && entry.status === 'Em andamento'))
+const movementTasks = computed(() => store.state.peopleChecklists.filter(entry => entry.process === 'movimentacao' && assignments.value.some(assignment => assignment.id === entry.refId)))
+
+function registerAssignment() {
+  store.changeAssignment(ui.activeTenantId, props.id, { sector: assignmentForm.sector, positionId: assignmentForm.positionId || undefined, validFrom: assignmentForm.validFrom })
+}
+
+function registerReview() {
+  const created = store.recordReview(props.id, reviewForm)
+  if (created) {
+    reviewForm.scoreLabel = ''
+    reviewForm.scale = ''
+    reviewForm.period = ''
+    reviewForm.origin = ''
+  }
 }
 </script>
 
@@ -82,27 +112,58 @@ function update(patch: Partial<Pick<User, 'role' | 'sector' | 'shift' | 'positio
       <h3 class="drawer-title">Cadastro</h3>
       <div class="form-grid">
         <div class="field"><label>Papel de acesso</label><select :value="person.role" @change="update({ role: ($event.target as HTMLSelectElement).value as Role })"><option v-for="role in ROLES" :key="role">{{ role }}</option></select></div>
-        <div class="field"><label>Setor</label><select :value="person.sector" @change="update({ sector: ($event.target as HTMLSelectElement).value })"><option v-for="entry in store.state.sectors" :key="entry.id">{{ entry.name }}</option></select></div>
-        <div class="field"><label>Cargo</label><select :value="person.positionId ?? ''" @change="update({ positionId: ($event.target as HTMLSelectElement).value || undefined })"><option value="">Sem cargo</option><option v-for="entry in store.state.positions" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+        <div class="field"><label>Setor vigente</label><input :value="person.sector" disabled /></div>
+        <div class="field"><label>Cargo vigente</label><input :value="position?.name ?? 'Sem cargo'" disabled /></div>
         <div class="field"><label>Turno</label><select :value="person.shift" @change="update({ shift: ($event.target as HTMLSelectElement).value as User['shift'] })"><option>Manhã</option><option>Tarde</option><option>Administrativo</option></select></div>
       </div>
       <div class="drawer-actions">
         <button class="button secondary small" @click="update({ active: person.active === false })">{{ person.active === false ? 'Reativar acesso' : 'Desativar acesso' }}</button>
       </div>
       <p v-if="position" class="hint">{{ position.name }}: {{ position.description }}</p>
+      <p v-if="offboarding" class="hint">Desligamento em andamento, com data efetiva {{ fmtDate(offboarding.effectiveOn) }}. Acompanhe em Pessoas → Desligamento.</p>
       </div>
+
+      <h3 class="drawer-title">Cargos e setores</h3>
+      <ol class="timeline">
+        <li v-for="entry in assignments" :key="entry.id"><i></i><div><strong>{{ entry.sector }} · {{ store.state.positions.find(position => position.id === entry.positionId)?.name ?? 'Sem cargo' }}</strong><span>{{ fmtDate(entry.validFrom) }}<template v-if="entry.validTo"> a {{ fmtDate(entry.validTo) }}</template><template v-else> · vigente</template> · {{ entry.actor }}</span></div></li>
+      </ol>
+      <p v-if="!assignments.length" class="empty-note">Sem vigência registrada. O setor atual continua no cadastro.</p>
+      <div class="form-grid">
+        <div class="field"><label>Novo setor</label><select v-model="assignmentForm.sector"><option value="">—</option><option v-for="entry in store.state.sectors" :key="entry.id">{{ entry.name }}</option></select></div>
+        <div class="field"><label>Novo cargo</label><select v-model="assignmentForm.positionId"><option value="">Sem cargo</option><option v-for="entry in positionsOf(assignmentForm.sector)" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+        <div class="field"><label>Vigência a partir de</label><input v-model="assignmentForm.validFrom" type="date" /></div>
+      </div>
+      <button class="button secondary small" @click="registerAssignment">Registrar vigência</button>
+      <div v-for="list in movementTasks" :key="list.id" class="list-row static">
+        <div><strong>Revisão após a mudança</strong><span>{{ list.items.map(item => `${item.label}: ${item.status}`).join(' · ') }}</span></div>
+      </div>
+      <p class="hint">A mudança não concede acesso. As tarefas são só de revisão.</p>
+
+      <h3 class="drawer-title">Avaliações individuais</h3>
+      <ol class="timeline">
+        <li v-for="entry in reviews" :key="entry.id"><i></i><div><strong>{{ entry.scoreLabel }} · escala {{ entry.scale }}</strong><span>{{ entry.period }} · {{ entry.origin }} · {{ entry.actor }} · {{ fmtDateTime(entry.at) }}</span></div></li>
+      </ol>
+      <p v-if="reviews.length > 1 && !comparable" class="hint">Estas notas usam escalas diferentes e não são comparadas.</p>
+      <p v-if="!reviews.length" class="empty-note">Nenhuma avaliação registrada.</p>
+      <div class="form-grid">
+        <div class="field"><label>Nota</label><input v-model="reviewForm.scoreLabel" placeholder="4 ou B" /></div>
+        <div class="field"><label>Escala</label><input v-model="reviewForm.scale" placeholder="0 a 5" /></div>
+        <div class="field"><label>Período</label><input v-model="reviewForm.period" placeholder="2026" /></div>
+        <div class="field"><label>Origem</label><input v-model="reviewForm.origin" placeholder="Gestor direto" /></div>
+      </div>
+      <button class="button secondary small" @click="registerReview">Registrar avaliação</button>
 
       <div data-tour="person-access">
       <h3 class="drawer-title">Acessos pelo papel {{ person.role }}</h3>
       <div v-for="entry in access" :key="entry.area" class="access-row"><b>{{ entry.area }}</b><span v-for="module in entry.modules" :key="module" class="chip">{{ module }}</span></div>
       <p v-if="!access.length" class="empty-note">Sem módulos. Operadores usam apenas o tablet.</p>
-      <p class="hint">As permissões por papel são ajustadas em Gestão → Organização e acessos.</p>
+      <p class="hint">As permissões por papel são ajustadas em Cadastros → Gestão de acesso.</p>
       </div>
 
       <div data-tour="person-team">
       <template v-if="managed.length">
         <h3 class="drawer-title">Equipe ({{ managed.map(entry => entry.name).join(', ') }})</h3>
-        <button v-for="member in team" :key="member.id" class="list-row" @click="ui.openRecord('person', member.id)">
+        <button v-for="member in team" :key="member.id" class="list-row" @click="ui.closeRecord(); router.push(`/pessoas/pessoa/${member.id}`)">
           <div><strong>{{ member.name }}</strong><span>{{ member.role }} · {{ member.shift }}</span></div><StatusBadge :value="member.active === false ? 'Inativo' : 'Ativo'" />
         </button>
       </template>

@@ -49,7 +49,7 @@ const STAGE_TONE: Record<ChangeStage, string> = { Solicitada: 'neutral', 'Em an�
 
     <h4 class="drawer-title">Impacto hoje</h4>
     <table class="dense">
-      <thead><tr><th>Item</th><th>Saldo</th><th>OPs abertas</th><th>Pedidos</th><th>Compras</th><th>Usado em</th><th>Versão</th></tr></thead>
+      <thead><tr><th>Produto</th><th>Saldo</th><th>OPs abertas</th><th>Pedidos</th><th>Compras</th><th>Usado em</th><th>Versão</th></tr></thead>
       <tbody>
         <tr v-for="row in impact" :key="row.item.id">
           <td><RouterLink :to="`/produtos/item/${row.item.id}?aba=manufatura`" class="cell-main code">{{ row.item.code }}</RouterLink><span class="cell-sub">{{ row.item.name }}</span></td>
@@ -69,7 +69,7 @@ const STAGE_TONE: Record<ChangeStage, string> = { Solicitada: 'neutral', 'Em an�
         </tr>
       </tbody>
     </table>
-    <p class="cell-sub">Na aprovação, cada item com estrutura precisa da sua versão em rascunho. Ao implementar, todas são liberadas juntas na data de efetividade.</p>
+    <p class="cell-sub">Na aprovação, cada produto com estrutura precisa da sua versão em rascunho. Ao implementar, todas são liberadas juntas na data de efetividade.</p>
 
     <div v-if="!closed" class="filter-row" style="margin-top:10px">
       <button v-for="action in actions" :key="action.to" class="button small" :class="{ secondary: action.secondary }" @click="store.moveChange(change.id, action.to, '')">{{ action.label }}</button>

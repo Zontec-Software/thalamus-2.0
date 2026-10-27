@@ -4,7 +4,7 @@ import {
   startOperation, updateNonConformity, type ErpState,
 } from '../domain/engine'
 import { defaultCatalog, ensureClassPath, seedPath, withCheckDigit } from '../domain/catalog'
-import { FUNCTIONALITIES, profileCode, seededProfiles } from '../domain/access'
+import { FUNCTIONALITIES, moduleFeature, profileCode, seededProfiles } from '../domain/access'
 import type { BusinessPartner, Item, PartnerRoleName, RouteStep, SalesOrder } from '../types/domain'
 
 const mp = (id: string, code: string, name: string, stock: number, minimum: number, cost: number, supplier: string, leadTimeDays: number): Item =>
@@ -151,9 +151,26 @@ function baseState(): ErpState {
       },
       { id: 'im-rack', code: 'RF-10005', name: 'Rack de carga portuário', type: 'IM', unit: 'un', stock: 1, minimum: 0, cost: 2400, location: 'Expedição' },
     ],
+    jobOpenings: [],
+    candidates: [],
+    applications: [],
+    interviews: [],
+    selectionReviews: [],
+    peopleChecklists: [],
+    candidateBriefings: [],
+    assignments: [],
+    performanceReviews: [],
+    offboardings: [],
+    accessRevocations: [],
+    persons: [],
+    workspaceConnections: [],
+    directoryAccounts: [],
+    employments: [],
+    identityLinks: [],
+    projectParticipations: [],
     users: [
       { id: 'u-master', name: 'Mestre da plataforma', role: 'Administrador', sector: 'Plataforma', shift: 'Administrativo', pin: '9000', email: 'plataforma@thalamus.local', active: true, platformMaster: true },
-      { id: 'u16', name: 'Lucas Lima', role: 'Administrador', sector: 'Diretoria industrial', shift: 'Administrativo', pin: '0000', email: 'lucas.lima@roboflex.com.br', active: true },
+      { id: 'u16', name: 'Lucas Lima', role: 'Administrador', sector: 'Diretoria industrial', shift: 'Administrativo', pin: '0000', email: 'lucas.lima@roboflex.com.br', positionId: 'pos-dir', active: true },
       { id: 'u1', name: 'Marina Souza', role: 'Gestor', sector: 'Diretoria industrial', shift: 'Administrativo', pin: '1111', email: 'marina@roboflex.com.br', active: true },
       { id: 'u1', name: 'Marina Souza', role: 'Gestor', sector: 'Diretoria industrial', shift: 'Administrativo', pin: '1111', email: 'marina@roboflex.com.br', active: true },
       { id: 'u12', name: 'Camila Nunes', role: 'Comercial', sector: 'Comercial', shift: 'Administrativo', pin: '1212', email: 'camila@roboflex.com.br', positionId: 'pos-com', active: true },
@@ -161,29 +178,33 @@ function baseState(): ErpState {
       { id: 'u14', name: 'Patrícia Melo', role: 'Financeiro', sector: 'Financeiro', shift: 'Administrativo', pin: '1414', email: 'patricia@roboflex.com.br', positionId: 'pos-fin', active: true },
       { id: 'u15', name: 'André Silva', role: 'Assistência', sector: 'Assistência técnica', shift: 'Administrativo', pin: '1515', email: 'andre@roboflex.com.br', positionId: 'pos-ast', active: true },
       { id: 'u2', name: 'Paulo Mendes', role: 'PCP', sector: 'Planejamento', shift: 'Administrativo', pin: '2222' },
-      { id: 'u3', name: 'Juliana Reis', role: 'Compras', sector: 'Suprimentos', shift: 'Administrativo', pin: '3333' },
+      { id: 'u3', name: 'Juliana Reis', role: 'Compras', sector: 'Suprimentos', shift: 'Administrativo', pin: '3333', positionId: 'pos-compras' },
       { id: 'u4', name: 'Carlos Lima', role: 'Almoxarifado', sector: 'Almoxarifado', shift: 'Manhã', pin: '4444' },
-      { id: 'u5', name: 'Bruno Alves', role: 'Líder de produção', sector: 'Produção', shift: 'Manhã', pin: '5555' },
-      { id: 'u6', name: 'João Pereira', role: 'Operador', sector: 'Injeção', shift: 'Manhã', pin: '1234' },
+      { id: 'u5', name: 'Bruno Alves', role: 'Líder de produção', sector: 'Produção', shift: 'Manhã', pin: '5555', positionId: 'pos-lider' },
+      { id: 'u6', name: 'João Pereira', role: 'Operador', sector: 'Injeção', shift: 'Manhã', pin: '1234', positionId: 'pos-op' },
       { id: 'u7', name: 'Ana Costa', role: 'Operador', sector: 'Montagem', shift: 'Manhã', pin: '1234' },
       { id: 'u8', name: 'Lucas Ferreira', role: 'Operador', sector: 'Injeção', shift: 'Tarde', pin: '1234' },
       { id: 'u9', name: 'Fernanda Rocha', role: 'Qualidade', sector: 'Qualidade', shift: 'Manhã', pin: '6666' },
       { id: 'u10', name: 'Rafael Souza', role: 'Expedição', sector: 'Logística', shift: 'Manhã', pin: '7777' },
-      { id: 'u11', name: 'Diego Martins', role: 'Manutenção', sector: 'Manutenção', shift: 'Manhã', pin: '8888' },
+      { id: 'u11', name: 'Diego Martins', role: 'Manutenção', sector: 'Manutenção', shift: 'Manhã', pin: '8888', email: 'diego.martins@roboflex.com.br', positionId: 'pos-manut' },
+      { id: 'u17', name: 'Sérgio Prado', role: 'Operador', sector: 'Injeção', shift: 'Tarde', pin: '1717', email: 'sergio.prado@roboflex.com.br', positionId: 'pos-op', active: true },
+      { id: 'u18', name: 'Helena Duarte', role: 'Engenharia', sector: 'Engenharia Zontec', shift: 'Administrativo', pin: '1818', email: 'helena.duarte@zontec.com.br', positionId: 'pos-z-eng', active: true, homeTenantId: 'tenant-roboflex-sul' },
     ],
     sectors: [
-      { id: 'sec-dir', name: 'Diretoria industrial', costCenters: { 'tenant-roboflex': 'CC-100', 'tenant-roboflex-sul': 'CC-100' } },
-      { id: 'sec-com', name: 'Comercial', managerId: 'u12', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-210', 'tenant-roboflex-sul': 'CC-210' } },
-      { id: 'sec-eng', name: 'Engenharia', managerId: 'u13', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-310', 'tenant-roboflex-sul': 'CC-310' } },
-      { id: 'sec-sup', name: 'Suprimentos', managerId: 'u3', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-320', 'tenant-roboflex-sul': 'CC-320' } },
-      { id: 'sec-pro', name: 'Operações', managerId: 'u5', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-400', 'tenant-roboflex-sul': 'CC-400' } },
-      { id: 'sec-ser', name: 'Serviços', managerId: 'u11', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-500', 'tenant-roboflex-sul': 'CC-400' } },
-      { id: 'sec-fin', name: 'Financeiro', managerId: 'u14', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-600', 'tenant-roboflex-sul': 'CC-600' } },
+      { id: 'sec-dir', tenantId: 'tenant-roboflex', name: 'Diretoria industrial', managerPositionId: 'pos-dir', managerId: 'u16', costCenters: { 'tenant-roboflex': 'CC-100', 'tenant-roboflex-sul': 'CC-100' } },
+      { id: 'sec-com', tenantId: 'tenant-roboflex', name: 'Comercial', managerPositionId: 'pos-com', managerId: 'u12', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-210', 'tenant-roboflex-sul': 'CC-210' } },
+      { id: 'sec-eng', tenantId: 'tenant-roboflex', name: 'Engenharia', managerPositionId: 'pos-eng', managerId: 'u13', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-310', 'tenant-roboflex-sul': 'CC-310' } },
+      { id: 'sec-sup', tenantId: 'tenant-roboflex', name: 'Suprimentos', managerPositionId: 'pos-compras', managerId: 'u3', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-320', 'tenant-roboflex-sul': 'CC-320' } },
+      { id: 'sec-pro', tenantId: 'tenant-roboflex', name: 'Operações', managerPositionId: 'pos-lider', managerId: 'u5', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-400', 'tenant-roboflex-sul': 'CC-400' } },
+      { id: 'sec-ser', tenantId: 'tenant-roboflex', name: 'Serviços', managerPositionId: 'pos-manut', managerId: 'u11', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-500', 'tenant-roboflex-sul': 'CC-400' } },
+      { id: 'sec-fin', tenantId: 'tenant-roboflex', name: 'Financeiro', managerPositionId: 'pos-fin', managerId: 'u14', parentId: 'sec-dir', costCenters: { 'tenant-roboflex': 'CC-600', 'tenant-roboflex-sul': 'CC-600' } },
+      { id: 'sec-z-dir', tenantId: 'tenant-roboflex-sul', name: 'Diretoria Zontec', costCenters: { 'tenant-roboflex-sul': 'CC-100' } },
+      { id: 'sec-z-eng', tenantId: 'tenant-roboflex-sul', name: 'Engenharia Zontec', managerPositionId: 'pos-z-eng', managerId: 'u18', parentId: 'sec-z-dir', costCenters: { 'tenant-roboflex-sul': 'CC-310' } },
     ],
     costCenters: [
       { id: 'cc-rob-100', tenantId: 'tenant-roboflex', code: 'CC-100', name: 'Diretoria industrial', responsibleUserId: 'u1', status: 'Ativo' },
-      { id: 'cc-rob-210', tenantId: 'tenant-roboflex', code: 'CC-210', name: 'Comercial', responsibleUserId: 'u12', status: 'Ativo' },
-      { id: 'cc-rob-310', tenantId: 'tenant-roboflex', code: 'CC-310', name: 'Engenharia de produto', responsibleUserId: 'u13', status: 'Ativo' },
+      { id: 'cc-rob-210', tenantId: 'tenant-roboflex', code: 'CC-210', name: 'Comercial', responsibleUserId: 'u12', responsiblePositionId: 'pos-com', status: 'Ativo' },
+      { id: 'cc-rob-310', tenantId: 'tenant-roboflex', code: 'CC-310', name: 'Engenharia de produto', responsibleUserId: 'u13', responsiblePositionId: 'pos-eng', status: 'Ativo' },
       { id: 'cc-rob-320', tenantId: 'tenant-roboflex', code: 'CC-320', name: 'Suprimentos', responsibleUserId: 'u3', status: 'Ativo' },
       { id: 'cc-rob-330', tenantId: 'tenant-roboflex', code: 'CC-330', name: 'Ferramental', responsibleUserId: 'u13', status: 'Ativo' },
       { id: 'cc-rob-400', tenantId: 'tenant-roboflex', code: 'CC-400', name: 'Operações', responsibleUserId: 'u5', status: 'Ativo' },
@@ -199,12 +220,29 @@ function baseState(): ErpState {
       { id: 'cc-sul-500', tenantId: 'tenant-roboflex-sul', code: 'CC-500', name: 'Serviços de campo', responsibleUserId: 'u11', status: 'Ativo' },
       { id: 'cc-sul-600', tenantId: 'tenant-roboflex-sul', code: 'CC-600', name: 'Financeiro', responsibleUserId: 'u14', status: 'Ativo' },
     ],
+    jobs: [
+      { id: 'job-com', tenantId: 'tenant-roboflex', name: 'Executiva comercial', level: 'Pleno', cbo: '2532-25', mission: 'CRM, propostas e carteira de clientes', requirements: ['Proposta comercial'], status: 'Ativo' },
+      { id: 'job-eng', tenantId: 'tenant-roboflex', name: 'Engenheiro de produto', level: 'Pleno', cbo: '2144-05', mission: 'Produto, estrutura, roteiro e revisão', requirements: ['Desenho técnico'], status: 'Ativo' },
+      { id: 'job-fin', tenantId: 'tenant-roboflex', name: 'Analista financeiro', level: 'Pleno', cbo: '2522-10', mission: 'Orçamentos e centros de custo', requirements: ['Acompanhamento orçamentário'], status: 'Ativo' },
+      { id: 'job-ast', tenantId: 'tenant-roboflex', name: 'Técnico de campo', level: 'Pleno', cbo: '3131-15', mission: 'Triagem e execução de assistência', requirements: ['Atendimento em campo'], status: 'Ativo' },
+      { id: 'job-dir', tenantId: 'tenant-roboflex', name: 'Diretor industrial', level: 'Diretoria', cbo: '1223-05', mission: 'Responder pela operação e pelas áreas de apoio', requirements: ['Gestão industrial'], status: 'Ativo' },
+      { id: 'job-op', tenantId: 'tenant-roboflex', name: 'Operador industrial', level: 'Operacional', cbo: '7842-05', mission: 'Apontamento e autocontrole', requirements: ['Injeção'], status: 'Ativo' },
+      { id: 'job-compras', tenantId: 'tenant-roboflex', name: 'Comprador', level: 'Pleno', cbo: '3542-05', mission: 'Cotações e pedidos de compra', requirements: ['Cotação'], status: 'Ativo' },
+      { id: 'job-lider', tenantId: 'tenant-roboflex', name: 'Líder de produção', level: 'Liderança', cbo: '7601-05', mission: 'Conduzir a operação do turno', requirements: ['Liderança de célula'], status: 'Ativo' },
+      { id: 'job-manut', tenantId: 'tenant-roboflex', name: 'Técnico de manutenção', level: 'Pleno', cbo: '9113-05', mission: 'Disponibilidade das máquinas', requirements: ['Manutenção industrial'], status: 'Ativo' },
+      { id: 'job-z-eng', tenantId: 'tenant-roboflex-sul', name: 'Engenheiro de produto', level: 'Pleno', cbo: '2144-05', mission: 'Apoio de engenharia da Zontec', requirements: ['Processo de injeção'], status: 'Ativo' },
+    ],
     positions: [
-      { id: 'pos-com', name: 'Executiva comercial', sectorId: 'sec-com', description: 'CRM, propostas e carteira de clientes' },
-      { id: 'pos-eng', name: 'Engenheiro de produto', sectorId: 'sec-eng', description: 'Produto, estrutura, roteiro e revisão' },
-      { id: 'pos-fin', name: 'Analista financeiro', sectorId: 'sec-fin', description: 'Orçamentos e centros de custo' },
-      { id: 'pos-ast', name: 'Técnico de campo', sectorId: 'sec-ser', description: 'Triagem e execução de assistência' },
-      { id: 'pos-op', name: 'Operador industrial', sectorId: 'sec-pro', description: 'Apontamento e autocontrole' },
+      { id: 'pos-com', tenantId: 'tenant-roboflex', name: 'Executiva comercial', sectorId: 'sec-com', jobId: 'job-com', description: 'CRM, propostas e carteira de clientes', headcount: 1, status: 'Ativo' },
+      { id: 'pos-eng', tenantId: 'tenant-roboflex', name: 'Engenheiro de produto', sectorId: 'sec-eng', jobId: 'job-eng', description: 'Produto, estrutura, roteiro e revisão', headcount: 1, status: 'Ativo' },
+      { id: 'pos-fin', tenantId: 'tenant-roboflex', name: 'Analista financeiro', sectorId: 'sec-fin', jobId: 'job-fin', description: 'Orçamentos e centros de custo', headcount: 1, status: 'Ativo' },
+      { id: 'pos-ast', tenantId: 'tenant-roboflex', name: 'Técnico de campo', sectorId: 'sec-ser', jobId: 'job-ast', description: 'Triagem e execução de assistência', headcount: 1, status: 'Ativo' },
+      { id: 'pos-op', tenantId: 'tenant-roboflex', name: 'Operador industrial', sectorId: 'sec-pro', jobId: 'job-op', description: 'Apontamento e autocontrole', parentPositionId: 'pos-lider', headcount: 6, status: 'Ativo' },
+      { id: 'pos-compras', tenantId: 'tenant-roboflex', name: 'Comprador', sectorId: 'sec-sup', jobId: 'job-compras', description: 'Cotações e pedidos de compra', headcount: 1, status: 'Ativo' },
+      { id: 'pos-dir', tenantId: 'tenant-roboflex', name: 'Diretor industrial', sectorId: 'sec-dir', jobId: 'job-dir', description: 'Responder pela operação e pelas áreas de apoio', headcount: 1, status: 'Ativo' },
+      { id: 'pos-lider', tenantId: 'tenant-roboflex', name: 'Líder de produção', sectorId: 'sec-pro', jobId: 'job-lider', description: 'Conduzir a operação do turno', headcount: 1, status: 'Ativo' },
+      { id: 'pos-manut', tenantId: 'tenant-roboflex', name: 'Técnico de manutenção', sectorId: 'sec-ser', jobId: 'job-manut', description: 'Disponibilidade das máquinas', headcount: 1, status: 'Ativo' },
+      { id: 'pos-z-eng', tenantId: 'tenant-roboflex-sul', name: 'Engenheiro de produto', sectorId: 'sec-z-eng', jobId: 'job-z-eng', description: 'Apoio de engenharia da Zontec', headcount: 2, status: 'Ativo' },
     ],
     supplierHomologations: [],
     partners: [
@@ -329,8 +367,8 @@ function baseState(): ErpState {
       { id: 'BL-18', tenantId: 'tenant-roboflex', kind: 'Realizado pago', categoryId: 'BC-OPER', period: '2025', amount: 120000, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'OPER-2025-400', description: 'Custo operacional de 2025 em Operações', costCenter: 'CC-400', createdAt: '2025-12-31T18:00:00.000Z', events: [] },
       { id: 'BL-19', tenantId: 'tenant-roboflex', kind: 'Realizado pago', categoryId: 'BC-OPER', period: '2025', amount: 50000, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'OPER-2025-310', description: 'Custo operacional de 2025 em Engenharia', costCenter: 'CC-310', createdAt: '2025-12-31T18:00:00.000Z', events: [] },
       { id: 'BL-20', tenantId: 'tenant-roboflex', kind: 'Realizado pago', categoryId: 'BC-OPER', period: '2025', amount: 30000, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'OPER-2025-320', description: 'Custo operacional de 2025 em Suprimentos', costCenter: 'CC-320', createdAt: '2025-12-31T18:00:00.000Z', events: [] },
-      { id: 'BL-16', tenantId: 'tenant-roboflex-sul', kind: 'Realizado recebido', categoryId: 'BC-ROB-SUL', period: '2025', amount: 16200000, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Recebimento', sourceId: 'FAT-2025-SUL', externalId: 'PG-ROB-SUL-2025', description: 'Faturamento consolidado de 2025 da Roboflex Sul · base do planejamento 2026', createdAt: '2025-12-31T18:00:00.000Z', events: [] },
-      { id: 'BL-17', tenantId: 'tenant-roboflex-sul', kind: 'Realizado pago', categoryId: 'BC-CMV-SUL', period: '2025', amount: 740000, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'CMV-2025-SUL', externalId: 'PG-CMV-SUL-2025', description: 'Custo de mercadoria vendida de 2025 da Roboflex Sul · base do planejamento 2026', createdAt: '2025-12-31T18:00:00.000Z', events: [] },
+      { id: 'BL-16', tenantId: 'tenant-roboflex-sul', kind: 'Realizado recebido', categoryId: 'BC-ROB-SUL', period: '2025', amount: 16200000, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Recebimento', sourceId: 'FAT-2025-SUL', externalId: 'PG-ROB-SUL-2025', description: 'Faturamento consolidado de 2025 da Zontec · base do planejamento 2026', createdAt: '2025-12-31T18:00:00.000Z', events: [] },
+      { id: 'BL-17', tenantId: 'tenant-roboflex-sul', kind: 'Realizado pago', categoryId: 'BC-CMV-SUL', period: '2025', amount: 740000, openAmount: 0, status: 'Liquidado', sourceModule: 'Omie', sourceType: 'Pagamento', sourceId: 'CMV-2025-SUL', externalId: 'PG-CMV-SUL-2025', description: 'Custo de mercadoria vendida de 2025 da Zontec · base do planejamento 2026', createdAt: '2025-12-31T18:00:00.000Z', events: [] },
     ],
     budgetExceptions: [
       { id: 'BX-1', tenantId: 'tenant-roboflex', kind: 'Sem categoria', status: 'Pendente', sourceModule: 'Omie', sourceId: 'PG-SEM-CAT', description: 'NF 8891 sem categoria', amount: 3250, categoryIds: [], period: '2026-10', createdAt: '2026-10-16T10:00:00.000Z' },
@@ -385,31 +423,210 @@ function baseState(): ErpState {
     tenants: [
       { id: 'tenant-roboflex', legalName: 'Roboflex', tradeName: 'Roboflex', document: '00.000.000/0001-91', city: 'Minas Gerais', status: 'Ativa', groupId: 'group-roboflex' },
       // Empresa-irmã só para demonstrar o planejamento de grupo em Orçamentos (meta combinada, gravação por empresa). Sem usuários/perfis próprios ainda: não é navegável como empresa completa.
-      { id: 'tenant-roboflex-sul', legalName: 'Roboflex Sul Indústria Ltda', tradeName: 'Roboflex Sul', document: '00.000.000/0002-72', city: 'Caxias do Sul, RS', status: 'Ativa', groupId: 'group-roboflex' },
+      { id: 'tenant-roboflex-sul', legalName: 'Zontec Indústria Ltda', tradeName: 'Zontec', document: '00.000.000/0002-72', city: 'Caxias do Sul, RS', status: 'Ativa', groupId: 'group-roboflex' },
     ],
-    economicGroups: [{ id: 'group-roboflex', name: 'Grupo Roboflex', description: 'Unidades Roboflex. O planejamento é combinado; cada empresa grava e mantém o próprio orçamento.' }],
+    economicGroups: [{ id: 'group-roboflex', name: 'Grupo Roboflex', description: 'Roboflex e Zontec. O planejamento é combinado; cada empresa grava o próprio dado.' }],
     omieConnections: [
       { tenantId: 'tenant-roboflex', appKey: 'demo-roboflex', secretDefined: true, status: 'Simulada', accountLabel: 'Conta de demonstração' },
       { tenantId: 'tenant-roboflex-sul', appKey: '', secretDefined: false, status: 'Não configurada', accountLabel: '' },
     ],
     accessProfiles: seededProfiles(),
     userProfileAssignments: [],
-    counters: { OP: 24030, RC: 5100, NC: 310, OS: 880, EV: 0, SY: 0, MV: 0, DT: 0, AL: 0, PC: 7310, NF: 18420, DM: 104, AP: 7308, AR: 18420, PV: 1056, OM: 98510, MF: 8, TP: 3 },
+    counters: { OP: 24030, RC: 5100, NC: 310, OS: 880, EV: 0, SY: 0, MV: 0, DT: 0, AL: 0, PC: 7310, NF: 18420, DM: 104, AP: 7308, AR: 18420, PV: 1056, OM: 98510, MF: 8, TP: 3, U: 18 },
   }
 }
 
 const order = (id: string, omieId: string, customerId: string, itemId: string, quantity: number, promisedDate: string, priority: SalesOrder['priority'], value: number, receivedAt: string): SalesOrder =>
   ({ id, omieId, customerId, itemId, quantity, promisedDate, priority, value, receivedAt, planned: false })
 
+/** Admissão, trajetória e um desligamento em andamento. Currículo e leitura de IA são texto fixo de demonstração. */
+function seedPeople(state: ErpState) {
+  const tenantId = 'tenant-roboflex'
+  state.assignments = state.users.filter(user => user.id !== 'u6' && !user.platformMaster).map(user => ({
+    id: `ASG-${user.id}`,
+    userId: user.id,
+    sector: user.sector,
+    positionId: user.positionId,
+    validFrom: '2024-01-01',
+    actor: 'Demonstração',
+  }))
+  state.assignments.push(
+    { id: 'ASG-JOAO-1', userId: 'u6', sector: 'Montagem', positionId: 'pos-op', validFrom: '2023-03-01', validTo: '2024-06-30', actor: 'Demonstração' },
+    { id: 'ASG-JOAO-2', userId: 'u6', sector: 'Injeção', positionId: 'pos-op', validFrom: '2024-07-01', actor: 'Demonstração' },
+  )
+  state.performanceReviews = [
+    { id: 'AV-1', userId: 'u6', scoreLabel: '4', scale: '0 a 5', period: '2025', origin: 'Gestor direto', at: '2026-01-15T12:00:00.000Z', actor: 'Bruno Alves' },
+    { id: 'AV-2', userId: 'u6', scoreLabel: 'B', scale: 'A a E', period: '2024', origin: 'Avaliação de experiência', at: '2024-08-01T12:00:00.000Z', actor: 'Bruno Alves' },
+  ]
+  state.jobOpenings = [
+    {
+      id: 'VAGA-INJ', tenantId, title: 'Operador de injeção', sectorId: 'sec-pro', requesterId: 'u5', ownerId: 'u1',
+      description: 'Cobrir o turno da injetora 02.', requirements: ['Injeção de termoplásticos', 'Autocontrole de qualidade', 'Disponibilidade de turno'],
+      status: 'Aberta', openedOn: '2026-09-01', targetOn: '2026-11-15',
+    },
+    {
+      id: 'VAGA-COM', tenantId, title: 'Analista de compras', sectorId: 'sec-sup', requesterId: 'u3', ownerId: 'u3',
+      description: 'Apoiar cotações de resina.', requirements: ['Cotação com fornecedor'],
+      status: 'Aberta', openedOn: '2026-10-01',
+    },
+  ]
+  state.candidates = [
+    {
+      id: 'CD-RICARDO', tenantId, name: 'Ricardo Pires', email: 'ricardo.pires@email.com', phone: '31988887777', resumeName: 'ricardo-pires.pdf',
+      resumeText: 'Operador com injeção de termoplásticos, autocontrole de qualidade e disponibilidade de turno na indústria.',
+    },
+    {
+      id: 'CD-HELENA', tenantId, name: 'Helena Dias', email: 'helena.dias@email.com', phone: '31977776666', resumeName: 'helena-dias.pdf',
+      resumeText: 'Experiência em injeção de termoplásticos e autocontrole de qualidade. Horário comercial.',
+    },
+  ]
+  state.applications = [
+    { id: 'CA-RICARDO', tenantId, candidateId: 'CD-RICARDO', jobId: 'VAGA-INJ', stage: 'Triagem', history: [{ at: '2026-10-10T12:00:00.000Z', actor: 'Marina Souza', text: 'Candidatura aberta em triagem' }] },
+    { id: 'CA-HELENA', tenantId, candidateId: 'CD-HELENA', jobId: 'VAGA-INJ', stage: 'Entrevista', history: [{ at: '2026-10-08T12:00:00.000Z', actor: 'Marina Souza', text: 'Candidatura aberta em triagem' }, { at: '2026-10-18T12:00:00.000Z', actor: 'Bruno Alves', text: 'Entrevista presencial registrada' }] },
+  ]
+  state.interviews = [
+    { id: 'ENT-RICARDO', applicationId: 'CA-RICARDO', at: '2026-10-30T14:00:00', place: 'Sala de reunião 1', interviewerIds: ['u5'], confirmed: false, notes: '' },
+    { id: 'ENT-HELENA', applicationId: 'CA-HELENA', at: '2026-10-22T09:00:00', place: 'Sala de reunião 1', interviewerIds: ['u5'], confirmed: true, notes: '' },
+  ]
+  state.selectionReviews = [
+    { id: 'SEL-HELENA', applicationId: 'CA-HELENA', origin: 'Entrevista presencial', notes: 'Conhece o processo. Turno ainda em aberto.', actor: 'Bruno Alves', at: '2026-10-22T11:00:00.000Z' },
+  ]
+  state.candidateBriefings = [
+    {
+      id: 'IA-RICARDO', applicationId: 'CA-RICARDO', version: 'pessoas-ia-demo-1',
+      criteria: ['Injeção de termoplásticos', 'Autocontrole de qualidade', 'Disponibilidade de turno'],
+      evidence: ['Injeção de termoplásticos', 'Autocontrole de qualidade', 'Disponibilidade de turno'],
+      gaps: [], questions: [], suggested: true, at: '2026-10-16T12:00:00.000Z',
+      summary: 'Ricardo Pires: 3 requisito(s) com evidência no texto e 0 lacuna(s). A decisão continua humana.',
+    },
+    {
+      id: 'IA-HELENA', applicationId: 'CA-HELENA', version: 'pessoas-ia-demo-1',
+      criteria: ['Injeção de termoplásticos', 'Autocontrole de qualidade', 'Disponibilidade de turno'],
+      evidence: ['Injeção de termoplásticos', 'Autocontrole de qualidade'],
+      gaps: ['Disponibilidade de turno'], questions: ['Conte uma experiência relacionada a: Disponibilidade de turno'],
+      suggested: false, at: '2026-10-16T12:00:00.000Z',
+      summary: 'Helena Dias: 2 requisito(s) com evidência no texto e 1 lacuna(s). A decisão continua humana.',
+    },
+  ]
+  const item = (id: string, label: string, owner: string, kind: 'geral' | 'ativo' | 'acesso' | 'confirmacao', required: boolean, status: 'Pendente' | 'Concluído' | 'Falha' = 'Pendente', dueOn?: string) =>
+    ({ id, label, owner, kind, required, status, dueOn })
+  state.peopleChecklists = [
+    { id: 'CHK-VAGA-INJ', tenantId, process: 'admissao', refId: 'VAGA-INJ', items: [item('CKI-INJ-1', 'Currículo organizado na candidatura', 'Admissão', 'geral', true), item('CKI-INJ-2', 'Contato conferido', 'Admissão', 'geral', true)] },
+    { id: 'CHK-VAGA-COM', tenantId, process: 'admissao', refId: 'VAGA-COM', items: [item('CKI-COM-1', 'Currículo organizado na candidatura', 'Admissão', 'geral', true), item('CKI-COM-2', 'Contato conferido', 'Admissão', 'geral', true)] },
+    { id: 'CHK-CA-RICARDO', tenantId, process: 'admissao', refId: 'CA-RICARDO', items: [item('CKI-R-1', 'Currículo organizado na candidatura', 'Admissão', 'geral', true, 'Concluído'), item('CKI-R-2', 'Contato conferido', 'Admissão', 'geral', true)] },
+    { id: 'CHK-CA-HELENA', tenantId, process: 'admissao', refId: 'CA-HELENA', items: [item('CKI-H-1', 'Currículo organizado na candidatura', 'Admissão', 'geral', true, 'Concluído'), item('CKI-H-2', 'Contato conferido', 'Admissão', 'geral', true, 'Concluído')] },
+    {
+      id: 'CHK-DES-1', tenantId, process: 'desligamento', refId: 'DES-1',
+      items: [
+        item('CKI-D-1', 'Comunicação aos responsáveis', 'A definir', 'geral', true, 'Concluído', '2026-10-20'),
+        item('CKI-D-2', 'Transferência de atividades', 'A definir', 'geral', true, 'Pendente', '2026-10-20'),
+        item('CKI-D-3', 'Devolução de equipamentos', 'A definir', 'ativo', true, 'Pendente', '2026-10-20'),
+        item('CKI-D-4', 'Encerramento de acessos', 'A definir', 'acesso', true, 'Pendente', '2026-10-20'),
+        item('CKI-D-5', 'Documentos e pendências', 'A definir', 'geral', false, 'Pendente', '2026-10-20'),
+        item('CKI-D-6', 'Confirmação final', 'A definir', 'confirmacao', true, 'Pendente', '2026-10-20'),
+      ],
+    },
+  ]
+  state.offboardings = [
+    { id: 'DES-1', tenantId, userId: 'u17', effectiveOn: '2026-10-20', reason: 'Pedido de desligamento informado pela área', status: 'Em andamento', startedAt: '2026-10-13T12:00:00.000Z', startedBy: 'Marina Souza' },
+  ]
+  const seen = new Set<string>()
+  for (const user of state.users) {
+    if (user.platformMaster || seen.has(user.id)) continue
+    seen.add(user.id)
+    const personTenant = user.homeTenantId ?? tenantId
+    const personId = `p-${user.id}`
+    user.personId = personId
+    user.homeTenantId = personTenant
+    state.persons.push({
+      id: personId, tenantId: personTenant, fullName: user.name, corporateEmail: user.email,
+      phone: user.id === 'u6' ? '31999990006' : undefined,
+      cpf: user.id === 'u11' ? '111.222.333-44' : undefined,
+      birthDate: user.id === 'u6' ? '1994-04-12' : undefined,
+      education: user.id === 'u13' ? [{ institution: 'UFMG', course: 'Engenharia mecânica', level: 'Graduação' }] : [],
+      family: [], emergencies: user.id === 'u6' ? [{ name: 'Maria Pereira', phone: '31988880006', bond: 'Mãe' }] : [],
+      banks: user.id === 'u6' ? [{ bank: '001', agency: '1234', account: '56789-0', kind: 'Corrente' }] : [],
+      address: user.id === 'u6' ? { street: 'Rua das Acácias', number: '120', district: 'Industrial', zip: '32000-000', state: 'MG', city: 'Contagem' } : undefined,
+      drugAllergy: user.id === 'u6' ? 'Dipirona' : undefined,
+      commute: user.id === 'u6' ? 'Ônibus · 2 · vale informado' : undefined,
+      notes: user.id === 'u6' ? 'Operador da injetora 02.' : undefined,
+    })
+    state.employments.push({
+      id: `emp-${user.id}`, tenantId: personTenant, personId, contractType: 'CLT', startedOn: '2024-01-01', status: 'Ativo',
+      salary: user.id === 'u6' ? 3200 : undefined, workplace: user.sector,
+    })
+  }
+  state.workspaceConnections = [
+    { tenantId: 'tenant-roboflex', provider: 'Google', domain: 'roboflex.com.br', secretDefined: true, status: 'Simulada' },
+    { tenantId: 'tenant-roboflex-sul', provider: 'Google', domain: 'zontec.com.br', secretDefined: true, status: 'Simulada' },
+  ]
+  const diegoSul = 'p-z-diego'
+  state.persons.push({
+    id: diegoSul, tenantId: 'tenant-roboflex-sul', fullName: 'Diego Martins', corporateEmail: 'diego.martins@zontec.com.br',
+    cpf: '111.222.333-44', education: [], family: [], emergencies: [], banks: [],
+  })
+  state.employments.push({ id: 'emp-z-diego', tenantId: 'tenant-roboflex-sul', personId: diegoSul, contractType: 'CLT', startedOn: '2025-03-01', status: 'Ativo', salary: 4100, workplace: 'Engenharia Zontec' })
+  state.users.push({
+    id: 'u19', name: 'Diego Martins', role: 'Manutenção', sector: 'Engenharia Zontec', shift: 'Administrativo', pin: '1919',
+    email: 'diego.martins@zontec.com.br', positionId: 'pos-z-eng', personId: diegoSul, homeTenantId: 'tenant-roboflex-sul', active: true,
+  })
+  state.assignments.push({ id: 'ASG-u19', userId: 'u19', sector: 'Engenharia Zontec', positionId: 'pos-z-eng', validFrom: '2025-03-01', actor: 'Demonstração' })
+  state.counters.U = 19
+  state.identityLinks = [
+    { id: 'IDN-DIEGO', leftPersonId: 'p-u11', rightPersonId: diegoSul, status: 'Confirmado', basis: 'Confirmação humana', actor: 'Marina Souza', at: '2026-08-01T12:00:00.000Z' },
+    { id: 'IDN-CAMILA', leftPersonId: 'p-u12', rightPersonId: 'p-z-echo', status: 'Sugerido', basis: 'E-mail', at: '2026-10-01T12:00:00.000Z' },
+  ]
+  state.persons.push({
+    id: 'p-z-echo', tenantId: 'tenant-roboflex-sul', fullName: 'Camila Nunes', corporateEmail: 'camila@roboflex.com.br',
+    education: [], family: [], emergencies: [], banks: [],
+  })
+  state.projectParticipations = [
+    { id: 'PRT-HELENA', projectId: 'PRJ-26-014', hostTenantId: tenantId, personId: 'p-u18', sourceTenantId: 'tenant-roboflex-sul', displayName: 'Helena Duarte', jobTitle: 'Engenheiro de produto', contact: 'helena.duarte@zontec.com.br', role: 'Apoio de processo' },
+  ]
+  for (const demand of state.demands) {
+    const owner = state.users.find(entry => entry.id === demand.requester)
+    if (owner?.personId) demand.requesterPersonId = owner.personId
+  }
+  state.directoryAccounts = state.persons.flatMap(person => {
+    const domain = state.workspaceConnections.find(entry => entry.tenantId === person.tenantId)?.domain
+    const email = person.corporateEmail?.toLowerCase()
+    if (!email || !domain || !email.endsWith(`@${domain}`)) return []
+    const overdue = person.id === 'p-u17'
+    return [{
+      id: `gda-${person.id}`, tenantId: person.tenantId, personId: person.id, provider: 'Google' as const, email,
+      externalId: `gws-${email}`, status: overdue ? 'Falha' as const : 'Ativa' as const,
+      pendingAction: overdue ? 'Suspender' as const : undefined,
+      failure: overdue ? 'A data efetiva já passou e o Google recusou a suspensão. A conta segue ativa.' : undefined,
+      requestedBy: 'Demonstração', requestedAt: '2024-01-01T12:00:00.000Z',
+    }]
+  })
+}
+
 /** Executa as próprias regras do motor para montar um cenário coerente em diferentes etapas. */
 export function createSeedState(): ErpState {
   const s = baseState()
-  s.userProfileAssignments = s.users.filter(user => !user.platformMaster).map((user, index) => ({
+  seedPeople(s)
+  s.userProfileAssignments = s.users.filter(user => !user.platformMaster && user.homeTenantId !== 'tenant-roboflex-sul').map((user, index) => ({
     id: `UP-${index + 1}`,
     userId: user.id,
-    tenantId: 'tenant-roboflex',
+    tenantId: user.homeTenantId ?? 'tenant-roboflex',
     profileId: `profile-${profileCode(user.role)}`,
   }))
+  s.accessProfiles.push(
+    {
+      id: 'profile-zontec-admin', tenantId: 'tenant-roboflex-sul', code: 'administrador', name: 'Administrador',
+      description: 'Acesso administrativo da Zontec, atribuído à mão.', system: true, functionalityIds: FUNCTIONALITIES.map(entry => entry.id), simulatedRole: 'Administrador',
+    },
+    {
+      id: 'profile-zontec-eng', tenantId: 'tenant-roboflex-sul', code: 'engenharia', name: 'Engenharia',
+      description: 'Engenharia da Zontec.', system: false, functionalityIds: [moduleFeature('Produtos')], simulatedRole: 'Engenharia',
+    },
+  )
+  s.userProfileAssignments.push(
+    { id: 'UP-LUCAS-ZONTEC', userId: 'u16', tenantId: 'tenant-roboflex-sul', profileId: 'profile-zontec-admin' },
+    { id: 'UP-HELENA-ZONTEC', userId: 'u18', tenantId: 'tenant-roboflex-sul', profileId: 'profile-zontec-eng' },
+    { id: 'UP-DIEGO-ZONTEC', userId: 'u19', tenantId: 'tenant-roboflex-sul', profileId: 'profile-zontec-eng' },
+  )
   prepareCatalog(s)
   preparePartners(s)
   const at = (dayOffset: number, hour: number, minute = 0) => setClock(new Date(2026, 9, 15 + dayOffset, hour, minute))

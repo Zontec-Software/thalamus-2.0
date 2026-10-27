@@ -1,18 +1,19 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { CalendarDays, ChevronDown, ChevronRight, ListTree, Plus, TrendingUp, X } from 'lucide-vue-next'
+import { CalendarDays, ChevronDown, ChevronRight, ListTree, Plus, Sparkles, TrendingUp, X } from 'lucide-vue-next'
 import BaseModal from '../components/BaseModal.vue'
 import MoneyInput from '../components/MoneyInput.vue'
 import PeriodScopeBar from '../components/PeriodScopeBar.vue'
 import { usePeriodScope } from '../composables/usePeriodScope'
 import { profileCan } from '../domain/access'
 import {
-  CAPEX_GROUP, RECEITA_GROUP, budgetSummary, childrenOf, groupPriorYearRealized, groupsFor, growthForTarget, inMonthRange, seesBudgetException, viewerCategoryScope,
+  CAPEX_GROUP, RECEITA_GROUP, budgetPlanBriefing, budgetSummary, childrenOf, groupPriorYearRealized, groupsFor, growthForTarget, inMonthRange, seesBudgetException, viewerCategoryScope,
   isBudgetLeaf, isDepreciationCategory, isSpendCategory, leavesInGroup, linkableDocuments, nextCategoryCode, rangeSummary, realizedOfYear,
 } from '../domain/budget'
 import { assetDepreciation, periodLabel } from '../domain/dre'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
+import type { BudgetApproachId } from '../domain/budget'
 import type { BudgetCategory, BudgetCategoryStatus, BudgetEntry, BudgetException, FunctionalityId, InvoiceLinkModule } from '../types/domain'
 import { fmtCurrency } from '../utils/format'
 
@@ -40,8 +41,8 @@ const { year, fromMonth, toMonth, scope, members: groupMemberTenants, groupView,
 const TOUR_SCREEN: [string, Screen][] = [
   ['budget-seasonality', 'mensal'],
   ['budget-plan', 'anual'],
+  ['budget-assistant', 'anual'],
   ['budget-summary', 'anual'],
-  ['budget-company', 'anual'],
   ['budget-tab-planejamento', 'anual'],
   ['budget-split', 'categorias'],
   ['budget-categories', 'categorias'],
@@ -238,6 +239,17 @@ const readOnlyNote = computed(() => {
   if (groupView.value) return 'A visão do grupo soma as empresas e não edita linha. A meta do grupo vale para cada empresa.'
   return `Você está vendo ${scopeLabel.value} só para leitura. Para editar, entre nessa empresa.`
 })
+const planBriefing = computed(() => groupView.value ? null : budgetPlanBriefing(store.state, viewingTenantId.value || ui.activeTenantId, year.value))
+const chosenApproach = ref<BudgetApproachId | null>(null)
+watch(year, () => { chosenApproach.value = null })
+const signedPct = (value: number) => `${value >= 0 ? '+' : ''}${value}%`
+function useApproach(id: BudgetApproachId) {
+  const applied = store.applyBudgetApproach(year.value, id)
+  if (!applied) return
+  chosenApproach.value = id
+  const target = planBriefing.value?.approaches.find(entry => entry.id === id)?.revenueTarget
+  if (target) metaValue.value = target
+}
 function applyMeta() {
   if (!(metaValue.value > 0)) return
   if (groupView.value) store.applyGroupRevenueTarget(economicGroup.value!.id, year.value, metaValue.value)
@@ -405,7 +417,6 @@ const categoryForm = reactive({ name: '', group: '03. Custos' as string, parentI
 const motherForm = reactive({ code: '', name: '' })
 const creatingCategory = ref(false)
 const categoryKind = ref<'conta' | 'mae'>('conta')
-const companyForm = reactive({ legalName: '', tradeName: '', document: '', city: '', adminName: '', adminEmail: '' })
 function openCategory() {
   categoryKind.value = 'conta'
   const preferred = groupOptions.value.find(entry => entry.name.startsWith('03.')) ?? groupOptions.value[0]
@@ -418,9 +429,6 @@ function createMother() {
     Object.assign(motherForm, { code: '', name: '' })
     creatingCategory.value = false
   }
-}
-function createCompany() {
-  if (store.createPlannedCompany({ ...companyForm })) Object.assign(companyForm, { legalName: '', tradeName: '', document: '', city: '', adminName: '', adminEmail: '' })
 }
 const parentCategory = computed(() => categoryForm.parentId ? category(categoryForm.parentId) : undefined)
 watch(() => categoryForm.group, groupName => {
@@ -683,9 +691,9 @@ watch([year, screen], () => { splitCategoryId.value = '' })
       <button v-if="canManage" class="button" @click="openCategory"><Plus :size="15" /> Nova categoria</button>
     </div>
     <table class="dense fit-table">
-      <thead><tr><th>Código</th><th>Categoria</th><th class="num">Valor</th><th>Responsável</th><th>Valores destinados</th><th data-tour="budget-split">Utilizadores</th><th>Executor</th><th>Limiar</th><th>Saldo negativo</th><th>Situação</th></tr></thead>
+      <thead><tr><th>Código</th><th>Categoria</th><th class="num">Valor</th><th>Responsável</th><th data-tour="budget-split">Valores destinados</th><th>Executor</th><th>Limiar</th><th>Saldo negativo</th><th>Situação</th></tr></thead>
       <tbody v-for="entry in tree" :key="entry.code">
-        <tr class="group-row"><td colspan="2"><strong>{{ entry.name }}</strong></td><td class="num"><strong>{{ fmtCurrency(groupAnnual(entry.name)) }}</strong></td><td colspan="7"></td></tr>
+        <tr class="group-row"><td colspan="2"><strong>{{ entry.name }}</strong></td><td class="num"><strong>{{ fmtCurrency(groupAnnual(entry.name)) }}</strong></td><td colspan="6"></td></tr>
         <template v-for="row in entry.rows" :key="row.category.id">
           <tr class="cat-row" :class="[`depth-${row.depth}`, { head: row.head }]">
             <td class="code">{{ row.category.code }}</td>
@@ -702,15 +710,11 @@ watch([year, screen], () => { splitCategoryId.value = '' })
               <span v-else class="cell-sub">{{ row.category.responsibleUserId ? userName(row.category.responsibleUserId) : '—' }}</span>
             </td>
             <td>
-              <span v-if="splittable(row.category)" class="slice-links">
+              <button v-if="splittable(row.category)" type="button" class="slice-links" title="Destinar o valor desta categoria aos setores que usam" @click="openSplit(row.category.id)">
                 <span v-for="line in sectorSummary(row.category.id).lines" :key="line.sectorId">{{ sectorName(line.sectorId) }} · {{ fmtCurrency(line.amount) }} · {{ sectorSummary(row.category.id).total ? Math.round(line.amount / sectorSummary(row.category.id).total * 1000) / 10 : 0 }}%</span>
                 <span v-if="!sectorSummary(row.category.id).lines.length" class="cell-sub">Nenhum valor destinado</span>
-              </span>
+              </button>
               <span v-else class="cell-sub">{{ row.head ? 'Nas subcategorias' : '—' }}</span>
-            </td>
-            <td>
-              <button v-if="splittable(row.category)" type="button" class="button ghost small" title="Destinar o valor desta categoria aos setores que usam" @click="openSplit(row.category.id)">{{ sectorSummary(row.category.id).lines.length ? `${sectorSummary(row.category.id).pct}% destinado` : 'Destinar' }}</button>
-              <span v-else class="cell-sub">—</span>
             </td>
             <td>
               <select v-if="canManage && splittable(row.category)" class="filter" :value="row.category.executorSectorId ?? ''" @change="assignCategory(row.category, row.category.responsibleUserId ?? '', ($event.target as HTMLSelectElement).value)">
@@ -738,6 +742,33 @@ watch([year, screen], () => { splitCategoryId.value = '' })
       </div>
     </div>
 
+    <article v-if="screen === 'anual'" class="card plan-assistant" data-tour="budget-assistant">
+      <div class="orc-card-head">
+        <div>
+          <h2><Sparkles :size="16" /> Assistente de planejamento</h2>
+          <p>Três planos para {{ year }}, cada conta crescendo sobre o próprio realizado de {{ priorYear }}. Mercado, internet e atas são um dossiê de demonstração: o sistema não acessa a web nem arquivo de reunião.</p>
+        </div>
+      </div>
+      <p v-if="!planBriefing" class="assistant-note">Escolha uma empresa. O assistente monta o plano dela, não a soma do grupo.</p>
+      <template v-else>
+        <ul class="source-list">
+          <li v-for="source in planBriefing.sources" :key="source.id">
+            <b>{{ source.label }}<span v-if="source.simulated" class="sim">Simulado</span></b>
+            <span>{{ source.text }}</span>
+          </li>
+        </ul>
+        <div class="approach-grid">
+          <article v-for="approach in planBriefing.approaches" :key="approach.id" class="approach-card" :class="{ on: chosenApproach === approach.id }">
+            <strong>{{ approach.label }}</strong>
+            <p>{{ approach.thesis }}</p>
+            <b class="target">{{ fmtCurrency(approach.revenueTarget) }}</b>
+            <small>Receita {{ signedPct(approach.revenueGrowth) }} · Custos {{ signedPct(approach.costGrowth) }} · Despesas {{ signedPct(approach.expenseGrowth) }} · Investimentos {{ signedPct(approach.capexGrowth) }}</small>
+            <button type="button" class="button small" :disabled="!canEditHere || !(approach.revenueBase > 0)" :title="canEditHere ? 'Grava esta abordagem no orçamento do ano' : 'Só a empresa ativa, com permissão de gerir, aplica o plano'" @click="useApproach(approach.id)">Usar esta</button>
+          </article>
+        </div>
+      </template>
+    </article>
+
     <article v-if="screen === 'anual'" class="card meta-bar" data-tour="budget-summary">
       <div data-tour="budget-plan-target">
         <span class="cell-sub">Meta de faturamento {{ year }}</span>
@@ -749,19 +780,6 @@ watch([year, screen], () => { splitCategoryId.value = '' })
       </p>
       <button class="button small" :disabled="(groupView ? !canPlanGroup : !canEditHere) || !(metaValue > 0)" @click="applyMeta"><TrendingUp :size="14" /> Definir meta e aplicar %</button>
     </article>
-
-    <fieldset v-if="screen === 'anual' && canEditHere" class="layer" data-tour="budget-company"><legend>Nova empresa do grupo</legend>
-      <div class="filter-row">
-        <input v-model="companyForm.legalName" class="filter grow" placeholder="Razão social" />
-        <input v-model="companyForm.tradeName" class="filter" placeholder="Nome fantasia" />
-        <input v-model="companyForm.document" class="filter" placeholder="CNPJ" />
-        <input v-model="companyForm.city" class="filter" placeholder="Cidade/UF" />
-        <input v-model="companyForm.adminName" class="filter" placeholder="Administrador" />
-        <input v-model="companyForm.adminEmail" class="filter" placeholder="E-mail" />
-        <button class="button small" @click="createCompany"><Plus :size="14" /> Cadastrar empresa</button>
-      </div>
-      <p class="cell-sub">A empresa entra no grupo com o orçamento vazio e também aparece na Plataforma.</p>
-    </fieldset>
 
     <article v-if="screen === 'anual'" class="card flush">
       <div class="orc-card-head">

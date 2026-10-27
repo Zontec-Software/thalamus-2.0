@@ -21,7 +21,7 @@ const myPending = (item: Item) => requiredApprovals(item).filter(role => !catalo
 
 const QUEUES = computed<{ id: Queue; label: string; hint: string; rows: Row[] }[]>(() => [
   {
-    id: 'mine', label: 'Aguardando meu papel', hint: `Itens em homologação com aprovação que o perfil ${ui.role} pode registrar.`,
+    id: 'mine', label: 'Aguardando meu papel', hint: `Produtos em homologação com aprovação que o perfil ${ui.role} pode registrar.`,
     rows: live.value.filter(item => catalogOf(item).lifecycle === 'Em homologação' && myPending(item).length)
       .map(item => ({ item, info: myPending(item).map(role => APPROVAL_LABEL[role]).join(', '), extra: myPending(item).flatMap(role => approvalIssues(item, role)).join(' · ') })),
   },
@@ -35,7 +35,7 @@ const QUEUES = computed<{ id: Queue; label: string; hint: string; rows: Row[] }[
     rows: live.value.filter(item => catalogOf(item).lifecycle === 'Alteração pendente').map(item => ({ item, info: catalogOf(item).keyChanges.filter(change => change.status === 'Pendente').map(change => `${change.originModule} ${change.originId}`).join(' · ') })),
   },
   {
-    id: 'inactivation', label: 'Inativação pendente', hint: 'Ao aprovar, o item para de aceitar solicitação nova. Estoque, ordens e pedidos já abertos seguem.',
+    id: 'inactivation', label: 'Inativação pendente', hint: 'Ao aprovar, o produto para de aceitar solicitação nova. Estoque, ordens e pedidos já abertos seguem.',
     rows: live.value.filter(item => catalogOf(item).lifecycle === 'Inativação pendente').map(item => ({ item, info: 'Aguardando aprovação' })),
   },
   {
@@ -43,7 +43,7 @@ const QUEUES = computed<{ id: Queue; label: string; hint: string; rows: Row[] }[
     rows: live.value.filter(item => catalogOf(item).lifecycle === 'Rascunho').map(item => ({ item, info: `Criado por ${catalogOf(item).createdBy} em ${catalogOf(item).createdAt.slice(0, 10)}` })),
   },
   {
-    id: 'exceptions', label: 'Exceções de campo-chave', hint: 'Mudança de unidade base ou NCM em item ativo. Decide a gestão do cadastro; quem pediu não aprova.',
+    id: 'exceptions', label: 'Exceções de campo-chave', hint: 'Mudança de unidade base ou NCM em produto ativo. Decide a gestão do cadastro; quem pediu não aprova.',
     rows: live.value.flatMap(item => catalogOf(item).keyChanges.filter(change => change.status === 'Pendente').map(change => ({
       item, info: `${change.field === 'ncm' ? 'NCM' : 'Unidade'}: ${change.from || '—'} → ${change.to}`, extra: `${change.reason} · ${change.requestedBy}`,
     }))),
@@ -76,7 +76,7 @@ const open = (item: Item, aba?: string) => router.push({ path: `/produtos/item/$
   <article class="card flush">
     <div class="section-head"><div><h2>{{ queue.label }}</h2><p>{{ queue.hint }}</p></div></div>
     <table class="dense">
-      <thead><tr><th>Item</th><th>Situação</th><th>{{ active === 'mine' ? 'Sua aprovação' : 'Detalhe' }}</th><th /></tr></thead>
+      <thead><tr><th>Produto</th><th>Situação</th><th>{{ active === 'mine' ? 'Sua aprovação' : 'Detalhe' }}</th><th /></tr></thead>
       <tbody>
         <tr v-for="(row, index) in slice" :key="row.item.id + index" class="clickable" @click="open(row.item, 'ciclo')">
           <td><span class="cell-main code">{{ row.item.code }}</span><span class="cell-sub">{{ row.item.name }}</span></td>

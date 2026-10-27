@@ -39,7 +39,8 @@ const TONES: Record<string, string> = {
   Atendida: 'success', Recebido: 'success', Concluído: 'success', Baixado: 'success', Ganha: 'success', Aceita: 'success', Ativo: 'success', Operando: 'success', Aprovado: 'success',
   'Em atendimento': 'info', 'Recebido parcial': 'info', 'Em andamento': 'info', Negociação: 'info', Agendada: 'info', Enviada: 'info', Proposta: 'info', Qualificação: 'neutral', Lead: 'neutral',
   'Aguardando aprovação': 'warning', 'Aguardando peça': 'warning', Rascunho: 'warning', Planejado: 'warning', Aberto: 'warning', Parado: 'warning', 'Em manutenção': 'danger',
-  Cancelada: 'neutral', Cancelado: 'neutral', Perdida: 'danger', Recusada: 'danger', Vencido: 'danger', Inativo: 'neutral', Expirada: 'neutral',
+  Cancelada: 'neutral', Cancelado: 'neutral', Perdida: 'danger', Recusada: 'danger', Vencido: 'danger', Inativo: 'neutral', Expirada: 'neutral', 'Conta bloqueada': 'neutral', 'Em desligamento': 'warning',
+  Triagem: 'info', Entrevista: 'info', Selecionado: 'warning', Efetivado: 'success', Encerrado: 'neutral', Falha: 'danger', Atrasado: 'danger', Sugerido: 'info', Devolvido: 'success', Ativa: 'success', Suspensa: 'neutral',
 }
 
 export const statusTone = (value: string) => TONES[value] ?? 'neutral'

@@ -44,11 +44,11 @@ function generate() {
 <template>
   <h3 class="drawer-title">Grade (variações)</h3>
   <template v-if="model">
-    <p class="cell-sub">Modelo <b>{{ model.name }}</b> · eixos {{ model.axes.map(axis => `${axis.name} (${axis.values.length})`).join(' × ') }}. Cada combinação é um item real, com código, EAN, estoque e estrutura próprios.
-      <template v-if="model.templateId !== item.id"> Item-modelo: <RouterLink :to="`/produtos/item/${model.templateId}`">{{ store.item(model.templateId).code }}</RouterLink>.</template>
+    <p class="cell-sub">Modelo <b>{{ model.name }}</b> · eixos {{ model.axes.map(axis => `${axis.name} (${axis.values.length})`).join(' × ') }}. Cada combinação é um produto real, com código, EAN, estoque e estrutura próprios.
+      <template v-if="model.templateId !== item.id"> Produto-modelo: <RouterLink :to="`/produtos/item/${model.templateId}`">{{ store.item(model.templateId).code }}</RouterLink>.</template>
     </p>
     <table class="dense">
-      <thead><tr><th v-if="missing.length" /><th v-for="axis in model.axes" :key="axis.name">{{ axis.name }}</th><th>Item</th><th>Situação</th></tr></thead>
+      <thead><tr><th v-if="missing.length" /><th v-for="axis in model.axes" :key="axis.name">{{ axis.name }}</th><th>Produto</th><th>Situação</th></tr></thead>
       <tbody>
         <tr v-for="row in matrix" :key="comboKey(row.combo)">
           <td v-if="missing.length"><input v-if="!row.item" v-model="picked" type="checkbox" :value="comboKey(row.combo)" :disabled="!allowed" /></td>
@@ -62,18 +62,18 @@ function generate() {
       <button class="button small" :disabled="!allowed" :title="allowed ? '' : `Quem gera variantes: ${editorsLabel('nucleo')}`" @click="generate">
         {{ picked.length ? `Gerar ${picked.length} selecionada(s)` : `Gerar todas as ${missing.length} faltantes` }} em rascunho
       </button>
-      <span class="cell-sub">Herdam fiscal, marca, categorias, dimensões e unidades do item-modelo. EAN, preço, estrutura e foto ficam por variante.</span>
+      <span class="cell-sub">Herdam fiscal, marca, categorias, dimensões e unidades do produto-modelo. EAN, preço, estrutura e foto ficam por variante.</span>
     </div>
   </template>
   <template v-else-if="item.type === 'PA' || item.type === 'KF'">
-    <p class="cell-sub">Este item não faz parte de grade. Transforme-o em item-modelo para gerar variações (cor, modelo de tablet, tamanho) como itens reais.</p>
+    <p class="cell-sub">Este produto não faz parte de grade. Transforme-o em produto-modelo para gerar variações (cor, modelo de tablet, tamanho) como produtos reais.</p>
     <fieldset class="layer" :disabled="!allowed">
       <div class="form-grid">
         <div class="field"><label>Nome do modelo</label><input v-model="draft.name" :placeholder="item.name" /></div>
         <div class="field"><label>Eixos e valores (um eixo por linha)</label><textarea v-model="draft.axes" rows="2" /><small>{{ classAxes.length ? 'Sugerido pelos atributos de lista marcados como eixo na classe. ' : '' }}Formato "Eixo: valor, valor". Até 3 eixos.</small></div>
       </div>
       <div class="filter-row" style="margin:6px 0">
-        <span class="cell-sub">Este item é:</span>
+        <span class="cell-sub">Este produto é:</span>
         <select v-for="axis in parsedAxes" :key="axis.name" v-model="templateValues[axis.name]" class="filter">
           <option value="">{{ axis.name }}: {{ axis.values[0] ?? '—' }}</option>
           <option v-for="value in axis.values.slice(1)" :key="value" :value="value">{{ axis.name }}: {{ value }}</option>

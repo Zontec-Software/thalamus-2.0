@@ -84,7 +84,7 @@ function createProfile() {
     <table>
       <thead><tr><th>Pessoa</th><th>Setor</th><th>Perfis</th></tr></thead>
       <tbody><tr v-for="user in companyUsers" :key="user.id">
-        <td><span class="cell-main">{{ user.name }}</span><span class="cell-sub">{{ user.email ?? 'Sem e-mail' }}</span></td><td>{{ user.sector }}</td>
+        <td><span class="cell-main">{{ user.name }}</span><span class="cell-sub">{{ store.state.persons.some(person => person.id === user.personId && person.tenantId === ui.activeTenantId) ? (user.email ?? 'Sem e-mail') : 'Acesso sem vínculo nesta empresa' }}</span></td><td>{{ store.state.persons.some(person => person.id === user.personId && person.tenantId === ui.activeTenantId) ? user.sector : '—' }}</td>
         <td>
           <div class="profile-chips">
             <span v-for="profile in profiles.filter(entry => assigned(user.id, entry.id))" :key="profile.id" class="chip active">

@@ -42,20 +42,20 @@ function downloadSped() {
 
 <template>
   <div class="tabs" style="margin-bottom:12px">
-    <button :class="{ active: view === 'itens' }" @click="view = 'itens'">Fiscal dos itens<b v-if="pendingCount">{{ pendingCount }}</b></button>
+    <button :class="{ active: view === 'itens' }" @click="view = 'itens'">Fiscal dos produtos<b v-if="pendingCount">{{ pendingCount }}</b></button>
     <button :class="{ active: view === 'matriz' }" @click="view = 'matriz'">Matriz fiscal</button>
     <button :class="{ active: view === 'sped' }" @click="view = 'sped'">SPED · registro 0200</button>
   </div>
   <FiscalMatrixPanel v-if="view === 'matriz'" />
   <article v-else-if="view === 'sped'" class="card flush">
-    <div class="section-head"><div><h2>SPED · Bloco 0</h2><p>Registros 0190 (unidades), 0200 (itens) e 0220 (fatores de conversão) da EFD ICMS/IPI, gerados do cadastro ativo. Rascunho, homologação e kit virtual ficam de fora.</p></div>
-      <button class="button" @click="downloadSped">Baixar .txt ({{ sped.count }} itens)</button>
+    <div class="section-head"><div><h2>SPED · Bloco 0</h2><p>Registros 0190 (unidades), 0200 (produtos) e 0220 (fatores de conversão) da EFD ICMS/IPI, gerados do cadastro ativo. Rascunho, homologação e kit virtual ficam de fora.</p></div>
+      <button class="button" @click="downloadSped">Baixar .txt ({{ sped.count }} produtos)</button>
     </div>
     <p v-if="sped.issues.length" class="notice warning" style="margin:0 16px 10px">{{ sped.issues.join(' · ') }}</p>
     <pre class="code-block" style="margin:0 16px 16px">{{ sped.lines.join('\n') }}</pre>
   </article>
   <article v-else class="card flush">
-    <div class="section-head"><div><h2>Fiscal do item</h2><p>NCM validado, Ex-TIPI, CEST quando há substituição tributária, benefícios por UF e a camada da reforma. CFOP, CST e alíquota vêm da matriz fiscal; a nota sai pelo Omie.</p></div>
+    <div class="section-head"><div><h2>Fiscal do produto</h2><p>NCM validado, Ex-TIPI, CEST quando há substituição tributária, benefícios por UF e a camada da reforma. CFOP, CST e alíquota vêm da matriz fiscal; a nota sai pelo Omie.</p></div>
       <span class="status" :class="pendingCount ? 'warning' : 'success'">{{ pendingCount }} com pendência fiscal</span>
     </div>
     <div class="list-meta">
@@ -66,7 +66,7 @@ function downloadSped() {
       </div>
     </div>
     <table class="dense">
-      <thead><tr><th>Item</th><th>Situação</th><th>NCM</th><th>CEST</th><th>Origem</th><th>cClassTrib</th><th>Pendência</th></tr></thead>
+      <thead><tr><th>Produto</th><th>Situação</th><th>NCM</th><th>CEST</th><th>Origem</th><th>cClassTrib</th><th>Pendência</th></tr></thead>
       <tbody>
         <tr v-for="item in slice" :key="item.id" class="clickable" @click="router.push({ path: `/produtos/item/${item.id}`, query: { aba: 'fiscal' } })">
           <td><span class="cell-main code">{{ item.code }}</span><span class="cell-sub">{{ item.name }}</span></td>

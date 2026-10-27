@@ -28,7 +28,7 @@ function add() {
 
 <template>
   <h3 class="drawer-title">Códigos de barras</h3>
-  <p v-if="conflict" class="notice warning">O CCG (cadastro nacional GS1) registra o EAN principal com NCM {{ conflict }}, mas o item usa {{ catalogOf(item).ncm }}. A Receita cruza os dois na NF-e: alinhe com o fiscal antes de faturar.</p>
+  <p v-if="conflict" class="notice warning">O CCG (cadastro nacional GS1) registra o EAN principal com NCM {{ conflict }}, mas o produto usa {{ catalogOf(item).ncm }}. A Receita cruza os dois na NF-e: alinhe com o fiscal antes de faturar.</p>
   <table v-if="barcodes.length" class="dense">
     <thead><tr><th>Código</th><th>Tipo</th><th>Unidade</th><th>Principal</th><th /></tr></thead>
     <tbody>

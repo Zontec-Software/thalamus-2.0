@@ -25,7 +25,7 @@ export function usePager<T>(rows: Ref<T[]>, initial = 25) {
   const pages = computed(() => Math.max(1, Math.ceil(rows.value.length / size.value)))
   const slice = computed(() => rows.value.slice((page.value - 1) * size.value, page.value * size.value))
   const range = computed(() => {
-    if (!rows.value.length) return '0 itens'
+    if (!rows.value.length) return '0 produtos'
     const start = (page.value - 1) * size.value + 1
     return `${start}–${Math.min(rows.value.length, page.value * size.value)} de ${rows.value.length}`
   })

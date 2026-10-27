@@ -9,7 +9,7 @@ import RecordDrawer from './components/records/RecordDrawer.vue'
 import ToastHost from './components/ToastHost.vue'
 import TourGuide from './components/TourGuide.vue'
 import { allocationOf } from './domain/budget'
-import { AREAS, areaOf, moduleFeature, moduleOf, owns } from './navigation'
+import { AREAS, areaDestination, areaOf, moduleFeature, moduleOf, owns } from './navigation'
 import { useErpStore } from './stores/erp'
 import { useUiStore } from './stores/ui'
 import { PAGE_TOURS, WELCOME_KEY, WELCOME_TOUR, tourKey } from './tour/steps'
@@ -33,9 +33,10 @@ const areaOpen = ref(false)
 const allowed = (module?: string) => !module || store.can(moduleFeature(module))
 const canPreview = computed(() => store.isAccessAdministrator())
 const areas = computed(() => AREAS.flatMap(area => {
-  const to = area.groups.flatMap(group => group.items).find(item => allowed(item.module) && item.to !== '/tablet')?.to
+  const to = areaDestination(area, allowed)
   return to ? [{ ...area, to }] : []
 }))
+const areaHome = computed(() => currentArea.value ? areaDestination(currentArea.value, allowed) : undefined)
 const navigation = computed(() => (currentArea.value?.groups ?? [])
   .map(group => ({ ...group, items: group.items.filter(item => allowed(item.module)) }))
   .filter(group => group.items.length))
@@ -50,6 +51,12 @@ const budgetNotices = computed(() => store.state.budgetAlerts.filter(entry => {
   return true
 }))
 const noticeCount = computed(() => openAlerts.value.length + budgetDecisions.value.length + budgetNotices.value.length)
+const sessionAccount = computed(() => store.state.users.find(entry => entry.id === ui.sessionUserId))
+const sessionPhoto = computed(() => store.state.persons.find(entry => entry.id === sessionAccount.value?.personId)?.photo)
+const sessionInitials = computed(() => {
+  const parts = (sessionAccount.value?.name ?? '').split(' ').filter(Boolean)
+  return parts.map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'US'
+})
 const decisionNotes = reactive<Record<string, string>>({})
 function decideBudget(id: string, approve: boolean) {
   if (store.decideBudgetException(id, approve, decisionNotes[id] || '')) delete decisionNotes[id]
@@ -79,7 +86,7 @@ const results = computed(() => {
   return [
     ...store.state.salesOrders.filter(order => has(order.id, order.omieId, store.customerName(order.customerId))).map(order => ({ key: order.id, type: 'Pedido', title: order.id, text: `${store.customerName(order.customerId)} · ${store.stage(order)}`, open: () => { ui.orderDrawer = order.id } })),
     ...store.state.productionOrders.filter(op => has(op.id, store.itemLabel(op.itemId))).map(op => ({ key: op.id, type: 'OP', title: op.id, text: `${store.itemLabel(op.itemId)} · ${op.status}`, open: () => { ui.opDrawer = op.id } })),
-    ...store.state.items.filter(item => has(item.code, item.name)).map(item => ({ key: item.id, type: 'Item', title: item.code, text: store.itemLabel(item.id), open: () => router.push(`/produtos/item/${item.id}`) })),
+    ...store.state.items.filter(item => has(item.code, item.name)).map(item => ({ key: item.id, type: 'Produto', title: item.code, text: store.itemLabel(item.id), open: () => router.push(`/produtos/item/${item.id}`) })),
     ...store.state.requisitions.filter(req => has(req.id, req.omiePo ?? '')).map(req => ({ key: req.id, type: 'Compra', title: req.id, text: `${store.itemLabel(req.itemId)} · ${req.status}`, open: () => router.push('/compras') })),
     ...store.state.opportunities.filter(entry => has(entry.id, entry.title, store.partnerName(entry.partnerId))).map(entry => ({ key: entry.id, type: 'CRM', title: entry.id, text: `${entry.title} · ${entry.stage}`, open: () => ui.openRecord('opportunity', entry.id) })),
     ...store.state.proposals.filter(entry => has(entry.id, store.partnerName(entry.partnerId))).map(entry => ({ key: entry.id, type: 'Proposta', title: entry.id, text: `${store.partnerName(entry.partnerId)} · ${entry.status}`, open: () => ui.openRecord('proposal', entry.id) })),
@@ -87,7 +94,7 @@ const results = computed(() => {
     ...store.state.purchaseOrders.filter(entry => has(entry.id, store.partnerName(entry.supplierId))).map(entry => ({ key: entry.id, type: 'Pedido de compra', title: entry.id, text: `${store.partnerName(entry.supplierId)} · ${entry.status}`, open: () => ui.openRecord('purchase', entry.id) })),
     ...store.state.technicalServiceOrders.filter(entry => has(entry.id, entry.description, store.partnerName(entry.partnerId), entry.assetSerial ?? '')).map(entry => ({ key: entry.id, type: 'Assistência', title: entry.id, text: `${entry.description} · ${entry.status}`, open: () => ui.openRecord('technical', entry.id) })),
     ...store.state.projects.filter(entry => has(entry.id, entry.name)).map(entry => ({ key: entry.id, type: 'Projeto', title: entry.id, text: `${entry.name} · ${entry.status}`, open: () => ui.openRecord('project', entry.id) })),
-    ...store.state.users.filter(entry => has(entry.name)).map(entry => ({ key: entry.id, type: 'Pessoa', title: entry.name, text: `${entry.role} · ${entry.sector}`, open: () => ui.openRecord('person', entry.id) })),
+    ...store.state.users.filter(entry => has(entry.name) && !entry.platformMaster).map(entry => ({ key: entry.personId ?? entry.id, type: 'Pessoa', title: entry.name, text: `${entry.role} · ${entry.sector}`, open: () => router.push(`/pessoas/pessoa/${entry.personId ?? entry.id}`) })),
     ...store.state.assets.filter(entry => has(entry.name, entry.serial ?? '')).map(entry => ({ key: entry.id, type: 'Ativo', title: entry.name, text: entry.kind, open: () => ui.openRecord('asset', entry.id) })),
   ].slice(0, 8)
 })
@@ -164,11 +171,16 @@ watch(() => ui.tourSteps.length, length => { if (length === 0) maybeStartTour() 
             <div><strong>Thalamus</strong><span>{{ store.isPlatformMaster() ? 'Plataforma' : (store.state.tenants.find(entry => entry.id === ui.activeTenantId)?.tradeName ?? 'Empresa') }}</span></div>
           </RouterLink>
           <div v-if="!isHome" class="title-block">
-          <button class="area-switch" @click.stop="areaOpen = !areaOpen; helpOpen = false; bellOpen = false">
-            <component :is="currentArea?.icon" v-if="currentArea" :size="13" />
-            {{ currentArea?.label ?? route.meta.eyebrow }}
-            <ChevronDown :size="13" />
-          </button>
+          <div class="area-switch">
+            <RouterLink v-if="areaHome" :to="areaHome" class="area-name" @click="areaOpen = false">
+              <component :is="currentArea?.icon" v-if="currentArea" :size="13" />
+              {{ currentArea?.label ?? route.meta.eyebrow }}
+            </RouterLink>
+            <span v-else class="area-name">{{ route.meta.eyebrow }}</span>
+            <button type="button" class="area-caret" title="Trocar de área" @click.stop="areaOpen = !areaOpen; helpOpen = false; bellOpen = false">
+              <ChevronDown :size="13" />
+            </button>
+          </div>
           <h1>{{ route.meta.title }}</h1>
           <div v-if="areaOpen" class="dropdown area-menu">
             <RouterLink to="/"><House :size="16" /> Início</RouterLink>
@@ -245,7 +257,7 @@ watch(() => ui.tourSteps.length, length => { if (length === 0) maybeStartTour() 
           </div>
 
           <button v-if="!store.isPlatformMaster()" class="button ghost small" @click="openPlatform">Plataforma</button>
-          <div class="user-chip"><span>{{ ui.userName.split(' ').map(part => part[0]).join('').slice(0, 2) }}</span><div><strong>{{ ui.userName }}</strong><small>{{ store.isPlatformMaster() ? 'Usuário mestre' : ui.role }}</small></div></div>
+          <div class="user-chip"><img v-if="sessionPhoto" :src="sessionPhoto" :alt="`Foto de ${sessionAccount?.name}`" /><span v-else>{{ sessionInitials }}</span><div><strong>{{ ui.userName }}</strong><small>{{ store.isPlatformMaster() ? 'Usuário mestre' : ui.role }}</small></div></div>
         </div>
       </header>
       <nav v-if="!isHome && navigation.length" class="module-bar" aria-label="Módulos da área">

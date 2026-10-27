@@ -19,6 +19,7 @@ const router = useRouter()
 
 const isNew = computed(() => props.id === 'new')
 const project = computed(() => store.state.projects.find(entry => entry.id === props.id))
+const participations = computed(() => store.state.projectParticipations.filter(entry => entry.projectId === props.id))
 const owners = computed(() => store.state.users.filter(entry => entry.role !== 'Operador'))
 const clients = computed(() => store.state.partners.filter(entry => roleIsOpen(entry, 'Cliente')))
 const products = computed(() => store.state.items.filter(entry => entry.type === 'PA'))
@@ -186,7 +187,9 @@ function addRisk() {
       <h3 class="drawer-title">Equipe e riscos</h3>
       <div class="chip-row">
         <span v-for="memberId in project.memberIds ?? [project.ownerId]" :key="memberId" class="chip">{{ store.userName(memberId) }}</span>
+        <span v-for="entry in participations" :key="entry.id" class="chip">{{ entry.displayName }} · {{ entry.role }}</span>
       </div>
+      <p v-if="participations.length" class="hint">Quem vem de outra empresa aparece pelo nome, cargo e contato. Documento, salário e saúde não atravessam.</p>
       <div v-for="entry in project.risks ?? []" :key="entry" class="list-row static"><div><strong><AlertTriangle :size="13" /> {{ entry }}</strong></div></div>
       <div class="inline-form row">
         <input v-model="risk" class="filter grow" placeholder="Registrar risco ou impedimento" @keyup.enter="addRisk" />

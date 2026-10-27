@@ -27,7 +27,7 @@ function submit() {
 
 <template>
   <BaseModal :open="open" :title="TITLE[field]"
-    subtitle="Item ativo. O valor vigente continua até a aprovação. A solicitação precisa apontar um documento de outra área." @close="emit('close')">
+    subtitle="Produto ativo. O valor vigente continua até a aprovação. A solicitação precisa apontar um documento de outra área." @close="emit('close')">
     <form id="key-change" @submit.prevent="submit">
       <div class="field"><label>Valor atual</label><input :value="current()" disabled /></div>
       <div class="field"><label>Novo valor</label>

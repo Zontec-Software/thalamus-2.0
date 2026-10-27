@@ -43,7 +43,7 @@ function addCategory(category: string) {
   <PermHint :item="item" layer="comercial" />
   <fieldset class="layer" :disabled="disabled">
     <div class="form-grid">
-      <div class="field wide"><label>Descrição comercial</label><input v-model="form.commercialName" placeholder="Como o cliente enxerga o item" /></div>
+      <div class="field wide"><label>Descrição comercial</label><input v-model="form.commercialName" placeholder="Como o cliente enxerga o produto" /></div>
       <div class="field"><label>Marca</label><input v-model="form.brand" list="known-brands" /><datalist id="known-brands"><option v-for="entry in known.brands" :key="entry" :value="entry" /></datalist></div>
       <div class="field"><label>Linha comercial</label><input v-model="form.productLine" list="known-lines" /><datalist id="known-lines"><option v-for="entry in known.lines" :key="entry" :value="entry" /></datalist></div>
       <div class="field wide"><label>Categorias de e-commerce</label><input v-model="form.categories" placeholder="Separe por vírgula" />

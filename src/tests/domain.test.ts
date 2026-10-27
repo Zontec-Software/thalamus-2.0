@@ -17,7 +17,7 @@ import {
   contractService, createDemand, createOpportunity, createProject, createProposal, createPurchaseOrder, createTechnicalOrder, deliveryLead, loseOpportunity,
   moveOpportunity, releaseRevision, tasksForRole, toggleMilestone, undoPick, updateProposal,
 } from '../domain/enterprise'
-import { absorbOmieCategories, acknowledgeAlert, applyBudgetSimulation, applyCategorySuggestion, applyOmiePayment, applyPriorSeasonality, applyRemoteCategories, budgetSummary, categoryOf, costCenterAmounts, createBudgetCategory, createBudgetGroup, createCostCenter, decideBudgetException, financeSnapshot, linkBudgetInvoice, notifiedUsers, rangeSummary, saveBudgetSimulation, sectorCostCenter, seesBudgetException, setBudget, setCategoryAssignment, setCostCenterSplit, setGroupBudget, setSectorAllocations, setSectorDefaultCostCenter, suggestCategoryCenters, suggestCostCenterShare, updateBudgetCategory, updateCostCenter, upsertForecast, viewerCategoryScope, viewerCenterScope } from '../domain/budget'
+import { absorbOmieCategories, acknowledgeAlert, applyBudgetApproach, applyBudgetSimulation, applyCategorySuggestion, budgetPlanBriefing, applyOmiePayment, applyPriorSeasonality, applyRemoteCategories, budgetSummary, categoryOf, costCenterAmounts, createBudgetCategory, createBudgetGroup, createCostCenter, decideBudgetException, financeSnapshot, linkBudgetInvoice, notifiedUsers, rangeSummary, saveBudgetSimulation, sectorCostCenter, seesBudgetException, setBudget, setCategoryAssignment, setCostCenterSplit, setGroupBudget, setSectorAllocations, setSectorDefaultCostCenter, suggestCategoryCenters, suggestCostCenterShare, updateBudgetCategory, updateCostCenter, upsertForecast, viewerCategoryScope, viewerCenterScope } from '../domain/budget'
 import { assetDepreciation, dreReading, dreStatement, periodLabel, superaEstimate } from '../domain/dre'
 import { createSeedState } from '../mocks/seed'
 import { MockOmieGateway } from '../services/omie/mockOmieGateway'
@@ -440,6 +440,31 @@ describe('orçamento integrado por categoria e período', () => {
     applyBudgetSimulation(state, TENANT, '2026', 'Patrícia', 'Financeiro')
     expect(state.budgets.find(entry => entry.id === 'ORC-OPER-10')!.amount).toBe(before + 1000)
     expect(() => applyBudgetSimulation(state, 'tenant-roboflex-sul', '2026', 'Patrícia', 'Financeiro')).toThrow('Não há simulação')
+  })
+
+  it('sugere três abordagens e grava ritmos diferentes sobre o realizado', () => {
+    const state = createSeedState()
+    const briefing = budgetPlanBriefing(state, TENANT, '2026')
+    expect(briefing.approaches.map(entry => entry.id)).toEqual(['conservadora', 'media', 'agressiva'])
+    expect(briefing.sources.find(entry => entry.id === 'historico')?.simulated).toBe(false)
+    expect(briefing.sources.filter(entry => entry.id !== 'historico').every(entry => entry.simulated)).toBe(true)
+    const conservative = briefing.approaches[0]
+    const aggressive = briefing.approaches[2]
+    expect(conservative.revenueBase).toBe(43_500_000)
+    expect(conservative.revenueTarget).toBe(45_240_000)
+    expect(conservative.revenueGrowth).toBeLessThan(aggressive.revenueGrowth)
+    const depreciation = state.budgets.find(entry => entry.categoryId === 'BC-DEPREC' && entry.period === '2026')?.amount
+    applyBudgetApproach(state, TENANT, '2026', 'conservadora', 'Patrícia', 'Financeiro')
+    expect(budgetSummary(state, 'BC-ROB', '2026').amount).toBe(45_240_000)
+    expect(budgetSummary(state, 'BC-OPER', '2026').amount).toBe(204_000)
+    expect(state.budgets.find(entry => entry.categoryId === 'BC-OPER' && entry.period === '2026')?.sectorAllocations).toEqual([
+      { sectorId: 'sec-pro', amount: 122_400 },
+      { sectorId: 'sec-eng', amount: 51_000 },
+      { sectorId: 'sec-sup', amount: 30_600 },
+    ])
+    expect(budgetSummary(state, 'BC-CAPEX', '2026').amount).toBe(480_000)
+    expect(state.budgets.find(entry => entry.categoryId === 'BC-DEPREC' && entry.period === '2026')?.amount).toBe(depreciation)
+    expect(() => applyBudgetApproach(state, TENANT, '2026', 'agressiva', 'Marina', 'Gestor')).toThrow('Somente o Financeiro')
   })
 
   it('monta o DRE com depreciação dos ativos e premiação estimada', () => {

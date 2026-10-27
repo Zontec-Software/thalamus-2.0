@@ -69,7 +69,7 @@ function expandAll(value: boolean) {
   <div class="version-grid" style="grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr)">
     <article class="card">
       <div class="section-head">
-        <div><h2>Árvore de classificação</h2><p>Profundidade livre. O código do item não depende da árvore: reclassificar não muda o código.</p></div>
+        <div><h2>Árvore de classificação</h2><p>Profundidade livre. O código do produto não depende da árvore: reclassificar não muda o código.</p></div>
         <div class="filter-row">
           <button class="button ghost small" @click="expandAll(true)">Expandir tudo</button>
           <button class="button ghost small" @click="expandAll(false)">Recolher</button>
@@ -82,7 +82,7 @@ function expandAll(value: boolean) {
           </button>
           <button class="name" @click="pick(row.node)">{{ row.node.name }}</button>
           <span v-if="row.node.attributes?.length" class="count" title="Atributos definidos neste nó">{{ row.node.attributes.length }} atributo(s)</span>
-          <span class="count">{{ total(row.node.id) }} item(ns)</span>
+          <span class="count">{{ total(row.node.id) }} {{ total(row.node.id) === 1 ? 'produto' : 'produtos' }}</span>
         </div>
       </div>
       <form class="filter-row" style="margin-top:12px" @submit.prevent="addRoot">
@@ -97,20 +97,20 @@ function expandAll(value: boolean) {
         <h2 style="font-size:16px;margin:2px 0 4px">{{ selected.name }}</h2>
         <p class="cell-sub">{{ classLabel(store.state, selected.id) }}</p>
         <div class="mini-stats" style="margin:12px 0">
-          <div class="mini-stat"><strong>{{ direct[selected.id] ?? 0 }}</strong><span>itens neste nó</span></div>
+          <div class="mini-stat"><strong>{{ direct[selected.id] ?? 0 }}</strong><span>produtos neste nó</span></div>
           <div class="mini-stat"><strong>{{ total(selected.id) }}</strong><span>incluindo filhos</span></div>
         </div>
-        <button class="button secondary block" @click="showItems(selected.id)">Ver itens na lista</button>
+        <button class="button secondary block" @click="showItems(selected.id)">Ver produtos na lista</button>
         <p v-if="!editable" class="perm-hint" style="margin-top:12px">Quem mantém a árvore: {{ editorsLabel('nucleo') }}.</p>
         <fieldset class="layer" :disabled="!editable" style="margin-top:12px">
           <form class="field" @submit.prevent="addChild"><label>Novo filho</label><div class="filter-row"><input v-model="form.child" class="filter grow" required /><button class="button small"><FolderPlus :size="13" /> Criar</button></div></form>
           <form class="field" @submit.prevent="store.renameClass(selected.id, form.rename)"><label>Renomear</label><div class="filter-row"><input v-model="form.rename" class="filter grow" required /><button class="button secondary small"><Pencil :size="13" /> Salvar</button></div></form>
           <button class="button secondary small" :disabled="children(selected.id).length > 0 || (direct[selected.id] ?? 0) > 0" @click="remove"><Trash2 :size="13" /> Remover nó</button>
-          <p class="cell-sub" style="margin-top:6px">Só nó sem filhos e sem itens pode ser removido. Reclassifique os itens antes (seleção em lote na lista).</p>
+          <p class="cell-sub" style="margin-top:6px">Só nó sem filhos e sem produtos pode ser removido. Reclassifique os produtos antes (seleção em lote na lista).</p>
         </fieldset>
         <ClassAttributesSection :class-id="selected.id" />
       </template>
-      <p v-else class="empty-note">Escolha um nó para ver os itens, criar filhos, renomear e definir os atributos que os itens herdam.</p>
+      <p v-else class="empty-note">Escolha um nó para ver os produtos, criar filhos, renomear e definir os atributos que os produtos herdam.</p>
     </article>
   </div>
 </template>

@@ -35,7 +35,7 @@ function create() {
     <div class="section-head" style="margin-top:0">
       <div>
         <h2>Ferramental</h2>
-        <p>Moldes, gabaritos e dispositivos são itens do catálogo. O roteiro aponta para eles; a manutenção conta os golpes no mesmo ativo.</p>
+        <p>Moldes, gabaritos e dispositivos são produtos do catálogo. O roteiro aponta para eles; a manutenção conta os golpes no mesmo ativo.</p>
       </div>
       <div class="filter-row" style="margin:0">
         <select v-model="kind" class="filter"><option value="">Todos os tipos</option><option>Molde</option><option>Gabarito</option><option>Dispositivo</option></select>

@@ -20,7 +20,7 @@ const creating = ref(false)
 
 <template>
   <div class="section-head" style="margin-top:0">
-    <div><p>Mudanças de engenharia que atingem este item. Mudança controlada: pede, analisa o impacto, aprova e libera as versões juntas.</p></div>
+    <div><p>Mudanças de engenharia que atingem este produto. Mudança controlada: pede, analisa o impacto, aprova e libera as versões juntas.</p></div>
     <button class="button small" @click="creating = true"><Plus :size="13" /> Solicitar mudança</button>
   </div>
   <div v-if="changes.length" class="version-grid">
@@ -33,6 +33,6 @@ const creating = ref(false)
     </div>
     <ChangeDetail v-if="selected" :change="selected" />
   </div>
-  <p v-else class="empty-note">Nenhuma mudança registrada para este item.</p>
+  <p v-else class="empty-note">Nenhuma mudança registrada para este produto.</p>
   <ChangeFormModal :open="creating" :item-id="item.id" @close="creating = false" @saved="id => selectedId = id" />
 </template>

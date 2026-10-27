@@ -50,13 +50,13 @@ function submit() {
         <div class="field"><label>Efetiva a partir de</label><input v-model="form.effectiveDate" type="date" :min="todayIso" required /></div>
       </div>
       <div class="field">
-        <label>Itens afetados</label>
+        <label>Produtos afetados</label>
         <div class="chip-row">
           <button v-for="id in form.itemIds" :key="id" type="button" class="chip active" title="Remover" @click="form.itemIds = form.itemIds.filter(entry => entry !== id)">{{ store.item(id).code }} ×</button>
-          <span v-if="!form.itemIds.length" class="cell-sub">Nenhum item ainda.</span>
+          <span v-if="!form.itemIds.length" class="cell-sub">Nenhum produto ainda.</span>
         </div>
         <div class="filter-row">
-          <select v-model="pick.itemId" class="filter grow"><option value="">Incluir item…</option><option v-for="item in candidates" :key="item.id" :value="item.id">{{ item.code }} · {{ item.name }}</option></select>
+          <select v-model="pick.itemId" class="filter grow"><option value="">Incluir produto…</option><option v-for="item in candidates" :key="item.id" :value="item.id">{{ item.code }} · {{ item.name }}</option></select>
           <button class="button secondary small" type="button" :disabled="!pick.itemId" @click="addItem">Incluir</button>
         </div>
       </div>

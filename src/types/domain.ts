@@ -329,6 +329,32 @@ export interface EconomicGroup {
   description: string
 }
 
+/** Domínio Google da empresa. O segredo de administrador fica no cofre, nunca aqui. */
+export interface WorkspaceConnection {
+  tenantId: string
+  provider: 'Google'
+  domain: string
+  secretDefined: boolean
+  status: 'Simulada'
+}
+
+/** Conta de diretório da pessoa. Não há senha, PIN nem segredo. */
+export interface DirectoryAccount {
+  id: string
+  tenantId: string
+  personId: string
+  provider: 'Google'
+  email: string
+  externalId?: string
+  status: 'Ativa' | 'Suspensa' | 'Falha'
+  /** O que tentar de novo quando a última chamada falhou. */
+  pendingAction?: 'Criar' | 'Suspender'
+  failure?: string
+  requestedBy: string
+  requestedAt: string
+  suspendedAt?: string
+}
+
 /** Vínculo da empresa com uma conta Omie. O segredo não é persistido no navegador. */
 export interface OmieConnection {
   tenantId: string
@@ -637,10 +663,172 @@ export interface User {
   shift: 'Manhã' | 'Tarde' | 'Administrativo'
   pin: string
   email?: string
+  /** Posição organizacional vigente. O cargo fica no catálogo, ligado a essa posição. */
   positionId?: string
+  /** Pessoa da empresa de origem. Ausente no mestre da plataforma e no acesso sem vínculo. */
+  personId?: string
+  /** Empresa do vínculo principal. O acesso a outra empresa não muda este campo. */
+  homeTenantId?: string
   active?: boolean
   /** Identidade da plataforma, fora de qualquer empresa. Cadastra tenants, grupos e o vínculo Omie. */
   platformMaster?: boolean
+}
+
+export type JobOpeningStatus = 'Aberta' | 'Pausada' | 'Encerrada'
+export type ApplicationStage = 'Triagem' | 'Entrevista' | 'Selecionado' | 'Efetivado' | 'Encerrado'
+export type PeopleChecklistKind = 'geral' | 'ativo' | 'acesso' | 'confirmacao'
+export type PeopleChecklistStatus = 'Pendente' | 'Concluído' | 'Falha'
+export type PeopleProcess = 'admissao' | 'efetivacao' | 'desligamento' | 'movimentacao'
+
+/** Vaga da empresa. Sem fluxo de aprovação: nenhum foi definido. */
+export interface JobOpening {
+  id: string
+  tenantId: string
+  title: string
+  sectorId?: string
+  requesterId?: string
+  description: string
+  requirements: string[]
+  ownerId?: string
+  status: JobOpeningStatus
+  openedOn: string
+  targetOn?: string
+}
+
+/** Pessoa externa em seleção. personId só existe depois da efetivação, no mesmo cadastro. */
+export interface Candidate {
+  id: string
+  tenantId: string
+  name: string
+  email?: string
+  phone?: string
+  /** Nome de arquivo de demonstração. O arquivo em si não é guardado. */
+  resumeName?: string
+  /** Texto usado pelo assistente. É simulado: não há leitura de arquivo. */
+  resumeText: string
+  personId?: string
+}
+
+export interface ApplicationEvent {
+  at: string
+  actor: string
+  text: string
+}
+
+export interface Application {
+  id: string
+  tenantId: string
+  candidateId: string
+  jobId: string
+  stage: ApplicationStage
+  history: ApplicationEvent[]
+}
+
+export interface Interview {
+  id: string
+  applicationId: string
+  at: string
+  place: string
+  interviewerIds: string[]
+  confirmed: boolean
+  notes: string
+}
+
+export interface SelectionReview {
+  id: string
+  applicationId: string
+  origin: string
+  notes: string
+  actor: string
+  at: string
+}
+
+export interface PeopleChecklistItem {
+  id: string
+  label: string
+  owner: string
+  status: PeopleChecklistStatus
+  dueOn?: string
+  evidence?: string
+  kind: PeopleChecklistKind
+  required: boolean
+}
+
+export interface PeopleChecklist {
+  id: string
+  tenantId: string
+  process: PeopleProcess
+  refId: string
+  items: PeopleChecklistItem[]
+}
+
+/** Leitura assistida. Não rejeita, não ordena por nota e não contrata. */
+export interface CandidateBriefing {
+  id: string
+  applicationId: string
+  version: string
+  criteria: string[]
+  evidence: string[]
+  gaps: string[]
+  questions: string[]
+  summary: string
+  suggested: boolean
+  at: string
+  humanDecision?: 'Seguir' | 'Não seguir'
+  humanNote?: string
+  decidedBy?: string
+  decidedAt?: string
+}
+
+/** Vigência de cargo e setor. A anterior permanece. */
+export interface Assignment {
+  id: string
+  userId: string
+  sector: string
+  positionId?: string
+  validFrom: string
+  validTo?: string
+  actor: string
+}
+
+/** Nota individual. A escala é um rótulo; escalas diferentes não se comparam. */
+export interface PerformanceReview {
+  id: string
+  userId: string
+  scoreLabel: string
+  scale: string
+  period: string
+  origin: string
+  at: string
+  actor: string
+}
+
+export type OffboardingStatus = 'Em andamento' | 'Concluído'
+
+export interface Offboarding {
+  id: string
+  tenantId: string
+  userId: string
+  effectiveOn: string
+  reason: string
+  status: OffboardingStatus
+  startedAt: string
+  startedBy: string
+  closedAt?: string
+  closedBy?: string
+}
+
+/** Execução da revogação. Não há campo de senha, PIN ou segredo. */
+export interface AccessRevocation {
+  id: string
+  offboardingId: string
+  systems: string[]
+  at: string
+  result: 'Concluído' | 'Falha'
+  actor: string
+  failure?: string
+  /** Referência da rotação no cofre, quando houver conta técnica. O segredo fica fora daqui. */
+  vaultReference?: string
 }
 
 export interface ShopAlert {
@@ -657,7 +845,11 @@ export type Priority = 'Baixa' | 'Normal' | 'Alta' | 'Urgente'
 
 export interface Sector {
   id: string
+  tenantId: string
   name: string
+  /** Posição de liderança. A hierarquia do setor aponta para a vaga, não para a pessoa. */
+  managerPositionId?: string
+  /** Conta do ocupante vigente da posição de liderança. Serve ao alerta e à tela; a fonte é a posição. */
   managerId?: string
   parentId?: string
   /** Código do centro de custo padrão desta equipe em cada empresa (id da empresa → código). */
@@ -670,16 +862,146 @@ export interface CostCenter {
   tenantId: string
   code: string
   name: string
-  /** Usuário que responde pelo gasto deste centro e recebe os alertas das contas em que ele tem fatia. */
+  /** Conta que recebe o alerta. A responsabilidade de negócio fica na posição. */
   responsibleUserId: string
+  /** Posição que responde pelo gasto. Não concede perfil. */
+  responsiblePositionId?: string
   status: EntityStatus
 }
 
+/** Catálogo de trabalho da empresa. Não forma hierarquia. */
+export interface JobCatalog {
+  id: string
+  tenantId: string
+  name: string
+  level: string
+  cbo: string
+  mission: string
+  requirements: string[]
+  status: EntityStatus
+}
+
+/** Vaga organizacional. A hierarquia fica aqui e no setor. */
 export interface JobPosition {
   id: string
+  tenantId: string
   name: string
   sectorId: string
+  jobId: string
   description: string
+  parentPositionId?: string
+  headcount: number
+  status: EntityStatus
+}
+
+export interface PersonAddress {
+  street: string
+  number: string
+  district: string
+  complement?: string
+  zip: string
+  state: string
+  city: string
+}
+
+export interface PersonEducation {
+  institution: string
+  course: string
+  level: string
+}
+
+export interface PersonRelative {
+  name: string
+  bond: string
+}
+
+export interface PersonEmergency {
+  name: string
+  phone: string
+  bond: string
+}
+
+export interface PersonBank {
+  bank: string
+  agency: string
+  account: string
+  kind: string
+}
+
+/** Cadastro da pessoa na empresa. Dados sensíveis não atravessam o grupo. */
+export interface Person {
+  id: string
+  tenantId: string
+  fullName: string
+  /** Retrato da pessoa. Data URL nesta demonstração; o arquivo real fica no armazenamento. */
+  photo?: string
+  birthDate?: string
+  sex?: string
+  gender?: string
+  cpf?: string
+  rg?: string
+  cnh?: string
+  cnhCategory?: string
+  personalEmail?: string
+  corporateEmail?: string
+  phone?: string
+  extension?: string
+  maritalStatus?: string
+  educationLevel?: string
+  race?: string
+  pcd?: string
+  height?: string
+  shoeSize?: string
+  shirtSize?: string
+  drugAllergy?: string
+  foodAllergy?: string
+  controlledMedicine?: string
+  notes?: string
+  address?: PersonAddress
+  education: PersonEducation[]
+  family: PersonRelative[]
+  emergencies: PersonEmergency[]
+  banks: PersonBank[]
+  /** Trajeto e benefícios ficam como registro, sem processo de pagamento. */
+  commute?: string
+}
+
+/** Vínculo trabalhista daquela empresa. */
+export interface Employment {
+  id: string
+  tenantId: string
+  personId: string
+  contractType: string
+  startedOn: string
+  endedOn?: string
+  status: 'Ativo' | 'Encerrado'
+  workplace?: string
+  salary?: number
+  cbo?: string
+}
+
+/** Ligação confirmada por uma pessoa, entre dois cadastros. CPF ou e-mail só sugerem. */
+export interface IdentityLink {
+  id: string
+  leftPersonId: string
+  rightPersonId: string
+  status: 'Sugerido' | 'Confirmado' | 'Recusado'
+  basis: string
+  actor?: string
+  at: string
+}
+
+/** Participação no projeto da outra empresa. Só o mínimo profissional. */
+export interface ProjectParticipation {
+  id: string
+  projectId: string
+  hostTenantId: string
+  personId: string
+  sourceTenantId: string
+  displayName: string
+  jobTitle: string
+  contact: string
+  role: string
 }
 
 export type PartnerRoleName = 'Cliente' | 'Fornecedor' | 'Transportadora'
@@ -852,6 +1174,8 @@ export interface Demand {
   assigneeRole: Role
   createdAt: string
   requester?: string
+  /** Pessoa que pediu, quando o pedido nasce de um colaborador. A conta continua no alerta. */
+  requesterPersonId?: string
   projectId?: string
   purchaseOrderId?: string
   supplierId?: string

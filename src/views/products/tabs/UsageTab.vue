@@ -24,9 +24,9 @@ const pendencies = computed(() => openPendencies(store.state, props.item.id))
     </div>
     <p v-if="!toolUsers(store.state, item.id).length" class="empty-note">Nenhum roteiro vigente usa este ferramental.</p>
   </template>
-  <h3 class="drawer-title" :style="item.type === 'FE' ? '' : 'margin-top:0'">Estruturas vigentes que usam este item</h3>
+  <h3 class="drawer-title" :style="item.type === 'FE' ? '' : 'margin-top:0'">Estruturas vigentes que usam este produto</h3>
   <table v-if="parents.length" class="dense">
-    <thead><tr><th>Item pai</th><th>Quantidade</th><th>Situação do pai</th></tr></thead>
+    <thead><tr><th>Produto pai</th><th>Quantidade</th><th>Situação do pai</th></tr></thead>
     <tbody>
       <tr v-for="parent in parents" :key="parent.id">
         <td><RouterLink :to="`/produtos/item/${parent.id}`" class="cell-main code">{{ parent.code }}</RouterLink><span class="cell-sub">{{ parent.name }}</span></td>
@@ -47,7 +47,7 @@ const pendencies = computed(() => openPendencies(store.state, props.item.id))
   <h3 class="drawer-title">Histórico de uso</h3>
   <div class="flag-list"><span v-for="entry in refs" :key="entry" class="status info">{{ entry }}</span></div>
   <p v-if="!refs.length" class="empty-note">Nunca foi usado: se for excluído, sai do cadastro de verdade.</p>
-  <p v-else class="cell-sub" style="margin-top:8px">Como já foi usado, a exclusão é lógica: o item some das listas e o histórico fica.</p>
+  <p v-else class="cell-sub" style="margin-top:8px">Como já foi usado, a exclusão é lógica: o produto some das listas e o histórico fica.</p>
 
   <h3 class="drawer-title">Em aberto agora</h3>
   <div v-for="entry in pendencies" :key="entry" class="list-row static"><div><strong>{{ entry }}</strong></div></div>

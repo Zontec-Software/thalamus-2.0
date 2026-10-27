@@ -1,5 +1,6 @@
 import { FUNCTIONALITIES, profileCode } from './access'
 import { DomainError, type ErpState } from './engine'
+import { ensurePerson } from './organization'
 import type { EconomicGroup, Tenant } from '../types/domain'
 
 export interface NewCompanyInput {
@@ -36,16 +37,18 @@ export function provisionCompany(state: ErpState, input: NewCompanyInput) {
     simulatedRole: 'Administrador',
   })
   const userId = `u-${tenantId}-admin`
-  state.users.push({
+  const admin = {
     id: userId,
     name: adminName,
-    role: 'Administrador',
+    role: 'Administrador' as const,
     sector: 'Administração',
-    shift: 'Administrativo',
+    shift: 'Administrativo' as const,
     pin: '0000',
     email: adminEmail,
     active: true,
-  })
+  }
+  state.users.push(admin)
+  ensurePerson(state, admin, tenantId, adminName)
   state.userProfileAssignments.push({ id: `UP-${tenantId}-admin`, userId, tenantId, profileId })
   return { tenantId, userId, profileId }
 }

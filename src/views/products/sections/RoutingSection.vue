@@ -126,7 +126,7 @@ function copy() {
   </BaseModal>
   <form v-if="isDraft && !disabled" class="filter-row" style="margin-top:10px" @submit.prevent="copy">
     <fieldset class="layer filter-row" style="flex:1">
-      <select v-model="copyFrom" class="filter grow"><option value="" disabled>Copiar roteiro de outro item…</option><option v-for="source in sources" :key="source.id" :value="source.id">{{ source.code }} · {{ source.name }} ({{ source.routing!.length }} op.)</option></select>
+      <select v-model="copyFrom" class="filter grow"><option value="" disabled>Copiar roteiro de outro produto…</option><option v-for="source in sources" :key="source.id" :value="source.id">{{ source.code }} · {{ source.name }} ({{ source.routing!.length }} op.)</option></select>
       <button class="button secondary small" type="submit" :disabled="!copyFrom"><Copy :size="13" /> Copiar</button>
     </fieldset>
   </form>
