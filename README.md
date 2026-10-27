@@ -27,13 +27,13 @@ Os dados são fictícios e ficam salvos no navegador. Para voltar ao cenário in
 - **Operações:** Planejamento, Produção, Qualidade e Tablet com revisão congelada na OP.
 - **Serviços:** Manutenção preventiva/corretiva e Assistência Técnica pós-venda.
 - **Gestão:** Indicadores, Projetos e tarefas por papel.
-- **Finanças:** DRE (entre dois meses, da empresa ou do grupo, com a leitura do período) e Orçamentos, com os centros de custo numa aba própria. Contas a pagar e a receber estão em estruturação; o título, o banco e a contabilidade ficam no Omie.
+- **Finanças:** DRE (entre dois meses, da empresa ou do grupo, com a leitura do período) e Orçamentos por categoria e setor utilizador. Contas a pagar e a receber estão em estruturação; o título, o banco e a contabilidade ficam no Omie.
 
 Troque o **Perfil** no topo para ver o sistema como PCP, Compras, Almoxarifado, Qualidade, Expedição etc. O menu, as tarefas e as permissões mudam conforme o papel.
 
 ### Orçamento integrado
 
-O orçamento é controlado por **categoria + mês**. O valor informado, a previsão operacional de Demandas/OPs/OSs/Projetos e o realizado pago são mantidos separadamente. O realizado só nasce de pagamento confirmado pelo Omie; pagamentos parciais, estornos, idempotência, alertas registrados, previsão retida por falta de saldo e fila de exceções fazem parte do cenário navegável. A árvore tem grupo, categoria e subcategoria. O Financeiro define o orçamento e os centros de custo de cada conta no mesmo lugar, e o Gestor libera exceções de saldo. Quem responde pela conta é o responsável de cada centro com fatia; a parte sem centro fica com o Financeiro.
+O orçamento é controlado por **categoria + mês**. O valor informado, a previsão operacional de Demandas/OPs/OSs/Projetos e o realizado pago são mantidos separadamente. O realizado só nasce de pagamento confirmado pelo Omie; pagamentos parciais, estornos, idempotência, alertas registrados, previsão retida por falta de saldo e fila de exceções fazem parte do cenário navegável. A árvore tem grupo, categoria e subcategoria. O Financeiro define o orçamento e o valor destinado a cada setor utilizador, e o Gestor libera exceções de saldo. Quem responde pela conta é a pessoa responsável da categoria.
 
 ## Tablet do chão de fábrica (`/tablet`)
 

@@ -74,7 +74,7 @@ export const router = createRouter({
     { path: '/ajuda/manual/:id?', component: () => import('../views/help/ManualView.vue'), meta: { title: 'Manual do sistema', eyebrow: 'Central de ajuda' } },
     { path: '/dre', component: () => import('../views/DreView.vue'), meta: { title: 'DRE', eyebrow: 'Finanças' } },
     { path: '/orcamentos', component: () => import('../views/BudgetsView.vue'), meta: { title: 'Orçamentos', eyebrow: 'Finanças' } },
-    { path: '/centros-de-custo', redirect: () => { useUiStore().budgetTab = 'centros'; return '/orcamentos' } },
+    { path: '/centros-de-custo', redirect: '/orcamentos' },
     { path: '/leitura-financeira', redirect: '/dre' },
     { path: '/contas-pagar', component: () => import('../views/FinanceTitlesView.vue'), meta: { title: 'Contas a pagar', eyebrow: 'Finanças' } },
     { path: '/contas-receber', component: () => import('../views/FinanceTitlesView.vue'), meta: { title: 'Contas a receber', eyebrow: 'Finanças' } },

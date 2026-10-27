@@ -82,7 +82,7 @@ const tasks = computed<Task[]>(() => {
     const mine = (alert.notifiedUserIds ?? []).includes(ui.sessionUserId)
     const allocation = allocationOf(s, alert.categoryId, alert.period)
     list.push({
-      id: alert.id, owner: mine ? ui.role : 'Financeiro', title: mine ? `Conta do seu centro em alerta · ${alert.period}` : `Orçamento em alerta · ${alert.period}`, detail: alert.message, urgent: alert.use >= 100,
+      id: alert.id, owner: mine ? ui.role : 'Financeiro', title: mine ? `Conta em alerta · ${alert.period}` : `Orçamento em alerta · ${alert.period}`, detail: alert.message, urgent: alert.use >= 100,
       action: 'Ciente', run: () => store.acknowledgeBudgetAlert(alert.id), open: allocation ? () => ui.openRecord('budget', allocation.id, { window: alert.period }) : undefined,
     })
   }

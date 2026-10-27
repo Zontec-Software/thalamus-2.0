@@ -22,7 +22,7 @@ import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NonConformity, Resource, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v47'
+const STORAGE_KEY = 'thalamus-erp-v50'
 
 function load(): ErpState {
   const seed = createSeedState()
@@ -135,14 +135,12 @@ export const useErpStore = defineStore('erp', () => {
 
   function assignProfile(userId: string, profileId: string, assigned: boolean) {
     if (!can('organizacao.acessos.gerir')) throw new Error('Sem permissão para gerir acessos')
-    const profile = state.accessProfiles.find(entry => entry.id === profileId)
-    const user = state.users.find(entry => entry.id === userId)
-    if (!profile || !user) throw new Error('Usuário ou perfil não encontrado')
-    if (profile.tenantId !== tenantId()) throw new Error('O perfil não pertence à empresa ativa')
-    const current = state.userProfileAssignments.find(entry => entry.userId === userId && entry.profileId === profileId && entry.tenantId === tenantId())
-    if (assigned && !current) state.userProfileAssignments.push({ id: `UP-${state.userProfileAssignments.length + 1}`, userId, tenantId: tenantId(), profileId })
-    if (!assigned && current) state.userProfileAssignments = state.userProfileAssignments.filter(entry => entry !== current)
-    engine.log(state, 'Organização', actor(), `Perfil ${profile.name} ${assigned ? 'atribuído a' : 'removido de'} ${user.name}`)
+    if (!tenantId()) throw new Error('Selecione a empresa antes de alterar um perfil')
+    try {
+      organization.setCompanyProfile(state, tenantId(), userId, profileId, assigned, actor(), can('organizacao.consultar_consolidado'))
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Não foi possível alterar o perfil')
+    }
   }
 
   /* Leituras */
@@ -344,20 +342,10 @@ export const useErpStore = defineStore('erp', () => {
       ui.activeTenantId = created.tenantId
       return created
     }, 'Empresa criada no grupo, com orçamento vazio')
-  const setCostCenterSplit = (categoryId: string, year: string, mode: 'percent' | 'amount', lines: { costCenterId: string; value: number }[]) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.setCostCenterSplit(state, tenantId(), categoryId, year, mode, lines, actor(), ui.role) }, 'Distribuição por centro de custo salva')
-  const applyCategorySuggestion = (categoryId: string, year: string) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.applyCategorySuggestion(state, tenantId(), categoryId, year, actor(), ui.role) }, 'Centros sugeridos pelo realizado anterior')
   const saveBudgetSimulation = (year: string) =>
     run(() => { requireFeature('orcamentos.gerir'); return budget.saveBudgetSimulation(state, tenantId(), year, actor(), ui.role) }, 'Simulação salva')
   const applyBudgetSimulation = (year: string) =>
     run(() => { requireFeature('orcamentos.gerir'); return budget.applyBudgetSimulation(state, tenantId(), year, actor(), ui.role) }, 'Simulação aplicada ao orçamento')
-  const createCostCenter = (code: string, name: string, responsibleUserId: string) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.createCostCenter(state, tenantId(), { code, name, responsibleUserId }, actor(), ui.role) }, 'Centro de custo criado')
-  const updateCostCenter = (id: string, name: string, status: 'Ativo' | 'Inativo', responsibleUserId: string) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.updateCostCenter(state, tenantId(), id, { name, status, responsibleUserId }, actor(), ui.role) }, 'Centro de custo atualizado')
-  const setSectorDefaultCostCenter = (sectorId: string, code: string) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.setSectorDefaultCostCenter(state, tenantId(), sectorId, code, actor(), ui.role) }, 'Centro padrão do setor atualizado')
   const requireGroupPlanning = () => { requireFeature('orcamentos.consultar_consolidado'); requireFeature('orcamentos.gerir') }
   const applyGroupGrowth = (groupId: string, year: string, growthPct: number, reason = '') =>
     run(() => { requireGroupPlanning(); return budget.applyGroupGrowth(state, groupId, year, growthPct, reason, actor(), ui.role) }, perTenant => `Planejamento aplicado a ${perTenant.length} empresa(s) do grupo`)
@@ -676,7 +664,7 @@ export const useErpStore = defineStore('erp', () => {
     createTechnicalOrder, scheduleTechnicalOrder, updateTechnicalOrder, addTechnicalPart, advanceTechnicalOrder, cancelTechnicalOrder,
     createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk,
     createBudget, distributeGroupBudget, setAnnualBudget, adjustBudget, createBudgetCategory, updateBudgetCategory, configureBudget, decideBudgetException, acknowledgeBudgetAlert, linkBudgetInvoice,
-    applyBudgetGrowth, applyRevenueTarget, applyBudgetApproach, applyPriorSeasonality, setMonthlyBudget, setSectorAllocations, setCategoryAssignment, createBudgetGroup, createPlannedCompany, setCostCenterSplit, applyCategorySuggestion, saveBudgetSimulation, applyBudgetSimulation, createCostCenter, updateCostCenter, setSectorDefaultCostCenter, applyGroupGrowth, applyGroupRevenueTarget,
+    applyBudgetGrowth, applyRevenueTarget, applyBudgetApproach, applyPriorSeasonality, setMonthlyBudget, setSectorAllocations, setCategoryAssignment, createBudgetGroup, createPlannedCompany, saveBudgetSimulation, applyBudgetSimulation, applyGroupGrowth, applyGroupRevenueTarget,
     createUser, updateUser, updatePerson, setPersonPhoto, updateEmployment, createSector, createJob, createPosition, placeSector, setSectorLeadership, suggestIdentity, confirmIdentity, refuseIdentity, addProjectParticipation, grantCompanyAccess, openLinkedEmployment, resetPin, provisionDirectoryAccount, retryDirectoryAccount, createJobOpening, updateJobOpening, setJobStatus, addPeopleChecklistItem, registerCandidate, noteCandidateView, prepareBriefing, reviewBriefing, scheduleInterview, setInterviewConfirmation, recordSelectionResult, setApplicationStage, setPeopleChecklistItem, hireCandidate, changeAssignment, recordReview, startOffboarding, revokeAccess, closeOffboarding, createPartner, updatePartnerMaster, addPartnerContact, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, setServiceStatus, openServiceRoutingChange, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
   }
 })

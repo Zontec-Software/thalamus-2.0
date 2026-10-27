@@ -5,7 +5,6 @@ import BaseModal from '../../components/BaseModal.vue'
 import RoleVsPosition from './RoleVsPosition.vue'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
-import { sectorCostCenter } from '../../domain/budget'
 import { occupantsAt } from '../../domain/organization'
 
 const store = useErpStore()
@@ -97,7 +96,7 @@ function addPosition() {
         <header class="partner-h-row">
           <div>
             <h3 class="section-title" style="margin:0">{{ selected.name }}</h3>
-            <span class="cell-sub">{{ sectorCostCenter(selected, ui.activeTenantId) || 'Sem centro de custo' }} · {{ peopleIn(selected.id) }} {{ peopleIn(selected.id) === 1 ? 'pessoa' : 'pessoas' }}</span>
+            <span class="cell-sub">{{ peopleIn(selected.id) }} {{ peopleIn(selected.id) === 1 ? 'pessoa' : 'pessoas' }}</span>
           </div>
           <button type="button" class="button secondary small" @click="openSector"><Plus :size="14" /> Setor abaixo</button>
         </header>

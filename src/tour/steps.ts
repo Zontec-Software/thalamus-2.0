@@ -231,7 +231,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('platform-omie', 'Vínculo Omie', 'A chave identifica a conta. O segredo é informado e descartado. A sincronização continua simulada até o Core existir.'),
   ],
   '/organizacao': [
-    t('permissions', 'Perfis por funcionalidade', 'Crie perfis reutilizáveis e marque ações de negócio, como gerir orçamento ou liberar saldo. Atribua vários perfis a uma pessoa; as permissões se somam.'),
+    t('permissions', 'Perfis por funcionalidade', 'Crie perfis reutilizáveis e marque ações de negócio, como gerir orçamento ou liberar saldo. Atribua vários perfis a uma pessoa; as permissões se somam. No topo, a empresa ou o grupo mostram onde a conta entra. A soma não edita.'),
   ],
   '/integracao': [
     t('sync-table', 'Histórico de integração', 'Cada troca com o Omie fica registrada com direção, resultado e mensagem. Falhas podem ser reprocessadas após a correção.'),

@@ -11,6 +11,13 @@ export const ACCOUNT_ROLES: Role[] = ['Administrador', 'Gestor', 'Comercial', 'E
 export type PersonView = 'completa' | 'financeira' | 'profissional'
 export type PersonBlock = 'documentos' | 'saude' | 'endereco' | 'familia' | 'salario' | 'banco' | 'profissional'
 
+/** O cenário já usa UP-1, UP-2… O contador começa em zero, então um id novo não pode repetir um existente. */
+function assignmentId(state: ErpState) {
+  let id = nextId(state, 'UP')
+  while (state.userProfileAssignments.some(entry => entry.id === id)) id = nextId(state, 'UP')
+  return id
+}
+
 const find = <T extends { id: string }>(list: T[], id: string, label: string) => {
   const entry = list.find(candidate => candidate.id === id)
   if (!entry) throw new DomainError(`${label} não encontrado(a)`)
@@ -90,7 +97,7 @@ export function createSector(state: ErpState, tenantId: string, input: { name: s
   if (state.sectors.some(entry => entry.tenantId === tenantId && entry.name.trim().toLowerCase() === input.name.trim().toLowerCase())) throw new DomainError('Já existe setor com este nome na empresa')
   if (input.parentId) find(state.sectors, input.parentId, 'Setor superior')
   const sector: Sector = {
-    id: nextId(state, 'SEC'), tenantId, name: input.name.trim(), parentId: input.parentId, managerPositionId: input.managerPositionId, costCenters: {},
+    id: nextId(state, 'SEC'), tenantId, name: input.name.trim(), parentId: input.parentId, managerPositionId: input.managerPositionId,
   }
   state.sectors.push(sector)
   syncSectorManagers(state)
@@ -303,7 +310,7 @@ export function grantCompanyAccess(state: ErpState, userId: string, tenantId: st
   const persons = state.persons.length
   const positions = state.positions.length
   const employments = state.employments.length
-  state.userProfileAssignments.push({ id: nextId(state, 'UP'), userId, tenantId, profileId })
+  state.userProfileAssignments.push({ id: assignmentId(state), userId, tenantId, profileId })
   if (state.persons.length !== persons || state.positions.length !== positions || state.employments.length !== employments) throw new DomainError('Acesso não cria cadastro de pessoa')
   log(state, 'Organização', actor, `${user.name} recebeu o perfil ${profile.name} sem novo vínculo`, undefined, user.id)
   return user
@@ -337,6 +344,44 @@ export function openLinkedEmployment(state: ErpState, sourcePersonId: string, te
   if (person.cpf || person.banks.length || person.address) throw new DomainError('O novo vínculo não copia dado sensível')
   log(state, 'Pessoas', actor, `${person.fullName} ganhou vínculo em outra empresa, sem unir os cadastros`, undefined, person.id)
   return { person, user, employment, link }
+}
+
+/** Perfil da conta numa empresa: nomes e se existe emprego lá. Não cria cadastro. */
+export function companyAccessOf(state: ErpState, userId: string, tenantId: string) {
+  const user = find(state.users, userId, 'Conta')
+  const employed = state.persons.some(entry => entry.id === user.personId && entry.tenantId === tenantId)
+    || state.employments.some(entry => entry.personId === user.personId && entry.tenantId === tenantId && entry.status === 'Ativo')
+  const profileNames = state.userProfileAssignments
+    .filter(entry => entry.userId === userId && entry.tenantId === tenantId)
+    .flatMap(entry => {
+      const profile = state.accessProfiles.find(candidate => candidate.id === entry.profileId)
+      return profile ? [profile.name] : []
+    })
+  return { employed, profileNames }
+}
+
+/**
+ * Concede ou tira um perfil. Outra empresa só entra com a consulta do grupo e se for do mesmo grupo.
+ * A conta continua a mesma: não nasce pessoa, vínculo nem posição.
+ */
+export function setCompanyProfile(state: ErpState, actorTenantId: string, userId: string, profileId: string, assigned: boolean, actor: string, canCrossGroup: boolean) {
+  const user = find(state.users, userId, 'Conta')
+  if (user.platformMaster) throw new DomainError('A identidade da plataforma não recebe perfil de empresa')
+  const profile = find(state.accessProfiles, profileId, 'Perfil')
+  const home = find(state.tenants, actorTenantId, 'Empresa')
+  const target = find(state.tenants, profile.tenantId, 'Empresa')
+  if (profile.tenantId !== actorTenantId) {
+    if (!canCrossGroup) throw new DomainError('Sem permissão para o acesso de outra empresa do grupo')
+    if (!home.groupId || home.groupId !== target.groupId) throw new DomainError('A empresa não está no grupo')
+  }
+  const persons = state.persons.length
+  const employments = state.employments.length
+  const current = state.userProfileAssignments.find(entry => entry.userId === userId && entry.profileId === profileId && entry.tenantId === profile.tenantId)
+  if (assigned && !current) state.userProfileAssignments.push({ id: assignmentId(state), userId, tenantId: profile.tenantId, profileId })
+  if (!assigned && current) state.userProfileAssignments = state.userProfileAssignments.filter(entry => entry !== current)
+  if (state.persons.length !== persons || state.employments.length !== employments) throw new DomainError('O perfil não cria vínculo')
+  log(state, 'Organização', actor, `Perfil ${profile.name} ${assigned ? 'atribuído a' : 'removido de'} ${user.name}`, undefined, user.id)
+  return user
 }
 
 /** Redefine o PIN e não o devolve. A tela mostra só os dois últimos dígitos. */

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { today } from '../domain/engine'
 import { createUser } from '../domain/enterprise'
 import {
-  addProjectParticipation, canSeePersonBlock, directManager, directoryCard, grantCompanyAccess, openLinkedEmployment, personView, placeSector, resetPin, setPersonPhoto, suggestIdentity,
+  addProjectParticipation, canSeePersonBlock, companyAccessOf, directManager, directoryCard, grantCompanyAccess, openLinkedEmployment, personView, placeSector, resetPin, setCompanyProfile, setPersonPhoto, suggestIdentity,
 } from '../domain/organization'
 import {
   BRIEFING_VERSION, changeAssignment, closeOffboarding, createJobOpening, hireCandidate, prepareBriefing, recordReview, registerCandidate, revokeAccess, reviewsShareScale, setApplicationStage, setChecklistItem, startOffboarding,
@@ -169,6 +169,29 @@ describe('pessoas', () => {
     expect(() => placeSector(state, 'sec-dir', 'sec-com', 'Marina')).toThrow(/abaixo dele/)
     placeSector(state, 'sec-fin', 'sec-com', 'Marina')
     expect(state.sectors.find(entry => entry.id === 'sec-fin')!.parentId).toBe('sec-com')
+  })
+
+  it('concede perfil em outra empresa do grupo sem criar usuário nem vínculo', () => {
+    const state = createSeedState()
+    const lucas = companyAccessOf(state, 'u16', 'tenant-roboflex-sul')
+    expect(lucas.employed).toBe(false)
+    expect(lucas.profileNames).toContain('Administrador')
+    expect(companyAccessOf(state, 'u16', TENANT).employed).toBe(true)
+    const joao = state.users.find(entry => entry.name.startsWith('João'))!
+    const persons = state.persons.length
+    const users = state.users.length
+    expect(() => setCompanyProfile(state, TENANT, joao.id, 'profile-zontec-eng', true, 'Lucas', false)).toThrow(/grupo/)
+    setCompanyProfile(state, TENANT, joao.id, 'profile-zontec-eng', true, 'Lucas', true)
+    const access = companyAccessOf(state, joao.id, 'tenant-roboflex-sul')
+    expect(access.employed).toBe(false)
+    expect(access.profileNames).toEqual(['Engenharia'])
+    expect(state.persons).toHaveLength(persons)
+    expect(state.users).toHaveLength(users)
+    expect(state.users.filter(entry => entry.personId === joao.personId)).toHaveLength(1)
+    const lucasBefore = state.userProfileAssignments.filter(entry => entry.userId === 'u16' && entry.tenantId === TENANT).map(entry => entry.id)
+    setCompanyProfile(state, TENANT, joao.id, 'profile-zontec-eng', false, 'Lucas', true)
+    expect(companyAccessOf(state, joao.id, 'tenant-roboflex-sul').profileNames).toHaveLength(0)
+    expect(state.userProfileAssignments.filter(entry => entry.userId === 'u16' && entry.tenantId === TENANT).map(entry => entry.id)).toEqual(lucasBefore)
   })
 
   it('acha o gestor direto pela posição superior e, sem ela, pelo líder do setor', () => {

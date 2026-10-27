@@ -852,21 +852,6 @@ export interface Sector {
   /** Conta do ocupante vigente da posição de liderança. Serve ao alerta e à tela; a fonte é a posição. */
   managerId?: string
   parentId?: string
-  /** Código do centro de custo padrão desta equipe em cada empresa (id da empresa → código). */
-  costCenters: Record<string, string>
-}
-
-/** Plano de centros de custo da empresa. O código é o mesmo que o Omie usa para classificar o gasto. */
-export interface CostCenter {
-  id: string
-  tenantId: string
-  code: string
-  name: string
-  /** Conta que recebe o alerta. A responsabilidade de negócio fica na posição. */
-  responsibleUserId: string
-  /** Posição que responde pelo gasto. Não concede perfil. */
-  responsiblePositionId?: string
-  status: EntityStatus
 }
 
 /** Catálogo de trabalho da empresa. Não forma hierarquia. */
@@ -1182,7 +1167,6 @@ export interface Demand {
   estimatedCost?: number
   budgetCategoryId?: string
   budgetPeriod?: string
-  costCenter?: string
   notes?: string
   resolution?: string
 }
@@ -1383,11 +1367,6 @@ export interface Budget {
   audit: BudgetAudit[]
   /** Distribuição mês a mês do valor anual. Sem isto, a fatia do mês é 1/12 igual para todos. */
   monthlyAmounts?: number[]
-  /** Parte do valor anual de cada centro de custo. A soma pode ficar abaixo do ano; o que falta fica com o Financeiro. Não pode passar do ano. */
-  costCenterSplit?: {
-    mode: 'percent' | 'amount'
-    lines: { costCenterId: string; value: number }[]
-  }
   /** Valor destinado a cada setor utilizador. A soma pode ficar abaixo do valor da categoria; o que falta não libera demanda. Não pode passar do valor. */
   sectorAllocations?: { sectorId: string; amount: number }[]
 }
@@ -1432,7 +1411,8 @@ export interface BudgetEntry {
   /** Preenchido quando alguém liga a nota na mão. O automático chega com os módulos de origem. */
   linkMode?: 'manual'
   projectId?: string
-  costCenter?: string
+  /** Setor utilizador deste lançamento. Sem isto, o gasto fica sem utilizador. */
+  sectorId?: string
   description: string
   createdAt: string
   events: BudgetEntryEvent[]

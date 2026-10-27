@@ -17,7 +17,7 @@ import {
   contractService, createDemand, createOpportunity, createProject, createProposal, createPurchaseOrder, createTechnicalOrder, deliveryLead, loseOpportunity,
   moveOpportunity, releaseRevision, tasksForRole, toggleMilestone, undoPick, updateProposal,
 } from '../domain/enterprise'
-import { absorbOmieCategories, acknowledgeAlert, applyBudgetApproach, applyBudgetSimulation, applyCategorySuggestion, budgetPlanBriefing, applyOmiePayment, applyPriorSeasonality, applyRemoteCategories, budgetSummary, categoryOf, costCenterAmounts, createBudgetCategory, createBudgetGroup, createCostCenter, decideBudgetException, financeSnapshot, linkBudgetInvoice, notifiedUsers, rangeSummary, saveBudgetSimulation, sectorCostCenter, seesBudgetException, setBudget, setCategoryAssignment, setCostCenterSplit, setGroupBudget, setSectorAllocations, setSectorDefaultCostCenter, suggestCategoryCenters, suggestCostCenterShare, updateBudgetCategory, updateCostCenter, upsertForecast, viewerCategoryScope, viewerCenterScope } from '../domain/budget'
+import { absorbOmieCategories, acknowledgeAlert, applyBudgetApproach, applyBudgetSimulation, budgetPlanBriefing, applyOmiePayment, applyPriorSeasonality, applyRemoteCategories, budgetSummary, categoryOf, createBudgetCategory, createBudgetGroup, decideBudgetException, financeSnapshot, linkBudgetInvoice, notifiedUsers, rangeSummary, saveBudgetSimulation, seesBudgetException, setBudget, setCategoryAssignment, setGroupBudget, setSectorAllocations, updateBudgetCategory, upsertForecast, viewerCategoryScope } from '../domain/budget'
 import { assetDepreciation, dreReading, dreStatement, periodLabel, superaEstimate } from '../domain/dre'
 import { createSeedState } from '../mocks/seed'
 import { MockOmieGateway } from '../services/omie/mockOmieGateway'
@@ -321,8 +321,6 @@ describe('orçamento integrado por categoria e período', () => {
     expect(setBudget(state, TENANT, 'BC-OPER', '2027', 5000, '', 'Financeiro', 'Financeiro').amount).toBe(5000)
     expect(() => setBudget(state, TENANT, 'BC-OPER', '2026-10', 5000, 'Planejamento inicial', 'Financeiro', 'Financeiro')).toThrow('AAAA')
     expect(() => setBudget(state, TENANT, 'BC-DEPREC', '2026', 1000, 'Teste', 'Financeiro', 'Financeiro')).toThrow('ativos')
-    expect(() => setCostCenterSplit(state, TENANT, 'BC-ROB', '2026', 'percent', [{ costCenterId: 'cc-rob-210', value: 100 }], 'Patrícia', 'Financeiro')).toThrow('custo, despesa e investimento')
-    expect(() => setCostCenterSplit(state, TENANT, 'BC-DEPREC', '2026', 'percent', [{ costCenterId: 'cc-rob-410', value: 100 }], 'Patrícia', 'Financeiro')).toThrow('custo, despesa e investimento')
   })
 
   it('conciliia categorias com o Omie nos dois sentidos sem duplicar', () => {
@@ -375,59 +373,6 @@ describe('orçamento integrado por categoria e período', () => {
     expect(budgetSummary(state, 'BC-IMPOSTOS', '2026').amount).toBe(500)
     expect(budgetSummary(state, 'BC-DEVOL', '2026').amount).toBe(500)
     expect(() => setGroupBudget(state, TENANT, '05. Despesas Fixas', '2026', 1000, 'Planejamento inicial', 'Financeiro', 'Financeiro')).toThrow('Não há categoria')
-  })
-
-  it('distribui o orçamento da categoria entre centros de custo por porcentagem ou por valor', () => {
-    const state = createSeedState()
-    const seeded = state.budgets.find(entry => entry.id === 'ORC-OPER-10')!
-    expect(costCenterAmounts(seeded.amount, seeded.costCenterSplit)).toEqual([
-      { costCenterId: 'cc-rob-400', percent: 60, amount: 230400 },
-      { costCenterId: 'cc-rob-310', percent: 25, amount: 96000 },
-      { costCenterId: 'cc-rob-320', percent: 15, amount: 57600 },
-    ])
-    const capex = state.budgets.find(entry => entry.id === 'ORC-CAPEX-10')!
-    expect(costCenterAmounts(capex.amount, capex.costCenterSplit)).toEqual([
-      { costCenterId: 'cc-rob-410', percent: 70, amount: 420000 },
-      { costCenterId: 'cc-rob-330', percent: 30, amount: 180000 },
-    ])
-    expect(state.sectors.some(entry => ['CC-410', 'CC-330'].includes(sectorCostCenter(entry, TENANT)))).toBe(false)
-    const partial = setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'percent', [{ costCenterId: 'cc-rob-400', value: 40 }], 'Financeiro', 'Financeiro')
-    expect(partial.costCenterSplit?.lines).toEqual([{ costCenterId: 'cc-rob-400', value: 40 }])
-    expect(() => setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'percent', [{ costCenterId: 'cc-rob-400', value: 110 }], 'Financeiro', 'Financeiro')).toThrow('não pode passar')
-    expect(setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'amount', [{ costCenterId: 'cc-rob-400', value: 1000 }], 'Financeiro', 'Financeiro').costCenterSplit?.lines).toEqual([{ costCenterId: 'cc-rob-400', value: 1000 }])
-    expect(() => setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'amount', [{ costCenterId: 'cc-rob-400', value: 999999 }], 'Financeiro', 'Financeiro')).toThrow('não pode passar')
-    expect(() => setCostCenterSplit(state, TENANT, 'BC-CMV', '2026', 'percent', [{ costCenterId: 'cc-rob-400', value: 100 }], 'Financeiro', 'Financeiro')).toThrow('categoria que recebe o valor')
-    expect(() => setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'percent', [{ costCenterId: 'cc-sul-400', value: 100 }], 'Financeiro', 'Financeiro')).toThrow('não encontrado nesta empresa')
-    updateCostCenter(state, TENANT, 'cc-rob-410', { name: 'Injetoras', status: 'Inativo', responsibleUserId: 'u11' }, 'Patrícia', 'Financeiro')
-    expect(() => setCostCenterSplit(state, TENANT, 'BC-CAPEX', '2026', 'percent', [{ costCenterId: 'cc-rob-410', value: 100 }], 'Financeiro', 'Financeiro')).toThrow('inativo')
-    const saved = setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'amount', [
-      { costCenterId: 'cc-rob-400', value: 200000 },
-      { costCenterId: 'cc-rob-600', value: 184000 },
-      { costCenterId: 'cc-rob-310', value: 0 },
-    ], 'Financeiro', 'Financeiro')
-    expect(saved.costCenterSplit).toEqual({ mode: 'amount', lines: [{ costCenterId: 'cc-rob-400', value: 200000 }, { costCenterId: 'cc-rob-600', value: 184000 }] })
-    setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'percent', [], 'Financeiro', 'Financeiro')
-    expect(state.budgets.find(entry => entry.id === 'ORC-OPER-10')?.costCenterSplit).toBeUndefined()
-    const created = createCostCenter(state, TENANT, { code: 'cc-810', name: 'Expedição', responsibleUserId: 'u10' }, 'Patrícia', 'Financeiro')
-    expect(created).toMatchObject({ code: 'CC-810', name: 'Expedição', status: 'Ativo', tenantId: TENANT, responsibleUserId: 'u10' })
-    expect(() => createCostCenter(state, TENANT, { code: 'CC-810', name: 'Outro', responsibleUserId: 'u10' }, 'Patrícia', 'Financeiro')).toThrow('Já existe')
-    expect(() => createCostCenter(state, TENANT, { code: 'CC-811', name: 'Sem dono', responsibleUserId: 'ninguem' }, 'Patrícia', 'Financeiro')).toThrow('responsável do centro de custo')
-    expect(updateCostCenter(state, TENANT, created.id, { name: 'Expedição', status: 'Ativo', responsibleUserId: 'u5' }, 'Patrícia', 'Financeiro').responsibleUserId).toBe('u5')
-    expect(() => updateCostCenter(state, 'tenant-roboflex-sul', created.id, { name: 'Expedição', status: 'Ativo', responsibleUserId: 'u5' }, 'Patrícia', 'Financeiro')).toThrow('não encontrado nesta empresa')
-  })
-
-  it('propõe os centros da conta pelo realizado do ano anterior, no mesmo lugar do valor', () => {
-    const state = createSeedState()
-    expect(suggestCostCenterShare(state, TENANT, 'BC-OPER', '2026', 'cc-rob-400')).toMatchObject({ percent: 60, priorRealized: 120000, priorTotal: 200000 })
-    expect(suggestCategoryCenters(state, TENANT, 'BC-OPER', '2026').map(entry => [entry.costCenterId, entry.percent])).toEqual([['cc-rob-400', 60], ['cc-rob-310', 25], ['cc-rob-320', 15]])
-    setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'percent', [{ costCenterId: 'cc-rob-600', value: 100 }], 'Patrícia', 'Financeiro')
-    const split = applyCategorySuggestion(state, TENANT, 'BC-OPER', '2026', 'Patrícia', 'Financeiro').costCenterSplit!
-    expect(split).toEqual({ mode: 'percent', lines: [{ costCenterId: 'cc-rob-400', value: 60 }, { costCenterId: 'cc-rob-310', value: 25 }, { costCenterId: 'cc-rob-320', value: 15 }] })
-    expect(applyCategorySuggestion(state, TENANT, 'BC-CAPEX', '2026', 'Patrícia', 'Financeiro').costCenterSplit!.lines).toEqual([{ costCenterId: 'cc-rob-410', value: 100 }])
-    expect(() => applyCategorySuggestion(state, TENANT, 'BC-PERDAS', '2026', 'Patrícia', 'Financeiro')).toThrow('realizado com centro')
-    expect(() => applyCategorySuggestion(state, TENANT, 'BC-OPER', '2026', 'Compras', 'Compras')).toThrow('Somente o Financeiro')
-    expect(viewerCenterScope(state, TENANT, 'u3', 'Compras').centerIds).toEqual(['cc-rob-320'])
-    expect(viewerCenterScope(state, TENANT, 'u16', 'Administrador').limited).toBe(false)
   })
 
   it('guarda a simulação sem alterar o ano e aplica quando pedido', () => {
@@ -552,7 +497,6 @@ describe('orçamento integrado por categoria e período', () => {
     expect(acknowledgeAlert(state, alert.id, 'u5', 'Bruno Alves', 'Líder de produção').status).toBe('Ciente')
     expect(notifiedUsers(state, 'BC-PERDAS', '2026-10')).toEqual(['u14'])
     expect(notifiedUsers(state, 'BC-CMV', '2026-10')).toEqual(['u3'])
-    setCostCenterSplit(state, TENANT, 'BC-OPER', '2026', 'percent', [{ costCenterId: 'cc-rob-400', value: 40 }], 'Patrícia', 'Financeiro')
     expect(notifiedUsers(state, 'BC-OPER', '2026-10')).toEqual(['u5'])
   })
 
@@ -622,17 +566,6 @@ describe('orçamento integrado por categoria e período', () => {
     const empty = state.budgetCategories.find(entry => entry.tenantId === TENANT && entry.status !== 'Inativa' && !state.budgetCategories.some(child => child.parentId === entry.id)
       && !state.budgetEntries.some(item => item.categoryId === entry.id && item.period.startsWith('2025') && item.kind.startsWith('Realizado')))!
     expect(() => applyPriorSeasonality(state, TENANT, [empty.id], '2026', 'Financeiro', 'Financeiro')).toThrow('sazonalidade')
-  })
-
-  it('guarda o centro padrão do setor por empresa', () => {
-    const state = createSeedState()
-    const sector = state.sectors.find(entry => entry.id === 'sec-ser')!
-    expect(sectorCostCenter(sector, TENANT)).toBe('CC-500')
-    expect(sectorCostCenter(sector, 'tenant-roboflex-sul')).toBe('CC-400')
-    setSectorDefaultCostCenter(state, TENANT, sector.id, 'cc-700', 'Financeiro', 'Financeiro')
-    expect(sectorCostCenter(sector, TENANT)).toBe('CC-700')
-    expect(sectorCostCenter(sector, 'tenant-roboflex-sul')).toBe('CC-400')
-    expect(() => setSectorDefaultCostCenter(state, 'tenant-roboflex-sul', sector.id, 'CC-700', 'Financeiro', 'Financeiro')).toThrow('nesta empresa')
   })
 
   it('concilia parcial, estorno e idempotência sem dupla contagem', () => {

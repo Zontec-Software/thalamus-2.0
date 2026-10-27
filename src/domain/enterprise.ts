@@ -54,7 +54,7 @@ export function adjustBudget(state: ErpState, id: string, amount: number, reason
 /* ---------- Demandas ---------- */
 
 type DemandInput = Pick<Demand, 'kind' | 'itemId' | 'serviceId' | 'description' | 'quantity' | 'origin' | 'originId' | 'neededBy' | 'priority' | 'assigneeRole'>
-  & Partial<Pick<Demand, 'requester' | 'projectId' | 'notes' | 'estimatedCost' | 'budgetCategoryId' | 'budgetPeriod' | 'costCenter'>>
+  & Partial<Pick<Demand, 'requester' | 'projectId' | 'notes' | 'estimatedCost' | 'budgetCategoryId' | 'budgetPeriod'>>
 
 export function createDemand(state: ErpState, input: DemandInput, actor: string) {
   if (!input.description.trim()) throw new DomainError('Descreva a necessidade')
@@ -75,7 +75,7 @@ export function createDemand(state: ErpState, input: DemandInput, actor: string)
   const demand: Demand = { id: nextId(state, 'DM'), status: 'Aberta', createdAt: now(), ...input, requester: input.requester ?? actor, projectId, estimatedCost: estimate, budgetCategoryId: categoryId, budgetPeriod: period }
   budgetDomain.upsertForecast(state, {
     categoryId, period, amount: estimate ?? 0, sourceModule: 'Demandas', sourceType: input.kind, sourceId: demand.id,
-    description: demand.description, projectId, costCenter: input.costCenter,
+    description: demand.description, projectId,
   }, actor)
   state.demands.unshift(demand)
   log(state, 'Demandas', actor, `${demand.id} aberta: ${demand.description} (${demand.origin}${demand.originId ? ` ${demand.originId}` : ''})`, undefined, demand.id)
@@ -216,7 +216,7 @@ export function selectQuote(state: ErpState, orderId: string, supplierId: string
     budgetDomain.upsertForecast(state, {
       categoryId: demand.budgetCategoryId, period: demand.budgetPeriod, amount: demand.estimatedCost,
       sourceModule: 'Demandas', sourceType: demand.kind, sourceId: demand.id, description: demand.description,
-      projectId: demand.projectId, costCenter: demand.costCenter,
+      projectId: demand.projectId,
     }, actor)
   }
   log(state, 'Compras', actor, `${order.id}: cotação de ${state.partners.find(entry => entry.id === supplierId)?.name} escolhida`, undefined, order.id)
@@ -695,7 +695,7 @@ export function createProject(
     project.budgetId = allocation.id
     budgetDomain.upsertForecast(state, {
       categoryId: 'BC-PD', period, amount: budget, sourceModule: 'Projetos', sourceType: project.kind,
-      sourceId: project.id, description: project.name, projectId: project.id, costCenter: (sector && budgetDomain.sectorCostCenter(sector, tenantId)) || 'CC-310',
+      sourceId: project.id, description: project.name, projectId: project.id, sectorId: sector?.id,
     }, actor)
   }
   return project

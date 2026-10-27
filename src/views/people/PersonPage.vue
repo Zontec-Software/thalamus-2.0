@@ -50,6 +50,7 @@ const profilesHere = computed(() => person.value ? store.state.userProfileAssign
 const companies = computed(() => [...new Set(profilesHere.value.map(entry => entry.tenantId))].map(id => store.state.tenants.find(entry => entry.id === id)?.tradeName ?? id))
 const profilesByCompany = computed(() => [...new Set(profilesHere.value.map(entry => entry.tenantId))].map(tenantId => ({
   tenant: store.state.tenants.find(entry => entry.id === tenantId)?.tradeName ?? tenantId,
+  employed: record.value?.tenantId === tenantId || store.state.employments.some(entry => entry.personId === record.value?.id && entry.tenantId === tenantId && entry.status === 'Ativo'),
   profiles: profilesHere.value.flatMap(entry => entry.tenantId === tenantId ? store.state.accessProfiles.filter(profile => profile.id === entry.profileId) : []),
 })))
 const homeProfileNames = computed(() => profilesHere.value.filter(entry => entry.tenantId === person.value?.homeTenantId).flatMap(entry => store.state.accessProfiles.filter(profile => profile.id === entry.profileId).map(profile => profile.name)).join(', '))
@@ -265,13 +266,14 @@ function registerReview() {
       <div v-else-if="tab === 'acesso'" data-tour="person-access">
         <div class="kpi-strip">
           <div class="kpi"><span>Conta</span><strong>{{ person.email ?? 'Só tablet' }}</strong><small>{{ person.active === false ? 'Bloqueada' : 'Ativa' }}</small></div>
-          <div class="kpi"><span>Empresas</span><strong>{{ companies.length }}</strong><small>{{ companies.join(' · ') || 'Nenhuma' }}</small></div>
+          <div class="kpi"><span>Acesso em</span><strong>{{ companies.length }}</strong><small>{{ companies.join(' · ') || 'Nenhuma' }}</small></div>
           <div class="kpi"><span>PIN do tablet</span><strong>••{{ person.pin.slice(-2) }}</strong><small>Os outros dígitos não aparecem</small></div>
         </div>
         <h3 class="partner-h">Perfis</h3>
-        <p class="hint">O que a conta vê vem destes perfis, os mesmos da Gestão de acesso. Uma pessoa pode ter mais de um, inclusive em outra empresa do grupo. A posição não concede perfil.</p>
+        <p class="hint">O número conta empresas em que a conta tem perfil, não empregos. Isso se define na Gestão de acesso: escolha a empresa, ou o grupo para ver o mapa. Acesso sem vínculo não cria usuário. Um emprego novo nasce em Pessoas, em Contratar aqui também. A posição não concede perfil.</p>
         <section v-for="group in profilesByCompany" :key="group.tenant" class="person-section">
           <h3>{{ group.tenant }}</h3>
+          <p class="cell-sub">{{ group.employed ? 'Vínculo nesta empresa.' : 'Acesso sem vínculo: a conta entra aqui, sem cadastro nem posição.' }}</p>
           <div class="chip-row"><span v-for="profile in group.profiles" :key="profile.id" class="chip active">{{ profile.name }}</span></div>
         </section>
         <p v-if="!profilesHere.length" class="empty-note">Nenhum perfil. O acesso se concede em Gestão de acesso.</p>

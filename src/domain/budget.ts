@@ -138,7 +138,7 @@ export function isCenterCategory(category: { group: string }) {
   return code !== '01' && code !== '02'
 }
 
-/** Conta que recebe teto e pode ser repartida entre centros. A depreciação fica de fora. */
+/** Conta que recebe teto e pode ser destinada a setores. A depreciação fica de fora. */
 export function isSpendCategory(category: { group: string; name: string }) {
   return isCenterCategory(category) && !isDepreciationCategory(category)
 }
@@ -419,9 +419,9 @@ function inheritParentBudgets(state: ErpState, child: BudgetCategory) {
     const parent = allocationOf(state, child.parentId, period)
     if (!parent) continue
     const saved = writeAllocation(state, child.id, period, parent.amount, 'Valor herdado da categoria ao abrir a primeira subcategoria', 'Sistema', true)
-    if (parent.costCenterSplit && saved) {
-      saved.costCenterSplit = parent.costCenterSplit
-      delete parent.costCenterSplit
+    if (parent.sectorAllocations && saved) {
+      saved.sectorAllocations = parent.sectorAllocations
+      delete parent.sectorAllocations
     }
     syncParentAmount(state, child.parentId, period)
   }
@@ -755,108 +755,6 @@ export function applyPriorSeasonality(state: ErpState, tenantId: string, categor
   return applied
 }
 
-export interface CostCenterSplitLine { costCenterId: string; value: number }
-export type CostCenterSplitMode = 'percent' | 'amount'
-
-function splitText(state: ErpState, split: { mode: CostCenterSplitMode; lines: CostCenterSplitLine[] }) {
-  return split.lines.map(line => {
-    const center = state.costCenters.find(entry => entry.id === line.costCenterId)
-    const name = center ? `${center.code} ${center.name}` : line.costCenterId
-    return split.mode === 'percent' ? `${name} ${line.value}%` : `${name} ${money(line.value)}`
-  }).join(' · ')
-}
-
-/** Converte a distribuição gravada em valor e percentual de cada centro de custo. */
-export function costCenterAmounts(amount: number, split?: { mode: CostCenterSplitMode; lines: CostCenterSplitLine[] }) {
-  if (!split) return []
-  return split.lines.map(line => ({
-    costCenterId: line.costCenterId,
-    percent: split.mode === 'percent' ? line.value : (amount > 0 ? round2(line.value / amount * 100) : 0),
-    amount: split.mode === 'amount' ? line.value : round2(amount * line.value / 100),
-  }))
-}
-
-/**
- * Distribui o orçamento anual da categoria entre centros de custo da mesma empresa.
- * A soma pode ficar abaixo do ano: o que falta fica sem centro e o Financeiro responde por ela.
- * A soma não pode passar do ano. Linhas zeradas são ignoradas; nenhuma linha remove a distribuição.
- * Um centro sem setor pode receber fatia: o plano não depende do organograma.
- */
-export function setCostCenterSplit(state: ErpState, tenantId: string, categoryId: string, year: string, mode: CostCenterSplitMode, lines: CostCenterSplitLine[], actor: string, role: Role) {
-  assertPlanner(role, 'distribui o orçamento entre centros de custo')
-  const category = categoryOf(state, categoryId)
-  assertCategoryTenant(category, tenantId)
-  if (!isBudgetLeaf(state, categoryId)) throw new DomainError('A distribuição por centro de custo é da categoria que recebe o valor')
-  if (!isSpendCategory(category)) throw new DomainError('A distribuição por centro vale para custo, despesa e investimento')
-  const budget = allocationOf(state, categoryId, year)
-  if (!budget || !(budget.amount > 0)) throw new DomainError('Informe o orçamento do ano antes de distribuir entre os centros de custo')
-  const cleaned = lines.map(line => ({ costCenterId: line.costCenterId, value: round2(Number(line.value) || 0) })).filter(line => line.value > 0)
-  if (!cleaned.length) {
-    if (budget.costCenterSplit) {
-      budget.audit.unshift(audit(state, actor, 'Centros de custo', splitText(state, budget.costCenterSplit), 'Sem distribuição', 'Distribuição removida'))
-      delete budget.costCenterSplit
-    }
-    return budget
-  }
-  const seen = new Set<string>()
-  for (const line of cleaned) {
-    if (seen.has(line.costCenterId)) throw new DomainError('O mesmo centro de custo não pode aparecer duas vezes')
-    seen.add(line.costCenterId)
-    const center = state.costCenters.find(entry => entry.id === line.costCenterId)
-    if (!center || center.tenantId !== tenantId) throw new DomainError('Centro de custo não encontrado nesta empresa')
-    if (center.status !== 'Ativo') throw new DomainError('Centro de custo inativo não entra na distribuição')
-  }
-  const sum = round2(cleaned.reduce((total, line) => total + line.value, 0))
-  if (mode === 'percent' && sum > 100.05) throw new DomainError(`A porcentagem não pode passar de 100%. A soma está em ${sum}%`)
-  if (mode === 'amount' && sum > budget.amount + 0.01) throw new DomainError(`A soma dos centros de custo não pode passar do orçamento do ano (${money(budget.amount)})`)
-  const next = { mode, lines: cleaned }
-  budget.audit.unshift(audit(state, actor, 'Centros de custo', budget.costCenterSplit ? splitText(state, budget.costCenterSplit) : 'Sem distribuição', splitText(state, next), mode === 'percent' ? 'Distribuição por porcentagem' : 'Distribuição por valor'))
-  budget.costCenterSplit = next
-  return budget
-}
-
-function realizedEntriesOfYear(state: ErpState, categoryId: string, year: string) {
-  return state.budgetEntries.filter(entry => entry.categoryId === categoryId
-    && (entry.kind === 'Realizado pago' || entry.kind === 'Realizado recebido')
-    && entry.status !== 'Cancelado'
-    && entryInWindow(entry.period, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], year))
-}
-
-/** Sugestão da fatia do centro: a parte dele no realizado da categoria no ano anterior. */
-export function suggestCostCenterShare(state: ErpState, tenantId: string, categoryId: string, year: string, costCenterId: string) {
-  const category = categoryOf(state, categoryId)
-  assertCategoryTenant(category, tenantId)
-  const center = state.costCenters.find(entry => entry.id === costCenterId)
-  if (!center || center.tenantId !== tenantId) throw new DomainError('Centro de custo não encontrado nesta empresa')
-  if (!/^\d{4}$/.test(year)) throw new DomainError('Informe o ano do orçamento, no formato AAAA')
-  const prior = realizedEntriesOfYear(state, categoryId, String(Number(year) - 1))
-  const priorTotal = round2(prior.reduce((sum, entry) => sum + entry.amount, 0))
-  const priorRealized = round2(prior.filter(entry => entry.costCenter === center.code).reduce((sum, entry) => sum + entry.amount, 0))
-  const percent = priorTotal > 0 ? round2(priorRealized / priorTotal * 100) : 0
-  const budget = allocationOf(state, categoryId, year)?.amount ?? 0
-  return { percent, amount: round2(budget * percent / 100), priorRealized, priorTotal }
-}
-
-/** Centros ativos que tiveram realizado na categoria no ano anterior, com a fatia de cada um. */
-export function suggestCategoryCenters(state: ErpState, tenantId: string, categoryId: string, year: string) {
-  return state.costCenters
-    .filter(center => center.tenantId === tenantId && center.status === 'Ativo')
-    .map(center => ({ costCenterId: center.id, ...suggestCostCenterShare(state, tenantId, categoryId, year, center.id) }))
-    .filter(entry => entry.percent > 0)
-    .sort((a, b) => b.percent - a.percent)
-}
-
-/** Troca a distribuição da categoria pela participação de cada centro no realizado do ano anterior. */
-export function applyCategorySuggestion(state: ErpState, tenantId: string, categoryId: string, year: string, actor: string, role: Role) {
-  assertPlanner(role, 'aplica a sugestão de centros de custo')
-  const suggestions = suggestCategoryCenters(state, tenantId, categoryId, year)
-  if (!suggestions.length) throw new DomainError('Esta conta não teve realizado com centro de custo no ano anterior')
-  const lines = suggestions.map(entry => ({ costCenterId: entry.costCenterId, value: entry.percent }))
-  const sum = round2(lines.reduce((total, line) => total + line.value, 0))
-  if (sum > 100) lines[0].value = round2(lines[0].value - (sum - 100))
-  return setCostCenterSplit(state, tenantId, categoryId, year, 'percent', lines, actor, role)
-}
-
 /** Guarda o plano do ano como simulação. O orçamento oficial não muda. */
 export function saveBudgetSimulation(state: ErpState, tenantId: string, year: string, actor: string, role: Role) {
   assertPlanner(role, 'salva a simulação do orçamento')
@@ -901,74 +799,6 @@ export function viewerCategoryScope(state: ErpState, tenantId: string, userId: s
   if (role === 'Administrador' || role === 'Financeiro') return { limited: false, categoryIds: [] as string[] }
   const categoryIds = state.budgetCategories.filter(entry => entry.tenantId === tenantId && entry.responsibleUserId === userId).map(entry => entry.id)
   return { limited: true, categoryIds }
-}
-
-/** Financeiro, Gestor e Administrador veem a empresa. Os demais veem os centros do seu nome, ou do papel em demonstração. */
-export function viewerCenterScope(state: ErpState, tenantId: string, userId: string, role: Role) {
-  if (hasFullAccess(role) || role === 'Financeiro') return { limited: false, centerIds: [] as string[] }
-  const active = state.costCenters.filter(entry => entry.tenantId === tenantId && entry.status !== 'Inativo')
-  const owned = active.filter(entry => entry.responsibleUserId === userId)
-  const centers = owned.length ? owned : active.filter(entry => state.users.find(user => user.id === entry.responsibleUserId)?.role === role)
-  return { limited: true, centerIds: centers.map(entry => entry.id) }
-}
-
-function normalizeCostCenterCode(code: string) {
-  return code.trim().toUpperCase()
-}
-
-/** Cadastra um centro de custo da empresa. O código fica estável para o mesmo código no Omie. */
-export function createCostCenter(state: ErpState, tenantId: string, input: { code: string; name: string; responsibleUserId: string }, actor: string, role: Role) {
-  assertPlanner(role, 'cadastra centro de custo')
-  const code = normalizeCostCenterCode(input.code)
-  const name = input.name.trim()
-  if (!name) throw new DomainError('Informe o nome do centro de custo')
-  if (!/^[A-Z0-9][A-Z0-9-]{1,15}$/.test(code)) throw new DomainError('O código usa letras, números e hífen')
-  assertResponsible(state, input.responsibleUserId, 'do centro de custo')
-  if (state.costCenters.some(entry => entry.tenantId === tenantId && entry.code === code)) throw new DomainError('Já existe um centro de custo com este código nesta empresa')
-  const center = { id: nextId(state, 'CDC'), tenantId, code, name, responsibleUserId: input.responsibleUserId, status: 'Ativo' as const }
-  state.costCenters.push(center)
-  log(state, 'Orçamentos', actor, `Centro de custo ${code} · ${name} criado, responsável ${userLabel(state, input.responsibleUserId)}`, undefined, center.id)
-  return center
-}
-
-/** Altera nome, responsável ou situação. O código não muda: é o vínculo com o Omie e com o padrão do setor. */
-export function updateCostCenter(state: ErpState, tenantId: string, id: string, patch: { name: string; status: 'Ativo' | 'Inativo'; responsibleUserId: string }, actor: string, role: Role) {
-  assertPlanner(role, 'altera centro de custo')
-  const center = state.costCenters.find(entry => entry.id === id && entry.tenantId === tenantId)
-  if (!center) throw new DomainError('Centro de custo não encontrado nesta empresa')
-  const name = patch.name.trim()
-  if (!name) throw new DomainError('Informe o nome do centro de custo')
-  assertResponsible(state, patch.responsibleUserId, 'do centro de custo')
-  const changes: string[] = []
-  if (center.name !== name) changes.push(`${center.name} → ${name}`)
-  if (center.responsibleUserId !== patch.responsibleUserId) changes.push(`responsável ${userLabel(state, center.responsibleUserId)} → ${userLabel(state, patch.responsibleUserId)}`)
-  if (center.status !== patch.status) changes.push(`${center.status} → ${patch.status}`)
-  if (changes.length) log(state, 'Orçamentos', actor, `Centro de custo ${center.code}: ${changes.join('; ')}`, undefined, center.id)
-  center.name = name
-  center.responsibleUserId = patch.responsibleUserId
-  center.status = patch.status
-  return center
-}
-
-/** Código do centro padrão do setor na empresa. Cada empresa escolhe o seu. */
-export function sectorCostCenter(sector: { costCenters?: Record<string, string> | null }, tenantId: string) {
-  const map = sector.costCenters
-  if (!map || typeof map !== 'object') return ''
-  return map[tenantId] ?? ''
-}
-
-/** O setor guarda um código padrão por empresa. O código precisa existir e estar ativo na empresa em que a escolha é feita. */
-export function setSectorDefaultCostCenter(state: ErpState, tenantId: string, sectorId: string, code: string, actor: string, role: Role) {
-  assertPlanner(role, 'define o centro padrão do setor')
-  const sector = state.sectors.find(entry => entry.id === sectorId)
-  if (!sector) throw new DomainError('Setor não encontrado')
-  const normalized = normalizeCostCenterCode(code)
-  const center = state.costCenters.find(entry => entry.tenantId === tenantId && entry.code === normalized && entry.status === 'Ativo')
-  if (!center) throw new DomainError('Centro de custo ativo não encontrado nesta empresa')
-  if (!sector.costCenters || typeof sector.costCenters !== 'object') sector.costCenters = {}
-  sector.costCenters[tenantId] = normalized
-  log(state, 'Orçamentos', actor, `${sector.name} passa a usar ${normalized} · ${center.name} como centro padrão`, undefined, center.id)
-  return sector
 }
 
 /* ---------- Planejamento de grupo: a meta é combinada, mas cada empresa grava o próprio orçamento ---------- */
@@ -1035,7 +865,7 @@ function periodPhrase(year: string, fromMonth: number, toMonth: number) {
 
 /**
  * Leitura do orçamento no período, no lugar do painel de inteligência.
- * Soma empresas sem misturar centros de custo de código igual.
+ * Soma empresas sem misturar o gasto de um setor com o de outro.
  * CAPEX fica fora do resultado operacional.
  */
 export function financeSnapshot(state: ErpState, tenantIds: string[], year: string, fromMonth: number, toMonth: number): FinanceSnapshot {
@@ -1066,7 +896,7 @@ export function financeSnapshot(state: ErpState, tenantIds: string[], year: stri
   const realizedPaid = round2(paid.reduce((sum, entry) => sum + entry.amount, 0))
   const bySector = new Map<string, FinanceCenterUse>()
   for (const entry of paid) {
-    const sector = entry.costCenter ? state.sectors.find(item => item.costCenters?.[entry.tenantId] === entry.costCenter) : undefined
+    const sector = entry.sectorId ? state.sectors.find(item => item.id === entry.sectorId && item.tenantId === entry.tenantId) : undefined
     if (!sector) continue
     const key = `${entry.tenantId}:${sector.id}`
     const current = bySector.get(key)
@@ -1169,7 +999,7 @@ export function evaluateAlerts(state: ErpState, categoryId: string, period: stri
   }
 }
 
-/** Ciente é do responsável de um centro com fatia, do Financeiro ou de quem tem acesso total. */
+/** Ciente é da pessoa responsável da conta, do Financeiro ou de quem tem acesso total. */
 export function acknowledgeAlert(state: ErpState, id: string, userId: string, actor: string, role: Role) {
   const alert = state.budgetAlerts.find(entry => entry.id === id)
   if (!alert || alert.status !== 'Aberto') throw new DomainError('Alerta aberto não encontrado')
@@ -1192,7 +1022,6 @@ export interface ForecastInput {
   sourceId: string
   description: string
   projectId?: string
-  costCenter?: string
   /** Setor utilizador da demanda. Sem valor destinado para ele, a demanda não segue. */
   sectorId?: string
 }
@@ -1231,7 +1060,7 @@ export function upsertForecast(state: ErpState, input: ForecastInput, actor: str
       id: nextId(state, 'BL'), tenantId: category.tenantId, kind: 'Previsão', categoryId: input.categoryId, period: input.period,
       amount: round2(input.amount), openAmount: overrun ? 0 : round2(input.amount), status: overrun ? 'Retido' : input.amount ? 'Ativo' : 'Liquidado',
       sourceModule: input.sourceModule, sourceType: input.sourceType, sourceId: input.sourceId,
-      projectId: input.projectId, costCenter: input.costCenter, description: input.description, createdAt: now(),
+      projectId: input.projectId, sectorId: input.sectorId, description: input.description, createdAt: now(),
       heldAmount: overrun ? round2(input.amount) : undefined,
       events: [event(state, actor, 'Criação', round2(input.amount), overrun ? 'Retida: sem saldo' : 'Previsão operacional criada')],
     }
@@ -1239,7 +1068,7 @@ export function upsertForecast(state: ErpState, input: ForecastInput, actor: str
   } else {
     current.description = input.description
     current.projectId = input.projectId
-    current.costCenter = input.costCenter
+    current.sectorId = input.sectorId
     if (!overrun) {
       current.categoryId = input.categoryId
       current.period = input.period
@@ -1337,7 +1166,7 @@ export function applyOmiePayment(state: ErpState, tenantId: string, payment: Omi
     id: nextId(state, 'BL'), tenantId, kind: isReceita ? 'Realizado recebido' : 'Realizado pago', categoryId, period: monthOf(payment.paidAt), amount: signed, openAmount: 0,
     status: payment.event === 'Estorno' ? 'Estornado' : 'Liquidado', sourceModule: 'Omie', sourceType: payment.event,
     sourceId: payment.sourceId, externalId: payment.id, invoiceNumber, linkModule: payment.link?.module, linkId: payment.link?.id,
-    projectId: forecast?.projectId, costCenter: forecast?.costCenter,
+    projectId: forecast?.projectId, sectorId: forecast?.sectorId,
     description: payment.description ?? `${payment.event} da nota ${invoiceNumber ?? payment.id}`, createdAt: now(),
     events: [event(state, actor, payment.event, signed, `Nota ${invoiceNumber ?? payment.id}`)],
   }

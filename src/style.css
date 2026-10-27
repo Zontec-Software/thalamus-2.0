@@ -328,6 +328,7 @@ tr.result-row td { background: #EAF3FC; font-weight: 700; border-top: 2px solid 
 .card { background: white; border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); padding: 18px; min-width: 0; }
 .card.flush { padding: 0; overflow: visible; }
 .card.flush > .section-head { padding: 16px 18px 0; }
+.card.flush > .inline-form { margin: 12px 16px 16px; }
 .card + .card, .card + .notice, .notice + .card { margin-top: 18px; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
 

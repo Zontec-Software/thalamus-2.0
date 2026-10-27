@@ -12,7 +12,7 @@ const round2 = (value: number) => Math.round(value * 100) / 100
 const round4 = (value: number) => Math.round(value * 10000) / 10000
 const brNumber = (value: number, digits = 2) => value.toFixed(digits).replace('.', ',')
 
-/** Custo-hora da mão de obra direta na demonstração; na vida real vem da folha por centro de custo. */
+/** Custo-hora da mão de obra direta na demonstração; na vida real vem da folha. */
 export const LABOR_RATE = 38
 /** Lote usado para ratear a preparação quando o item não define lote mínimo. */
 export const STANDARD_LOT = 200

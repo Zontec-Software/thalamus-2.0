@@ -103,7 +103,7 @@ export const MANUAL: ManualChapter[] = [
             head: ['Perfil', 'Módulos liberados'],
             rows: [
               ['Administrador', 'Todos, inclusive orçamento, categorias e liberação de saldo excedido'],
-              ['Gestor', 'Todos, inclusive a liberação de saldo excedido e a consulta consolidada do grupo'],
+              ['Gestor', 'Todos, inclusive a liberação de saldo excedido, a consulta consolidada do orçamento e a consulta do acesso do grupo'],
               ['Comercial', 'CRM, Vendas, Expedição, Produtos'],
               ['Engenharia', 'Produtos, Serviços, Ativos, Projetos'],
               ['PCP', 'Painel, Fluxo do pedido, Vendas, Produtos, Planejamento, Ordens de produção, Demandas, Injeção, Montagem, Indicadores'],
@@ -114,12 +114,12 @@ export const MANUAL: ManualChapter[] = [
               ['Expedição', 'Expedição, Vendas'],
               ['Manutenção', 'Manutenção, Ativos, Serviços, Demandas, Injeção'],
               ['Assistência', 'Assistência técnica, Serviços, Demandas, Almoxarifado'],
-              ['Financeiro', 'DRE, Orçamentos (com centros de custo e consulta consolidada do grupo), Projetos, Indicadores, Produtos'],
+              ['Financeiro', 'DRE, Orçamentos (com setor utilizador e consulta consolidada do grupo), Projetos, Indicadores, Produtos'],
               ['Operador', 'Somente o tablet do posto'],
             ],
           },
-          { kind: 'p', text: 'A funcionalidade representa uma ação de negócio, não cada botão: por exemplo, consultar Orçamentos, gerir orçamento, liberar saldo excedido ou gerir acessos. A tela pergunta quais perfis da empresa têm aquela funcionalidade. A lista de perfis Financeiro, Gestor e demais existe só no cenário de demonstração. Numa empresa nova, o único perfil inicial é o Administrador; os outros são criados nesta tela.' },
-          { kind: 'p', text: 'Cargo e setor descrevem a pessoa e podem indicar o responsável de um centro de custo. Eles não abrem o botão. Quem decide a ação é o perfil.' },
+          { kind: 'p', text: 'A funcionalidade representa uma ação de negócio, não cada botão: por exemplo, consultar Orçamentos, gerir orçamento, liberar saldo excedido, gerir acessos ou consultar o acesso do grupo. A tela pergunta quais perfis da empresa têm aquela funcionalidade. A lista de perfis Financeiro, Gestor e demais existe só no cenário de demonstração. Numa empresa nova, o único perfil inicial é o Administrador; os outros são criados nesta tela.' },
+          { kind: 'p', text: 'Cargo e setor descrevem a pessoa. Eles não abrem o botão. Quem decide a ação é o perfil.' },
           { kind: 'note', tone: 'info', text: 'Na demonstração, apenas o Administrador vê **Visualizar como** no topo. Ela serve para conferir a interface de outro perfil, sem trocar a identidade nem os acessos reais. Na API real, qualquer impersonação exigirá justificativa e auditoria.' },
         ],
         related: ['organizacao', 'permissoes-camada'],
@@ -956,7 +956,7 @@ export const MANUAL: ManualChapter[] = [
           { kind: 'p', text: 'O filtro **Outras empresas do grupo** abre o diretório. O botão **Trazer** oferece três caminhos: **Participar de um projeto** registra nome, cargo, contato e papel, sem dado sensível. **Acesso sem vínculo** põe um perfil escolhido na conta e não cria cadastro nem vaga. **Contratar aqui também** abre outro cadastro na empresa, com setor, posição e contrato, ligado ao de origem por confirmação humana. CPF ou e-mail apenas sugerem.' },
           {
             kind: 'steps', title: 'Cadastrar uma pessoa',
-            items: ['Em Colaboradores, clique em **Nova pessoa**. A página pede nome, e-mail de login, setor, posição livre, turno e o perfil da Gestão de acesso.', 'O e-mail do Google vem sugerido no domínio da empresa. A criação só acontece se a pessoa confirmar. A senha não volta para o Thalamus. O perfil define o que a conta vê. A posição não concede perfil. O PIN do tablet é gerado e não volta a ser exibido.', 'Complete a ficha em **Dados pessoais** e **Saúde e benefícios**. Em **Vínculo e trajetória** ficam o contrato e as mudanças de posição, com data.', 'A aba **Acesso** mostra os perfis por empresa, o que a conta vê e a conta Google. Mudar perfil é na Gestão de acesso.', 'Para encerrar o vínculo, use **Iniciar desligamento** no topo da página. Na data efetiva o sistema suspende a conta Google e bloqueia o Thalamus. Se o Google recusar, a falha fica na lista e na atenção da home.'],
+            items: ['Em Colaboradores, clique em **Nova pessoa**. A página pede nome, e-mail de login, setor, posição livre, turno e o perfil da Gestão de acesso.', 'O e-mail do Google vem sugerido no domínio da empresa. A criação só acontece se a pessoa confirmar. A senha não volta para o Thalamus. O perfil define o que a conta vê. A posição não concede perfil. O PIN do tablet é gerado e não volta a ser exibido.', 'Complete a ficha em **Dados pessoais** e **Saúde e benefícios**. Em **Vínculo e trajetória** ficam o contrato e as mudanças de posição, com data.', 'A aba **Acesso** mostra os perfis por empresa. Vínculo é emprego naquela empresa. Acesso sem vínculo deixa a conta entrar em outra empresa do grupo, sem cadastro lá. Os dois se veem na Gestão de acesso, escolhendo a empresa ou o grupo no topo. Conceder o perfil não cria usuário. Um emprego novo nasce em Contratar aqui também. A aba também mostra o que a conta vê e a conta Google.', 'Para encerrar o vínculo, use **Iniciar desligamento** no topo da página. Na data efetiva o sistema suspende a conta Google e bloqueia o Thalamus. Se o Google recusar, a falha fica na lista e na atenção da home.'],
           },
           {
             kind: 'rules',
@@ -978,7 +978,8 @@ export const MANUAL: ManualChapter[] = [
         screens: [{ label: 'Gestão de acesso', to: '/organizacao' }],
         tour: '/organizacao',
         blocks: [
-          { kind: 'p', text: 'Selecione um perfil e marque as funcionalidades que ele pode executar. Atribua quantos perfis forem necessários para cada pessoa da empresa. O acesso final é a soma dos perfis; não há exceção individual nesta fase.' },
+          { kind: 'p', text: 'No topo, quem consulta o acesso do grupo escolhe a empresa ou a soma, como no orçamento. A soma mostra o mapa e não edita. Na empresa, o perfil se concede e se tira sem sair da tela. Acesso sem vínculo usa a conta que já existe e não cria usuário, cadastro nem posição. Um emprego novo continua em Pessoas, em Contratar aqui também, e nasce outro cadastro na empresa que recebe.' },
+          { kind: 'p', text: 'Selecione um perfil e marque as funcionalidades que ele pode executar. Atribua quantos perfis forem necessários para cada pessoa da empresa. O acesso final é a soma dos perfis; não há exceção individual nesta fase. Criar um perfil novo vale para a empresa em que você entrou. Outra empresa do grupo usa os perfis que ela já tem.' },
           { kind: 'note', tone: 'info', text: 'Administrador é um perfil de sistema: não pode ser apagado ou reduzido. A mesma funcionalidade será validada também na API, com o tenant da empresa ativo.' },
         ],
         related: ['perfis', 'pessoas', 'plataforma'],
@@ -1495,7 +1496,7 @@ export const MANUAL: ManualChapter[] = [
 
   {
     id: 'financas', title: 'Finanças', icon: CircleDollarSign,
-    intro: 'DRE e orçamento por categoria e setor utilizador. O centro de custo continua nas demandas e nas compras. Contas a pagar e a receber estão em estruturação; por enquanto o título, o banco e a contabilidade ficam no Omie.',
+    intro: 'DRE e orçamento por categoria e setor utilizador. Contas a pagar e a receber estão em estruturação; por enquanto o título, o banco e a contabilidade ficam no Omie.',
     sections: [
       {
         id: 'orcamentos', title: 'Orçamentos',
@@ -1513,24 +1514,10 @@ export const MANUAL: ManualChapter[] = [
           { kind: 'list', title: 'As abas, na ordem', items: ['**Visão geral**: custo, despesa e investimento no período. Quatro números no topo (orçado, realizado, previsão e saldo) e, por conta, orçado, realizado, previsão, desvio e uso, com cor por situação: verde com folga, amarelo a partir de 80% e vermelho acima de 100%. Receita e lucro ficam no DRE. Clicar numa conta abre o gasto de cada **setor utilizador**, com valor e percentual do que foi destinado a ele, mais o cartão **Sem utilizador** para o que não libera demanda. Clicar num setor filtra as origens, listadas da maior para a menor. **Só o que estourou** deixa as contas acima de 100%.', '**Ações**: sem categoria para o Financeiro, sem vínculo para o executor e saldo excedido para o responsável da conta.', '**Categorias**: código, nome, valor, pessoa responsável, valores destinados, setor executor, limiar, ação de saldo negativo e situação. Clicar em valores destinados abre a destinação aos setores. O setor só entra com um valor. A soma não passa do valor da categoria e o restante fica sem utilizador. Subcategoria aparece recuada, com linha guia, sob a categoria-mãe, que só soma. **Nova categoria** abre o formulário. A categoria mãe usa código de dois dígitos, como 06. A conta de depreciação continua no plano para o Omie classificar; o valor vem dos ativos.', '**Planejamento**: monta o ano, inclusive a receita. **Anual** (realizado do ano anterior, participação, crescimento e orçamento), **Mensal** (doze meses) e **CAPEX** (investimentos, fora da receita líquida). A depreciação aparece no anual como valor dos ativos e não se edita. O **assistente de planejamento** lê o realizado do ano anterior e propõe três abordagens: conservadora, média e agressiva. Usar uma delas grava o crescimento de cada conta sobre o próprio realizado, com ritmos diferentes para receita, custo, despesa e investimento. Mercado, internet e atas dessa tela são um dossiê de demonstração: não há consulta externa nem ata gravada. Com a consulta consolidada, a soma do grupo é só leitura e a meta do grupo grava o valor no orçamento de cada empresa.'] },
           { kind: 'p', text: 'O custo realizado é a **nota que chega do Omie**. A ficha da categoria mostra o número da nota e, quando existe, o documento do Thalamus de onde ela veio: compra, projeto, ordem de serviço, demanda, chamado ou OP. Nota sem esse vínculo entra no custo do mesmo jeito e fica na aba Ações para o Financeiro ou o Administrador ligarem na mão. Compras, projetos e as demais origens passarão a enviar esse vínculo sozinhas quando esses módulos forem refeitos.' },
           { kind: 'table', head: ['Valor', 'Quando muda'], rows: [['Orçamento informado', 'Valor do ano, no cadastro, na ficha da visão geral ou em Planejamento'], ['Previsão aberta', 'Necessidades de Demandas, OPs, OSs e Projetos no intervalo da lente; baixa ao cancelar ou conforme a nota'], ['Previsão retida', 'Necessidade que deixaria o saldo do ano negativo; fica fora do saldo até o Gestor liberar'], ['Realizado pago', 'Nota do Omie, inclusive parcial e estorno. O vínculo com o documento daqui é outro dado e não muda o valor'], ['Realizado recebido', 'Recebimento do Omie nas categorias de Receita'], ['Saldo', 'Na despesa: fatia do período menos previsão e realizado daquele intervalo. Na Receita: quanto falta vender para a meta. No bloqueio: saldo do ano'], ['Desvio', 'Previsão aberta mais a nota do intervalo, comparados à fatia. O valor aparece num chip verde, amarelo ou vermelho, sem sinal de menos. Na Receita a cor é invertida']] },
-          { kind: 'rules', items: ['Ao cruzar o limiar, o sistema registra uma ocorrência e avisa a pessoa responsável da conta e o Financeiro, no sino e em Minhas tarefas. Ciente é dessa pessoa, do Financeiro ou do Administrador, e encerra o aviso.', 'Os setores utilizadores se escolhem na aba Categorias, clicando em Valores destinados. O setor só entra com um valor destinado. A soma pode ficar abaixo do valor da categoria: o que falta fica sem utilizador e não libera demanda. A soma não pode passar do valor. Sem setores, a destinação é removida. Categoria com subcategoria não destina: o valor dela é a soma. Receita, dedução e depreciação não recebem utilizador. **Salvar simulação** guarda o plano do ano; **Aplicar simulação** copia esse retrato para o orçamento.', 'Com bloqueio ativo, a necessidade é registrada mas a previsão fica **retida**. Compra e contratação dessa necessidade só seguem depois que o Gestor libera.', 'Liberar aplica a previsão; recusar cancela a previsão retida. Cancelar a origem encerra a exceção.', 'Pagamento sem categoria, com várias categorias ou com erro fica fora do realizado e aparece para o Financeiro. Sem vínculo aparece para o executor da categoria. O Financeiro escolhe a categoria correta e o pagamento é lançado; ou rejeita com justificativa.', 'Lançamentos preservam origem, projeto, centro de custo e eventos para auditoria e evitam dupla contagem por idempotência. O centro de custo continua nas demandas e nas compras; o orçamento acompanha pelo setor.'] },
+          { kind: 'rules', items: ['Ao cruzar o limiar, o sistema registra uma ocorrência e avisa a pessoa responsável da conta e o Financeiro, no sino e em Minhas tarefas. Ciente é dessa pessoa, do Financeiro ou do Administrador, e encerra o aviso.', 'Os setores utilizadores se escolhem na aba Categorias, clicando em Valores destinados. O setor só entra com um valor destinado. A soma pode ficar abaixo do valor da categoria: o que falta fica sem utilizador e não libera demanda. A soma não pode passar do valor. Sem setores, a destinação é removida. Categoria com subcategoria não destina: o valor dela é a soma. Receita, dedução e depreciação não recebem utilizador. **Salvar simulação** guarda o plano do ano; **Aplicar simulação** copia esse retrato para o orçamento.', 'Com bloqueio ativo, a necessidade é registrada mas a previsão fica **retida**. Compra e contratação dessa necessidade só seguem depois que o Gestor libera.', 'Liberar aplica a previsão; recusar cancela a previsão retida. Cancelar a origem encerra a exceção.', 'Pagamento sem categoria, com várias categorias ou com erro fica fora do realizado e aparece para o Financeiro. Sem vínculo aparece para o executor da categoria. O Financeiro escolhe a categoria correta e o pagamento é lançado; ou rejeita com justificativa.', 'Lançamentos preservam origem, projeto, setor utilizador e eventos para auditoria e evitam dupla contagem por idempotência. O orçamento acompanha pelo setor utilizador.'] },
           { kind: 'note', tone: 'warning', text: 'O realizado pago e os dados fiscais pertencem ao Omie. Nesta demonstração, pagamentos, parciais e estornos são simulados em memória.' },
         ],
-        related: ['centros-de-custo', 'dre', 'compras', 'projetos', 'demandas', 'manutencao'],
-      },
-      {
-        id: 'centros-de-custo', title: 'Centros de custo',
-        summary: 'Código do compromisso, o mesmo do Omie. O orçamento da categoria acompanha pelo setor utilizador.',
-        roles: ['Financeiro', 'Gestor'],
-        screens: [{ label: 'Orçamentos', to: '/orcamentos' }],
-        tour: '/orcamentos',
-        blocks: [
-          { kind: 'p', text: 'O centro de custo continua no lançamento de demanda, compra, projeto e assistência. É o código que o setor traz como padrão e que segue para o Omie. O Thalamus não contabiliza: carimba o código no compromisso.' },
-          { kind: 'p', text: 'Orçamentos não tem aba de centros de custo. O valor destinado, a visão geral e o pagamento no DRE usam o **setor utilizador**. O responsável da categoria é uma pessoa. Nesta etapa não há tela para incluir ou editar o plano de centros: o painel saiu de Orçamentos e o cadastro novo ainda não foi colocado em outro lugar. Os centros da demonstração continuam no cenário inicial.' },
-          { kind: 'list', title: 'Como entra no dia a dia', items: ['Demanda, compra, projeto e assistência nascem com o centro padrão do setor e podem trocar.', 'A visão geral mostra de onde veio o desvio pelo setor utilizador, não pelo centro.', 'O centro do lançamento antigo permanece no registro.'] },
-          { kind: 'note', tone: 'warning', text: 'O vínculo real com o plano de centros do Omie ainda é simulado. Os códigos da demonstração são de exemplo.' },
-        ],
-        related: ['orcamentos', 'dre', 'pessoas'],
+        related: ['dre', 'compras', 'projetos', 'demandas', 'manutencao'],
       },
       {
         id: 'dre', title: 'DRE',
@@ -1545,7 +1532,7 @@ export const MANUAL: ManualChapter[] = [
           { kind: 'p', text: 'A depreciação orçada é linear, pelo valor de aquisição e pela vida útil cadastrados em Ativos. Ela não entra na coluna de realizado, porque ainda não há lançamento de depreciação. A premiação SUPERA orçada é estimada: a nota sai dos mesmos fatos de Indicadores (entrega no prazo e refugo) e o valor é 1% do EBITDA vezes essa nota, quando a nota passa de 80. O salário fica registrado no vínculo da pessoa e ainda não entra neste cálculo. IRPJ e o não operacional ficam zerados até a etapa deles. O CAPEX aparece separado e não altera o lucro.' },
           { kind: 'note', tone: 'warning', text: 'Depreciação e premiação desta tela são estimadas na demonstração. O vínculo real com a folha e com a nota oficial do SUPERA ainda não existe. A leitura do período é calculada; não há modelo de inteligência ligado.' },
         ],
-        related: ['orcamentos', 'centros-de-custo', 'ativos', 'pessoas', 'indicadores'],
+        related: ['orcamentos', 'ativos', 'pessoas', 'indicadores'],
       },
       {
         id: 'contas-pagar-receber', title: 'Contas a pagar e a receber',
@@ -1553,7 +1540,7 @@ export const MANUAL: ManualChapter[] = [
         roles: ['Financeiro', 'Gestor'],
         screens: [{ label: 'Contas a pagar', to: '/contas-pagar' }, { label: 'Contas a receber', to: '/contas-receber' }],
         blocks: [
-          { kind: 'p', text: 'As duas abas voltaram ao menu de Finanças para marcar o lugar. Cada uma explica de onde virão os títulos: compra aprovada, contrato e ativo no pagar; venda, contrato e assistência no receber. Cada título vai nascer ligado ao documento de origem e consumir a previsão da categoria e do centro.' },
+          { kind: 'p', text: 'As duas abas voltaram ao menu de Finanças para marcar o lugar. Cada uma explica de onde virão os títulos: compra aprovada, contrato e ativo no pagar; venda, contrato e assistência no receber. Cada título vai nascer ligado ao documento de origem e consumir a previsão da categoria.' },
           { kind: 'note', tone: 'info', text: 'Hoje o título, a baixa e o boleto continuam no Omie. O Thalamus lê o pagamento e o recebimento como realizado do orçamento.' },
         ],
         related: ['orcamentos', 'compras', 'ativos'],
@@ -1594,8 +1581,7 @@ export const MANUAL: ManualChapter[] = [
               ['Disponível', 'Saldo menos reservado.'],
               ['Demanda', 'Necessidade de material, serviço ou ativo, de qualquer origem.'],
               ['Categoria orçamentária', 'Classificação com código, grupo, responsável e situação. A chave do controle é categoria + ano.'],
-              ['Centro de custo', 'Código do compromisso, o mesmo do Omie. Nasce com a demanda e a compra, pelo centro padrão do setor. O orçamento da categoria acompanha pelo setor utilizador.'],
-              ['Setor', 'Equipe na hierarquia da empresa, configurada em Pessoas → Estrutura. No orçamento, é o utilizador ou o executor da categoria. Também aponta um centro de custo padrão para o compromisso.'],
+              ['Setor', 'Equipe na hierarquia da empresa, configurada em Pessoas → Estrutura. No orçamento, é o utilizador ou o executor da categoria.'],
               ['Cargo', 'Catálogo do trabalho: missão, nível, CBO e requisitos. Não forma hierarquia e não concede acesso.'],
               ['Posição', 'Vaga organizacional: setor, cargo, posição superior, número de vagas e ocupante atual. A hierarquia fica nas posições e nos setores, no Organograma.'],
               ['Serviço', 'Cadastro mestre único. Venda, ordem de serviço e roteiro são usos independentes do local e de quem executa. Terceirizado exige datasheet. A média de tempo não é calculada enquanto a fórmula não existir.'],

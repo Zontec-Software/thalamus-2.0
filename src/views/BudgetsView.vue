@@ -58,7 +58,7 @@ watch(() => ui.tourSteps[ui.tourIndex]?.target, target => {
   if (match) screen.value = match[1]
 })
 watch(() => ui.budgetTab, value => {
-  const map: Record<string, Screen> = { excecoes: 'acoes', acoes: 'acoes', categorias: 'categorias', configuracao: 'categorias', centros: 'categorias', planejamento: 'anual', visao: 'visao' }
+  const map: Record<string, Screen> = { excecoes: 'acoes', acoes: 'acoes', categorias: 'categorias', configuracao: 'categorias', planejamento: 'anual', visao: 'visao' }
   if (map[value]) {
     screen.value = map[value]
     ui.budgetTab = ''
@@ -319,8 +319,7 @@ function toggleFocus(line: StatementLine) {
 }
 watch(screen, () => { focusKey.value = '' })
 function sectorIdOf(entry: BudgetEntry) {
-  if (!entry.costCenter) return ''
-  return store.state.sectors.find(sector => sector.costCenters?.[entry.tenantId] === entry.costCenter)?.id ?? ''
+  return entry.sectorId ?? ''
 }
 const isUsage = (entry: BudgetEntry) => entry.kind === 'Previsão'
   ? entry.status === 'Ativo' || entry.status === 'Parcial'

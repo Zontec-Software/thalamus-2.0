@@ -19,6 +19,7 @@ const moduleFeatures: Functionality[] = MODULES.map(module => ({
 export const FUNCTIONALITIES: Functionality[] = [
   ...moduleFeatures,
   { id: 'organizacao.acessos.gerir', module: 'Organização', action: 'gerir_acessos', label: 'Gerir acessos', description: 'Cria perfis e atribui perfis a usuários.' },
+  { id: 'organizacao.consultar_consolidado', module: 'Organização', action: 'consultar_consolidado', label: 'Consultar acessos do grupo', description: 'Vê o acesso das empresas autorizadas do grupo. A soma não edita.' },
   { id: 'orcamentos.gerir', module: 'Orçamentos', action: 'gerir', label: 'Gerir orçamento', description: 'Altera orçamento, categorias e configuração.' },
   { id: 'orcamentos.liberar_saldo', module: 'Orçamentos', action: 'liberar_saldo', label: 'Liberar saldo excedido', description: 'Decide previsão retida por saldo anual.' },
   { id: 'orcamentos.consultar_consolidado', module: 'Orçamentos', action: 'consultar_consolidado', label: 'Consultar consolidado de grupo', description: 'Consulta orçamento das empresas autorizadas do grupo econômico.' },
@@ -57,7 +58,7 @@ const profileDescription: Record<Role, string> = {
   Expedição: 'Conferência, expedição e vendas.',
   Manutenção: 'Ativos, corretivas, preventivas e demandas.',
   Assistência: 'Chamados, serviços, demandas e peças.',
-  Financeiro: 'Orçamento, centros de custo, projetos e indicadores.',
+  Financeiro: 'Orçamento, projetos e indicadores.',
 }
 
 export const profileCode = (role: Role) => role.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-')
@@ -72,7 +73,7 @@ export function seededProfiles(tenantId = 'tenant-roboflex'): AccessProfile[] {
     const functionalityIds = role === 'Administrador'
       ? FUNCTIONALITIES.map(entry => entry.id)
       : roleModuleGrants[role].map(moduleFeature)
-    if (role === 'Gestor') functionalityIds.push('orcamentos.liberar_saldo', 'orcamentos.consultar_consolidado', 'produtos.aprovar')
+    if (role === 'Gestor') functionalityIds.push('orcamentos.liberar_saldo', 'orcamentos.consultar_consolidado', 'organizacao.consultar_consolidado', 'produtos.aprovar')
     if (role === 'Financeiro') functionalityIds.push('orcamentos.gerir', 'orcamentos.consultar_consolidado')
     if (role === 'Engenharia') functionalityIds.push('produtos.editar', 'produtos.aprovar')
     return {

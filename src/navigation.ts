@@ -87,7 +87,7 @@ export const AREAS: Area[] = [
     ],
   },
   {
-    id: 'financas', label: 'Finanças', description: 'Resultado, orçamento e centros de custo. Banco e contabilidade ficam no Omie.', icon: CircleDollarSign,
+    id: 'financas', label: 'Finanças', description: 'Resultado e orçamento por setor utilizador. Banco e contabilidade ficam no Omie.', icon: CircleDollarSign,
     groups: [
       { label: 'Planejamento', items: [
         { label: 'DRE', to: '/dre', icon: Landmark, module: 'DRE' },

@@ -14,7 +14,7 @@ const plan = computed(() => paying.value
         { module: 'Compras', text: 'Pedido de compra aprovado vira parcela prevista com vencimento pela condição de pagamento.', to: '/compras' },
         { module: 'Gestão de contratos', text: 'Contrato recorrente (aluguel, serviço, licença) gera as parcelas do período. Módulo ainda não existe.' },
         { module: 'Ativos', text: 'Aquisição e financiamento de máquina e molde geram parcelas ligadas ao ativo.', to: '/ativos' },
-        { module: 'Orçamentos', text: 'Cada parcela consome a previsão da categoria e do centro de custo; o pagamento no Omie vira realizado.', to: '/orcamentos' },
+        { module: 'Orçamentos', text: 'Cada parcela consome a previsão da categoria; o pagamento no Omie vira realizado.', to: '/orcamentos' },
       ],
     }
   : {
