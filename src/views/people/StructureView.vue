@@ -42,6 +42,18 @@ const leaderName = (sectorId: string) => {
 }
 const peopleIn = (sectorId: string) => positionsOf(sectorId).reduce((sum, entry) => sum + occupantsAt(store.state, entry.id).length, 0)
 const selectedPositions = computed(() => positionsOf(selected.value?.id))
+const sectorName = (id?: string) => sectors.value.find(entry => entry.id === id)?.name ?? ''
+const parentGroups = computed(() => {
+  const hidden = dialog.value === 'editar' ? blockedParents(editingId.value) : new Set<string>()
+  return tree.value.map(row => ({
+    sector: row.sector,
+    positions: positions.value.filter(entry => entry.sectorId === row.sector.id && !hidden.has(entry.id)),
+  })).filter(group => group.positions.length)
+})
+const bossOf = (id?: string) => {
+  const boss = positions.value.find(entry => entry.id === id)
+  return boss ? `${boss.name} · ${sectorName(boss.sectorId)}` : '—'
+}
 const descendants = computed(() => {
   const out = new Set<string>()
   const walk = (id: string) => sectors.value.filter(entry => entry.parentId === id).forEach(entry => { out.add(entry.id); walk(entry.id) })
@@ -155,8 +167,8 @@ function removePosition() {
           <thead><tr><th>Posição</th><th>Responde a</th><th>Ocupação</th><th>Quem ocupa</th><th></th></tr></thead>
           <tbody>
             <tr v-for="entry in selectedPositions" :key="entry.id">
-              <td><span class="cell-main">{{ entry.name }}</span><span class="cell-sub">Cargo: {{ jobs.find(job => job.id === entry.jobId)?.name ?? entry.name }}</span><span v-if="selected.managerPositionId === entry.id" class="cell-sub">Lidera o setor</span></td>
-              <td>{{ positions.find(item => item.id === entry.parentPositionId)?.name ?? '—' }}</td>
+              <td><span class="cell-main">{{ entry.name }}</span><span v-if="selected.managerPositionId === entry.id" class="cell-sub">Lidera o setor</span></td>
+              <td>{{ bossOf(entry.parentPositionId) }}</td>
               <td :class="{ 'warn-text': occupantsAt(store.state, entry.id).length < entry.headcount }">{{ occupantsAt(store.state, entry.id).length }} de {{ entry.headcount }}</td>
               <td>
                 <RouterLink v-for="user in occupants(entry.id)" :key="user.id" :to="`/pessoas/pessoa/${user.personId ?? user.id}`" class="chip">{{ user.name }}</RouterLink>
@@ -167,7 +179,7 @@ function removePosition() {
           </tbody>
         </table>
         <p v-if="!selectedPositions.length" class="empty-note">Nenhuma posição neste setor.</p>
-        <p class="hint">Editar muda o cargo desta vaga, o setor, a chefia e os lugares. A pessoa entra pela aba Vínculo da ficha. A posição não concede perfil de acesso.</p>
+        <p class="hint">A chefia é outra vaga e pode ficar em outro setor: o Comercial responde à Diretoria. Editar muda essa vaga. A pessoa entra pela aba Vínculo. A posição não concede perfil.</p>
       </section>
     </div>
   </article>
@@ -184,7 +196,7 @@ function removePosition() {
     <RoleVsPosition compact />
     <div class="form-grid">
       <div class="field"><label>Cargo da vaga</label><select v-model="positionForm.jobId"><option value="" disabled>Escolha o cargo</option><option v-for="entry in jobs" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>A vaga já nasce com esse cargo e pode ficar livre. A pessoa entra depois. Falta o cargo? <RouterLink to="/pessoas/cargos">Cadastre em Cargos</RouterLink>.</small></div>
-      <div class="field"><label>Responde a</label><select v-model="positionForm.parentPositionId"><option value="">Ninguém neste nível</option><option v-for="entry in positions" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+      <div class="field"><label>Responde a</label><select v-model="positionForm.parentPositionId"><option value="">Ninguém neste nível</option><optgroup v-for="group in parentGroups" :key="group.sector.id" :label="group.sector.name"><option v-for="entry in group.positions" :key="entry.id" :value="entry.id">{{ entry.name }} · {{ occupants(entry.id).map(user => user.name).join(', ') || 'vaga livre' }}</option></optgroup></select><small>Outra vaga, do mesmo setor ou de outro. O nome repetido é outra vaga.</small></div>
       <div class="field"><label>Vagas</label><input v-model.number="positionForm.headcount" type="number" min="1" /></div>
     </div>
     <template #footer>
@@ -198,7 +210,7 @@ function removePosition() {
     <div class="form-grid">
       <div class="field"><label>Cargo da vaga</label><select v-model="positionForm.jobId"><option v-for="entry in jobs" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
       <div class="field"><label>Setor</label><select v-model="positionForm.sectorId"><option v-for="entry in sectors" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
-      <div class="field"><label>Responde a</label><select v-model="positionForm.parentPositionId"><option value="">Ninguém neste nível</option><option v-for="entry in positions.filter(item => !blockedParents(editingId).has(item.id))" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+      <div class="field"><label>Responde a</label><select v-model="positionForm.parentPositionId"><option value="">Ninguém neste nível</option><optgroup v-for="group in parentGroups" :key="group.sector.id" :label="group.sector.name"><option v-for="entry in group.positions" :key="entry.id" :value="entry.id">{{ entry.name }} · {{ occupants(entry.id).map(user => user.name).join(', ') || 'vaga livre' }}</option></optgroup></select><small>Pode ser uma vaga de outro setor. As opções estão agrupadas pelo setor da vaga.</small></div>
       <div class="field"><label>Vagas</label><input v-model.number="positionForm.headcount" type="number" min="1" /></div>
     </div>
     <template #footer>
