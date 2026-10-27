@@ -23,7 +23,7 @@ const person = computed(() => store.state.users.find(entry => entry.id === props
 const form = reactive({ name: '', email: '', role: 'Operador' as Role, sector: props.context.sector ?? store.state.sectors[0]?.name ?? '', positionId: '', shift: 'Manhã' as User['shift'] })
 const positionsOf = (sectorName: string) => {
   const sector = store.state.sectors.find(entry => entry.name === sectorName)
-  return store.state.positions.filter(entry => entry.sectorId === sector?.id)
+  return store.state.positions.filter(entry => entry.status === 'Ativo' && entry.sectorId === sector?.id)
 }
 
 function create() {

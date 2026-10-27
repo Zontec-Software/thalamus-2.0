@@ -55,7 +55,7 @@ const managerOf = (user: User) => directManager(store.state, user)?.name ?? '—
 const projects = computed(() => store.state.projects.filter(entry => entry.status !== 'Cancelado'))
 const profiles = computed(() => store.state.accessProfiles.filter(entry => entry.tenantId === ui.activeTenantId))
 const targetAccount = computed(() => store.state.users.find(entry => entry.personId === target.value?.personId))
-const freePositions = computed(() => store.state.positions.filter(entry => entry.sectorId === companySectors.value.find(item => item.name === form.sector)?.id && occupantsAt(store.state, entry.id).length < entry.headcount))
+const freePositions = computed(() => store.state.positions.filter(entry => entry.status === 'Ativo' && entry.sectorId === companySectors.value.find(item => item.name === form.sector)?.id && occupantsAt(store.state, entry.id).length < entry.headcount))
 const tenantName = computed(() => store.state.tenants.find(entry => entry.id === ui.activeTenantId)?.tradeName ?? 'esta empresa')
 
 function open(entry: ReturnType<typeof groupDirectory>[number]) {
@@ -80,7 +80,7 @@ function confirm() {
     <div class="section-head">
       <div>
         <h2>Colaboradores</h2>
-        <p>Quem trabalha em {{ tenantName }}. Clique na pessoa para abrir a ficha.</p>
+        <p>Quem trabalha em {{ tenantName }}. A coluna mostra a posição que a pessoa ocupa. O cargo é o dessa vaga.</p>
       </div>
       <button data-tour="new-record" class="button" @click="router.push('/pessoas/nova')">Nova pessoa</button>
     </div>
@@ -96,7 +96,7 @@ function confirm() {
 
     <template v-if="filter !== 'grupo'">
       <table class="dense">
-        <thead><tr><th>Pessoa</th><th>Setor e posição</th><th>Gestor direto</th><th>Turno</th><th>Situação</th></tr></thead>
+        <thead><tr><th>Pessoa</th><th>Setor e posição que ocupa</th><th>Gestor direto</th><th>Turno</th><th>Situação</th></tr></thead>
         <tbody>
           <tr v-for="user in people" :key="user.id" class="clickable" @click="router.push(`/pessoas/pessoa/${user.personId ?? user.id}`)">
             <td><div class="person-cell"><PersonPhoto :name="user.name" :photo="store.state.persons.find(entry => entry.id === user.personId)?.photo" size="row" /><div><span class="cell-main">{{ user.name }}</span><span class="cell-sub">{{ user.email ?? 'Usa só o tablet' }}</span></div></div></td>
@@ -153,7 +153,7 @@ function confirm() {
       <p class="hint">Abre um segundo vínculo formal em {{ tenantName }}. Nasce outro cadastro, só com nome e contato, ligado ao de origem. O resto é preenchido aqui.</p>
       <div class="form-grid">
         <div class="field"><label>Setor</label><select v-model="form.sector" @change="form.positionId = ''"><option v-for="entry in companySectors" :key="entry.id" :value="entry.name">{{ entry.name }}</option></select></div>
-        <div class="field"><label>Posição</label><select v-model="form.positionId"><option value="">Sem posição por enquanto</option><option v-for="entry in freePositions" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small v-if="!freePositions.length">Nenhuma vaga livre neste setor.</small></div>
+        <div class="field"><label>Posição</label><select v-model="form.positionId"><option value="">Sem posição por enquanto</option><option v-for="entry in freePositions" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>A pessoa ocupa esta vaga. O cargo é o da vaga.<template v-if="!freePositions.length"> Nenhuma está livre neste setor.</template></small></div>
         <div class="field"><label>Contrato</label><select v-model="form.contractType"><option>CLT</option><option>Estágio</option><option>PJ</option><option>Temporário</option></select></div>
         <div class="field"><label>Início</label><input v-model="form.startedOn" type="date" /></div>
         <div class="field"><label>Turno</label><select v-model="form.shift"><option>Manhã</option><option>Tarde</option><option>Administrativo</option></select></div>

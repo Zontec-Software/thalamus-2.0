@@ -41,7 +41,7 @@ const contract = reactive({ contractType: '', salary: 0, cbo: '', workplace: '' 
 const companySectors = computed(() => store.state.sectors.filter(entry => entry.tenantId === (record.value?.tenantId ?? ui.activeTenantId)))
 const companyProfiles = computed(() => store.state.accessProfiles.filter(entry => entry.tenantId === ui.activeTenantId))
 const defaultProfile = () => companyProfiles.value.find(entry => entry.simulatedRole === 'Operador')?.id ?? companyProfiles.value[0]?.id ?? ''
-const freePositions = (sectorName: string) => store.state.positions.filter(entry => entry.sectorId === companySectors.value.find(sector => sector.name === sectorName)?.id && (entry.id === person.value?.positionId || occupantsAt(store.state, entry.id).length < entry.headcount))
+const freePositions = (sectorName: string) => store.state.positions.filter(entry => entry.status === 'Ativo' && entry.sectorId === companySectors.value.find(sector => sector.name === sectorName)?.id && (entry.id === person.value?.positionId || occupantsAt(store.state, entry.id).length < entry.headcount))
 const employment = computed(() => store.state.employments.find(entry => entry.personId === record.value?.id && entry.tenantId === record.value?.tenantId && entry.status === 'Ativo') ?? store.state.employments.find(entry => entry.personId === record.value?.id && entry.tenantId === record.value?.tenantId))
 const managed = computed(() => store.state.sectors.filter(entry => entry.managerId === person.value?.id))
 const team = computed(() => store.state.users.filter(entry => managed.value.some(sector => sectorOf(store.state, entry)?.id === sector.id) && entry.id !== person.value?.id))
@@ -55,6 +55,7 @@ const profilesByCompany = computed(() => [...new Set(profilesHere.value.map(entr
 })))
 const homeProfileNames = computed(() => profilesHere.value.filter(entry => entry.tenantId === person.value?.homeTenantId).flatMap(entry => store.state.accessProfiles.filter(profile => profile.id === entry.profileId).map(profile => profile.name)).join(', '))
 const position = computed(() => store.state.positions.find(entry => entry.id === person.value?.positionId))
+const job = computed(() => store.state.jobs.find(entry => entry.id === position.value?.jobId))
 const manager = computed(() => person.value ? directManager(store.state, person.value) : undefined)
 const assignments = computed(() => store.state.assignments.filter(entry => entry.userId === person.value?.id).sort((a, b) => b.validFrom.localeCompare(a.validFrom)))
 const reviews = computed(() => store.state.performanceReviews.filter(entry => entry.userId === person.value?.id).sort((a, b) => b.at.localeCompare(a.at)))
@@ -155,7 +156,7 @@ function registerReview() {
       <div class="field"><label>E-mail de login</label><input v-model="form.email" placeholder="Deixe vazio para usar o e-mail do Google, ou vazio de vez se usa só o tablet" /></div>
       <div class="field"><label>Conta Google</label><label class="check-line"><input v-model="form.google" type="checkbox" /> Criar no domínio da empresa</label><input v-if="form.google" v-model="form.googleEmail" @input="googleTouched = true" /></div>
       <div class="field"><label>Setor</label><select v-model="form.sector" @change="form.positionId = ''"><option v-for="entry in companySectors" :key="entry.id">{{ entry.name }}</option></select></div>
-      <div class="field"><label>Posição</label><select v-model="form.positionId"><option value="">Sem posição por enquanto</option><option v-for="entry in freePositions(form.sector)" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small v-if="!freePositions(form.sector).length">Nenhuma vaga livre. <RouterLink to="/pessoas/organograma">Abrir o organograma</RouterLink></small></div>
+      <div class="field"><label>Posição</label><select v-model="form.positionId"><option value="">Sem posição por enquanto</option><option v-for="entry in freePositions(form.sector)" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>A pessoa ocupa uma vaga que já existe. O cargo é o dessa vaga.<template v-if="!freePositions(form.sector).length"> Nenhuma está livre. <RouterLink to="/pessoas/organograma">Abrir o organograma</RouterLink></template></small></div>
       <div class="field"><label>Turno</label><select v-model="form.shift"><option>Manhã</option><option>Tarde</option><option>Administrativo</option></select></div>
       <div class="field"><label>Perfil</label><select v-model="form.profileId"><option v-for="entry in companyProfiles" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>O mesmo catálogo da Gestão de acesso. A posição não concede perfil.</small></div>
     </div>
@@ -172,7 +173,7 @@ function registerReview() {
       <div class="item-head">
         <PersonPhoto v-if="record" :name="person.name" :photo="record.photo" :person-id="record.id" />
         <div class="item-head-main">
-          <span class="eyebrow">{{ position?.name ?? 'Sem posição' }} · {{ person.sector }}</span>
+          <span class="eyebrow">{{ position ? `Ocupa ${position.name}` : 'Sem posição' }} · {{ person.sector }}</span>
           <h2>{{ person.name }}</h2>
           <div class="meta">
             <span>{{ person.email ?? 'Usa só o tablet' }}</span>
@@ -209,7 +210,8 @@ function registerReview() {
           <h3>Hoje</h3>
           <div class="form-grid">
             <div class="field"><label>Setor</label><input :value="person.sector" disabled /></div>
-            <div class="field"><label>Posição</label><input :value="position?.name ?? 'Sem posição'" disabled /><small v-if="position">{{ position.description }}</small></div>
+            <div class="field"><label>Posição</label><input :value="position?.name ?? 'Sem posição'" disabled /><small>{{ position ? 'A vaga que esta pessoa ocupa.' : 'Sem vaga, não há cargo.' }}</small></div>
+            <div class="field"><label>Cargo</label><input :value="job?.name ?? '—'" disabled /><small v-if="position">É o cargo desta vaga. Troca no <RouterLink to="/pessoas/organograma">organograma</RouterLink>, não nesta ficha.</small></div>
             <div class="field"><label>Gestor direto</label><input :value="manager?.name ?? '—'" disabled /></div>
             <div class="field"><label>Turno</label><select :value="person.shift" @change="update({ shift: ($event.target as HTMLSelectElement).value as User['shift'] })"><option>Manhã</option><option>Tarde</option><option>Administrativo</option></select></div>
           </div>
@@ -244,7 +246,7 @@ function registerReview() {
           </ol>
           <p v-if="!assignments.length" class="empty-note">Nenhuma mudança registrada.</p>
           <div v-for="list in movementTasks" :key="list.id" class="list-row static"><div><strong>Revisar depois da mudança</strong><span>{{ list.items.map(item => `${item.label}: ${item.status}`).join(' · ') }}</span></div></div>
-          <p class="hint">Mudar de posição não mexe no acesso. O sistema só cria as tarefas de revisão.</p>
+          <p class="hint">Mudar de posição muda a vaga que a pessoa ocupa, e com ela o cargo. O acesso não muda. O sistema só cria as tarefas de revisão.</p>
         </section>
       </div>
 

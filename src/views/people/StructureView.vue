@@ -10,13 +10,14 @@ import { occupantsAt } from '../../domain/organization'
 const store = useErpStore()
 const ui = useUiStore()
 const selectedId = ref('')
-const dialog = ref<'' | 'setor' | 'posicao'>('')
+const dialog = ref<'' | 'setor' | 'posicao' | 'editar'>('')
+const editingId = ref('')
 const sectorForm = reactive({ name: '' })
-const positionForm = reactive({ jobId: '', parentPositionId: '', headcount: 1 })
+const positionForm = reactive({ jobId: '', sectorId: '', parentPositionId: '', headcount: 1 })
 
 const sectors = computed(() => store.state.sectors.filter(entry => entry.tenantId === ui.activeTenantId))
-const jobs = computed(() => store.state.jobs.filter(entry => entry.tenantId === ui.activeTenantId))
-const positions = computed(() => store.state.positions.filter(entry => entry.tenantId === ui.activeTenantId))
+const jobs = computed(() => store.state.jobs.filter(entry => entry.tenantId === ui.activeTenantId && entry.status === 'Ativo'))
+const positions = computed(() => store.state.positions.filter(entry => entry.tenantId === ui.activeTenantId && entry.status === 'Ativo'))
 const tree = computed(() => {
   const rows: { sector: (typeof sectors.value)[number]; depth: number }[] = []
   const walk = (parentId: string | undefined, depth: number) => {
@@ -53,8 +54,27 @@ function openSector() {
   dialog.value = 'setor'
 }
 function openPosition() {
-  Object.assign(positionForm, { jobId: '', parentPositionId: '', headcount: 1 })
+  Object.assign(positionForm, { jobId: '', sectorId: selected.value?.id ?? '', parentPositionId: '', headcount: 1 })
   dialog.value = 'posicao'
+}
+function blockedParents(id: string) {
+  const blocked = new Set<string>([id])
+  const walk = (current: string) => {
+    positions.value.filter(entry => entry.parentPositionId === current).forEach(entry => {
+      if (blocked.has(entry.id)) return
+      blocked.add(entry.id)
+      walk(entry.id)
+    })
+  }
+  walk(id)
+  return blocked
+}
+function openEdit(id: string) {
+  const position = positions.value.find(entry => entry.id === id)
+  if (!position) return
+  editingId.value = id
+  Object.assign(positionForm, { jobId: position.jobId, sectorId: position.sectorId, parentPositionId: position.parentPositionId ?? '', headcount: position.headcount })
+  dialog.value = 'editar'
 }
 function addSector() {
   if (!selected.value) return
@@ -69,6 +89,17 @@ function addPosition() {
   const created = store.createPosition(ui.activeTenantId, { sectorId: selected.value.id, jobId: positionForm.jobId, parentPositionId: positionForm.parentPositionId || undefined, headcount: Number(positionForm.headcount) })
   if (created) dialog.value = ''
 }
+function savePosition() {
+  const saved = store.updatePosition(ui.activeTenantId, editingId.value, { sectorId: positionForm.sectorId, jobId: positionForm.jobId, parentPositionId: positionForm.parentPositionId || undefined, headcount: Number(positionForm.headcount) })
+  if (saved) {
+    dialog.value = ''
+    if (positionForm.sectorId) selectedId.value = positionForm.sectorId
+  }
+}
+function removePosition() {
+  const removed = store.removePosition(ui.activeTenantId, editingId.value)
+  if (removed) dialog.value = ''
+}
 </script>
 
 <template>
@@ -76,7 +107,7 @@ function addPosition() {
     <div class="section-head">
       <div>
         <h2>Organograma</h2>
-        <p>A hierarquia da empresa. Escolha um setor à esquerda para ver as vagas dele.</p>
+        <p>As vagas da empresa. Cada uma já tem um cargo, mesmo vazia. A pessoa ocupa a vaga.</p>
       </div>
     </div>
     <RoleVsPosition />
@@ -121,21 +152,22 @@ function addPosition() {
           <button type="button" class="button secondary small" @click="openPosition"><Plus :size="14" /> Posição</button>
         </div>
         <table class="dense">
-          <thead><tr><th>Posição</th><th>Responde a</th><th>Ocupação</th><th>Quem ocupa</th></tr></thead>
+          <thead><tr><th>Posição</th><th>Responde a</th><th>Ocupação</th><th>Quem ocupa</th><th></th></tr></thead>
           <tbody>
             <tr v-for="entry in selectedPositions" :key="entry.id">
-              <td><span class="cell-main">{{ entry.name }}</span><span v-if="selected.managerPositionId === entry.id" class="cell-sub">Lidera o setor</span></td>
+              <td><span class="cell-main">{{ entry.name }}</span><span class="cell-sub">Cargo: {{ jobs.find(job => job.id === entry.jobId)?.name ?? entry.name }}</span><span v-if="selected.managerPositionId === entry.id" class="cell-sub">Lidera o setor</span></td>
               <td>{{ positions.find(item => item.id === entry.parentPositionId)?.name ?? '—' }}</td>
               <td :class="{ 'warn-text': occupantsAt(store.state, entry.id).length < entry.headcount }">{{ occupantsAt(store.state, entry.id).length }} de {{ entry.headcount }}</td>
               <td>
                 <RouterLink v-for="user in occupants(entry.id)" :key="user.id" :to="`/pessoas/pessoa/${user.personId ?? user.id}`" class="chip">{{ user.name }}</RouterLink>
                 <span v-if="!occupants(entry.id).length" class="cell-sub">Vaga livre</span>
               </td>
+              <td class="row-actions"><button type="button" class="button ghost small" @click="openEdit(entry.id)">Editar</button></td>
             </tr>
           </tbody>
         </table>
         <p v-if="!selectedPositions.length" class="empty-note">Nenhuma posição neste setor.</p>
-        <p class="hint">A pessoa entra numa posição pela aba Vínculo da ficha, com data. A posição não concede perfil de acesso.</p>
+        <p class="hint">Editar muda o cargo desta vaga, o setor, a chefia e os lugares. A pessoa entra pela aba Vínculo da ficha. A posição não concede perfil de acesso.</p>
       </section>
     </div>
   </article>
@@ -151,13 +183,28 @@ function addPosition() {
   <BaseModal :open="dialog === 'posicao'" title="Nova posição" :subtitle="selected ? `Uma vaga em ${selected.name}` : ''" width="640px" @close="dialog = ''">
     <RoleVsPosition compact />
     <div class="form-grid">
-      <div class="field"><label>Cargo</label><select v-model="positionForm.jobId"><option value="" disabled>Escolha o cargo</option><option v-for="entry in jobs" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>Falta o cargo? <RouterLink to="/pessoas/cargos">Cadastre em Cargos</RouterLink>.</small></div>
+      <div class="field"><label>Cargo da vaga</label><select v-model="positionForm.jobId"><option value="" disabled>Escolha o cargo</option><option v-for="entry in jobs" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>A vaga já nasce com esse cargo e pode ficar livre. A pessoa entra depois. Falta o cargo? <RouterLink to="/pessoas/cargos">Cadastre em Cargos</RouterLink>.</small></div>
       <div class="field"><label>Responde a</label><select v-model="positionForm.parentPositionId"><option value="">Ninguém neste nível</option><option v-for="entry in positions" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
       <div class="field"><label>Vagas</label><input v-model.number="positionForm.headcount" type="number" min="1" /></div>
     </div>
     <template #footer>
       <button class="button secondary" @click="dialog = ''">Cancelar</button>
       <button class="button" :disabled="!positionForm.jobId" @click="addPosition">Criar posição</button>
+    </template>
+  </BaseModal>
+
+  <BaseModal :open="dialog === 'editar'" title="Editar posição" :subtitle="positions.find(entry => entry.id === editingId)?.name" width="640px" @close="dialog = ''">
+    <p class="hint">Este cargo fica na vaga, livre ou ocupada. A pessoa ocupa a vaga pela ficha. Trocar a pessoa não troca o cargo.</p>
+    <div class="form-grid">
+      <div class="field"><label>Cargo da vaga</label><select v-model="positionForm.jobId"><option v-for="entry in jobs" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+      <div class="field"><label>Setor</label><select v-model="positionForm.sectorId"><option v-for="entry in sectors" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+      <div class="field"><label>Responde a</label><select v-model="positionForm.parentPositionId"><option value="">Ninguém neste nível</option><option v-for="entry in positions.filter(item => !blockedParents(editingId).has(item.id))" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+      <div class="field"><label>Vagas</label><input v-model.number="positionForm.headcount" type="number" min="1" /></div>
+    </div>
+    <template #footer>
+      <button class="button danger" style="margin-right: auto" @click="removePosition">Remover</button>
+      <button class="button secondary" @click="dialog = ''">Cancelar</button>
+      <button class="button" :disabled="!positionForm.jobId || !positionForm.sectorId" @click="savePosition">Salvar</button>
     </template>
   </BaseModal>
 </template>

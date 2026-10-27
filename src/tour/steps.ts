@@ -106,12 +106,12 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('partner-list', 'Perfis depois de abrir', 'Clique em um parceiro para abrir a página dele, com as abas Cadastro, Contatos e endereços, Cliente, Fornecedor e Histórico. A aba Cliente mostra a base de vendas e a classe ABC. O do fornecedor mostra os recebimentos e o retrato da homologação. Ticket médio e nota não têm fórmula definida, então o número não é publicado.'),
   ],
   '/pessoas': [
-    t('people-areas', 'Cinco abas', 'Colaboradores, Admissão e Desligamento cuidam das pessoas. Organograma e Cargos cuidam da estrutura da empresa.'),
+    t('people-areas', 'Cinco abas', 'Colaboradores, Admissão e Desligamento cuidam das pessoas. Organograma e Cargos cuidam da estrutura. A pessoa ocupa uma posição. O cargo é o dessa vaga.'),
     t('record-list', 'Quem trabalha aqui', 'Os filtros mostram quem está sem posição, em desligamento ou com a conta bloqueada. Outras empresas do grupo abre o diretório: dali a pessoa entra num projeto, recebe acesso ou é contratada aqui também.', 'close'),
-    t('new-record', 'Nova pessoa', 'Só nome, setor, posição, turno e o perfil da Gestão de acesso. O resto da ficha vem depois. O PIN do tablet é gerado e não fica à mostra.', 'close'),
-    t('org-chart', 'Organograma', 'À esquerda, os setores. Clique num deles para dizer onde ele fica, quem lidera e quantas vagas cada posição tem. O cargo vem do catálogo em Cargos.', 'close'),
+    t('new-record', 'Nova pessoa', 'Nome, setor, uma vaga que já existe, turno e o perfil da Gestão de acesso. O cargo é o dessa vaga. O resto da ficha vem depois. O PIN do tablet é gerado e não fica à mostra.', 'close'),
+    t('org-chart', 'Organograma', 'À esquerda, os setores. Cada vaga já tem um cargo, mesmo vazia. A pessoa ocupa a vaga. Editar muda o cargo, o setor e os lugares. Remover tira a vaga livre.', 'close'),
     t('person-file', 'Dados pessoais', 'A foto fica no topo. Sem arquivo, aparecem as iniciais. O resto é uma página só, por seções, com um botão de salvar. Documento, endereço, família e saúde aparecem só para o RH e para a própria pessoa.'),
-    t('person-role', 'Vínculo e trajetória', 'Posição, gestor, contrato e o histórico de mudanças. Mudar de posição tem data e não mexe no acesso.'),
+    t('person-role', 'Vínculo e trajetória', 'A ficha mostra a posição que a pessoa ocupa. O cargo é o dessa vaga e se troca no organograma. Mudar de posição tem data e não mexe no acesso.'),
     t('person-access', 'A conta, não o catálogo', 'Os perfis são os da Gestão de acesso, por empresa. Eles definem o que a pessoa vê. A conta Google é criada aqui, com o e-mail confirmado, e suspensa na data do desligamento. A senha não aparece.'),
   ],
   '/servicos': [

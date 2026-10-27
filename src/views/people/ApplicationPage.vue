@@ -214,7 +214,7 @@ watch(() => route.params.id, rememberView)
         <div class="form-grid">
           <div class="field"><label>Perfil</label><select v-model="hireForm.profileId"><option v-for="entry in hireProfiles" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>O mesmo catálogo da Gestão de acesso.</small></div>
           <div class="field"><label>Turno</label><select v-model="hireForm.shift"><option>Manhã</option><option>Tarde</option><option>Administrativo</option></select></div>
-          <div class="field"><label>Cargo</label><select v-model="hireForm.positionId"><option value="">Sem cargo</option><option v-for="entry in store.state.positions" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+          <div class="field"><label>Posição</label><select v-model="hireForm.positionId"><option value="">Sem posição por enquanto</option><option v-for="entry in store.state.positions.filter(item => item.status === 'Ativo' && item.tenantId === (job?.tenantId ?? application?.tenantId))" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>A pessoa ocupa esta vaga. O cargo é o da vaga, definido no organograma.</small></div>
         </div>
         <p v-if="sameEmail" class="hint">O e-mail já é de {{ sameEmail.name }}. A efetivação une os cadastros e não cria outra conta Google.</p>
         <template v-else>

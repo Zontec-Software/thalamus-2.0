@@ -382,12 +382,13 @@ button.person-photo { cursor: pointer; }
 .person-photo-action { border: 0; background: none; padding: 0; font: 600 11px Manrope, sans-serif; color: #1B5C3A; cursor: pointer; }
 .role-vs { margin: 0 18px 16px; padding: 14px 16px; border: 1px solid #C5D9F0; background: #F4F9FD; border-radius: 12px; color: #16324f; }
 .role-vs-lead { margin: 0 0 10px; font: 700 13.5px Manrope, sans-serif; }
-.role-vs-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.role-vs-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 .role-vs-cols > div { background: white; border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; border: 1px solid #E3EDF6; }
 .role-vs-cols b { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .role-vs-cols span { font-size: 12.5px; line-height: 1.45; color: #33485c; }
 .role-vs-example { margin: 10px 2px 0; font-size: 12.5px; line-height: 1.5; color: #24384c; }
 .role-vs.compact { margin: 0 0 14px; padding: 12px; }
+.role-vs.compact .role-vs-cols { grid-template-columns: 1fr; }
 .role-vs.compact .role-vs-lead { margin-bottom: 8px; }
 @media (max-width: 720px) { .role-vs-cols { grid-template-columns: 1fr; } }
 

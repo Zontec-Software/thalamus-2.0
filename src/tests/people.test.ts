@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { today } from '../domain/engine'
 import { createUser } from '../domain/enterprise'
 import {
-  addProjectParticipation, canSeePersonBlock, companyAccessOf, directManager, directoryCard, grantCompanyAccess, openLinkedEmployment, personView, placeSector, resetPin, setCompanyProfile, setPersonPhoto, suggestIdentity,
+  addProjectParticipation, canSeePersonBlock, companyAccessOf, createPosition, directManager, directoryCard, grantCompanyAccess, occupantsAt, openLinkedEmployment, personView, placeSector, removePosition, resetPin, setCompanyProfile, setPersonPhoto, setSectorLeadership, suggestIdentity, updatePosition,
 } from '../domain/organization'
 import {
   BRIEFING_VERSION, changeAssignment, closeOffboarding, createJobOpening, hireCandidate, prepareBriefing, recordReview, registerCandidate, revokeAccess, reviewsShareScale, setApplicationStage, setChecklistItem, startOffboarding,
@@ -204,5 +204,36 @@ describe('pessoas', () => {
     expect(directManager(state, loose)?.id).toBe(sales.managerId)
     expect(directManager(state, state.users.find(entry => entry.id === sales.managerId)!)?.id).toBe('u16')
     expect(directManager(state, state.users.find(entry => entry.id === 'u16')!)).toBeUndefined()
+  })
+
+  it('edita a vaga e só remove a que está livre', () => {
+    const state = createSeedState()
+    const created = createPosition(state, TENANT, { sectorId: 'sec-dir', jobId: 'job-lider', parentPositionId: 'pos-dir', headcount: 1 }, 'Marina')
+    const moved = updatePosition(state, TENANT, created.id, { sectorId: 'sec-com', jobId: 'job-op', headcount: 2 }, 'Marina')
+    expect(moved).toMatchObject({ name: 'Operador industrial', sectorId: 'sec-com', jobId: 'job-op', headcount: 2, parentPositionId: undefined })
+    expect(() => updatePosition(state, TENANT, 'pos-dir', { sectorId: 'sec-dir', jobId: 'job-dir', headcount: 0 }, 'Marina')).toThrow(/inteiro/)
+    expect(() => updatePosition(state, TENANT, 'pos-op', { sectorId: 'sec-pro', jobId: 'job-op', parentPositionId: 'pos-op', headcount: 6 }, 'Marina')).toThrow(/abaixo dela/)
+    expect(() => updatePosition(state, TENANT, 'pos-lider', { sectorId: 'sec-pro', jobId: 'job-lider', parentPositionId: 'pos-op', headcount: 1 }, 'Marina')).toThrow(/abaixo dela/)
+    state.assignments.push({ id: 'ASG-SERGIO', userId: 'u17', sector: 'Injeção', positionId: 'pos-op', validFrom: '2024-07-01', actor: 'Demonstração' })
+    expect(occupantsAt(state, 'pos-op').length).toBeGreaterThan(1)
+    expect(() => updatePosition(state, TENANT, 'pos-op', { sectorId: 'sec-pro', jobId: 'job-op', headcount: 1 }, 'Marina')).toThrow(/não pode ficar abaixo/)
+    expect(() => removePosition(state, TENANT, 'pos-dir', 'Marina')).toThrow(/Há alguém/)
+    const parent = createPosition(state, TENANT, { sectorId: 'sec-ser', jobId: 'job-ast', headcount: 1 }, 'Marina')
+    const child = createPosition(state, TENANT, { sectorId: 'sec-ser', jobId: 'job-ast', parentPositionId: parent.id, headcount: 1 }, 'Marina')
+    expect(() => removePosition(state, TENANT, parent.id, 'Marina')).toThrow(/responde a esta/)
+    removePosition(state, TENANT, child.id, 'Marina')
+    removePosition(state, TENANT, parent.id, 'Marina')
+    const vacant = createPosition(state, TENANT, { sectorId: 'sec-dir', jobId: 'job-ast', headcount: 1 }, 'Marina')
+    setSectorLeadership(state, 'sec-dir', vacant.id, 'Marina')
+    removePosition(state, TENANT, vacant.id, 'Marina')
+    expect(state.positions.some(entry => entry.id === vacant.id)).toBe(false)
+    expect(state.sectors.find(entry => entry.id === 'sec-dir')!.managerPositionId).toBeUndefined()
+    expect(state.sectors.find(entry => entry.id === 'sec-pro')!.managerPositionId).toBe('pos-lider')
+    removePosition(state, TENANT, created.id, 'Marina')
+    expect(state.positions.some(entry => entry.id === created.id)).toBe(false)
+    const past = createPosition(state, TENANT, { sectorId: 'sec-ser', jobId: 'job-ast', headcount: 1 }, 'Marina')
+    state.assignments.push({ id: 'ASG-TEST', userId: 'u11', sector: 'Serviços', positionId: past.id, validFrom: '2020-01-01', validTo: '2020-12-31', actor: 'Marina' })
+    removePosition(state, TENANT, past.id, 'Marina')
+    expect(state.positions.find(entry => entry.id === past.id)?.status).toBe('Inativo')
   })
 })

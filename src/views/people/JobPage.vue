@@ -110,7 +110,7 @@ watch(() => route.path, path => {
     <h2>Nova vaga</h2>
     <p class="cell-sub" style="margin-bottom:14px">A vaga nasce nesta empresa. O checklist que a acompanha é um modelo de demonstração.</p>
     <div class="form-grid">
-      <div class="field"><label>Cargo ou posição</label><input v-model="form.title" /></div>
+      <div class="field"><label>Título do anúncio</label><input v-model="form.title" /><small>Na efetivação, a pessoa ocupa uma posição do organograma. O cargo é o dessa posição.</small></div>
       <div class="field"><label>Setor</label><select v-model="form.sectorId"><option value="">Quando houver</option><option v-for="entry in store.state.sectors" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
       <div class="field"><label>Gestor requisitante</label><select v-model="form.requesterId"><option value="">—</option><option v-for="entry in people" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
       <div class="field"><label>Responsável</label><select v-model="form.ownerId"><option value="">—</option><option v-for="entry in people" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>

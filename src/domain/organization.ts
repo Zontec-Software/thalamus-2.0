@@ -116,7 +116,20 @@ export function createJob(state: ErpState, tenantId: string, input: { name: stri
   return job
 }
 
-export function createPosition(state: ErpState, tenantId: string, input: { sectorId: string; jobId: string; parentPositionId?: string; headcount: number }, actor: string) {
+/** Sobe a cadeia de chefia. Serve para impedir que uma vaga responda a quem já está abaixo dela. */
+function reportsUpTo(state: ErpState, startId: string, targetId: string) {
+  const seen = new Set<string>()
+  let cursor = state.positions.find(entry => entry.id === startId)
+  while (cursor && !seen.has(cursor.id)) {
+    if (cursor.id === targetId) return true
+    seen.add(cursor.id)
+    const parentId = cursor.parentPositionId
+    cursor = parentId ? state.positions.find(entry => entry.id === parentId) : undefined
+  }
+  return false
+}
+
+function readPositionDraft(state: ErpState, tenantId: string, input: { sectorId: string; jobId: string; parentPositionId?: string; headcount: number }, positionId?: string) {
   const sector = find(state.sectors, input.sectorId, 'Setor')
   if (sector.tenantId !== tenantId) throw new DomainError('A posição fica no setor da mesma empresa')
   const job = find(state.jobs, input.jobId, 'Cargo')
@@ -124,14 +137,76 @@ export function createPosition(state: ErpState, tenantId: string, input: { secto
   if (input.parentPositionId) {
     const parent = find(state.positions, input.parentPositionId, 'Posição superior')
     if (parent.tenantId !== tenantId) throw new DomainError('A posição superior é da mesma empresa')
+    if (parent.status !== 'Ativo') throw new DomainError('A posição superior saiu do organograma')
+    if (positionId && reportsUpTo(state, parent.id, positionId)) throw new DomainError('Uma posição não responde a si nem a uma vaga que já está abaixo dela')
   }
   if (!Number.isInteger(input.headcount) || input.headcount < 1) throw new DomainError('O número de vagas é um inteiro maior que zero')
+  return { sector, job }
+}
+
+export function createPosition(state: ErpState, tenantId: string, input: { sectorId: string; jobId: string; parentPositionId?: string; headcount: number }, actor: string) {
+  const { sector, job } = readPositionDraft(state, tenantId, input)
   const position: JobPosition = {
     id: nextId(state, 'POS'), tenantId, name: job.name, sectorId: sector.id, jobId: job.id, description: job.mission,
     parentPositionId: input.parentPositionId, headcount: input.headcount, status: 'Ativo',
   }
   state.positions.push(position)
   log(state, 'Pessoas', actor, `Posição ${position.name} com ${position.headcount} vaga(s)`, undefined, position.id)
+  return position
+}
+
+/** O cargo fica na vaga, não na pessoa. Trocar o cargo renomeia a vaga, mesmo quando ela está livre. */
+export function updatePosition(state: ErpState, tenantId: string, positionId: string, input: { sectorId: string; jobId: string; parentPositionId?: string; headcount: number }, actor: string) {
+  const position = find(state.positions, positionId, 'Posição')
+  if (position.tenantId !== tenantId) throw new DomainError('A posição é desta empresa')
+  if (position.status !== 'Ativo') throw new DomainError('Esta posição saiu do organograma')
+  const { sector, job } = readPositionDraft(state, tenantId, input, position.id)
+  const used = occupantsAt(state, position.id).length
+  if (input.headcount < used) throw new DomainError(`Há ${used} ${used === 1 ? 'pessoa' : 'pessoas'} nesta posição. O número de vagas não pode ficar abaixo disso.`)
+  const previousSector = position.sectorId
+  position.sectorId = sector.id
+  position.jobId = job.id
+  position.name = job.name
+  position.description = job.mission
+  position.parentPositionId = input.parentPositionId
+  position.headcount = input.headcount
+  if (previousSector !== sector.id) {
+    for (const entry of state.sectors) {
+      if (entry.managerPositionId === position.id) {
+        entry.managerPositionId = undefined
+        entry.managerId = undefined
+      }
+    }
+  }
+  syncSectorManagers(state)
+  log(state, 'Pessoas', actor, `Posição ${position.name} atualizada`, undefined, position.id)
+  return position
+}
+
+/**
+ * Tira a vaga do organograma. Com alguém nela, ou com outra vaga respondendo a ela, recusa.
+ * Se já houve ocupante, a posição fica inativa para o histórico continuar com o nome.
+ */
+export function removePosition(state: ErpState, tenantId: string, positionId: string, actor: string) {
+  const position = find(state.positions, positionId, 'Posição')
+  if (position.tenantId !== tenantId) throw new DomainError('A posição é desta empresa')
+  if (position.status !== 'Ativo') throw new DomainError('Esta posição saiu do organograma')
+  if (occupantsAt(state, position.id).length) throw new DomainError('Há alguém nesta posição. Mude o vínculo da pessoa antes de remover.')
+  if (state.positions.some(entry => entry.status === 'Ativo' && entry.parentPositionId === position.id)) throw new DomainError('Outra posição responde a esta. Aponte essas vagas para outro lugar antes de remover.')
+  for (const sector of state.sectors) {
+    if (sector.managerPositionId === position.id) {
+      sector.managerPositionId = undefined
+      sector.managerId = undefined
+    }
+  }
+  const hadPeople = state.assignments.some(entry => entry.positionId === position.id)
+  if (hadPeople) {
+    position.status = 'Inativo'
+    log(state, 'Pessoas', actor, `Posição ${position.name} saiu do organograma e permanece no histórico`, undefined, position.id)
+  } else {
+    state.positions = state.positions.filter(entry => entry.id !== position.id)
+    log(state, 'Pessoas', actor, `Posição ${position.name} removida`, undefined, position.id)
+  }
   return position
 }
 
@@ -158,6 +233,7 @@ export function directManager(state: ErpState, user: User, day = today()): User 
 
 export function positionRoom(state: ErpState, positionId: string, exceptUserId?: string, day = today()) {
   const position = find(state.positions, positionId, 'Posição')
+  if (position.status !== 'Ativo') throw new DomainError('Esta posição saiu do organograma')
   const used = occupantsAt(state, positionId, day).filter(entry => entry.userId !== exceptUserId).length
   return { position, used, free: position.headcount - used }
 }
@@ -196,7 +272,7 @@ export function placeSector(state: ErpState, sectorId: string, parentId: string 
 export function setSectorLeadership(state: ErpState, sectorId: string, positionId: string, actor: string) {
   const sector = find(state.sectors, sectorId, 'Setor')
   const position = find(state.positions, positionId, 'Posição')
-  if (position.tenantId !== sector.tenantId || position.sectorId !== sector.id) throw new DomainError('A liderança é uma posição deste setor')
+  if (position.status !== 'Ativo' || position.tenantId !== sector.tenantId || position.sectorId !== sector.id) throw new DomainError('A liderança é uma posição deste setor')
   sector.managerPositionId = position.id
   syncSectorManagers(state)
   log(state, 'Pessoas', actor, `${sector.name} liderado pela posição ${position.name}`, undefined, sector.id)

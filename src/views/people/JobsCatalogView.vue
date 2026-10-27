@@ -13,7 +13,7 @@ const open = ref(false)
 const form = reactive({ name: '', level: '', cbo: '', mission: '', requirements: '' })
 
 const jobs = computed(() => store.state.jobs.filter(entry => entry.tenantId === ui.activeTenantId && (!query.value || `${entry.name} ${entry.cbo} ${entry.mission}`.toLowerCase().includes(query.value.toLowerCase()))))
-const usage = (jobId: string) => store.state.positions.filter(entry => entry.jobId === jobId)
+const usage = (jobId: string) => store.state.positions.filter(entry => entry.jobId === jobId && entry.status === 'Ativo')
 
 function start() {
   Object.assign(form, { name: '', level: '', cbo: '', mission: '', requirements: '' })
@@ -30,7 +30,7 @@ function create() {
     <div class="section-head">
       <div>
         <h2>Cargos</h2>
-        <p>O catálogo do trabalho. Cada cargo daqui vira vaga quando uma posição do organograma o usa.</p>
+        <p>O catálogo do trabalho. A pessoa não recebe o cargo aqui: ela ocupa uma posição do organograma que usa este cargo.</p>
       </div>
       <button class="button" @click="start">Novo cargo</button>
     </div>
