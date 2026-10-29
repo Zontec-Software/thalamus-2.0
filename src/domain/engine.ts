@@ -402,7 +402,7 @@ export function planOrder(state: ErpState, orderId: string, actor: string) {
     const component = getItem(state, line.itemId)
     assertUsable(component, 'consumo')
     const short = round(lineNeed(line, order.quantity) - availableQty(state, component.id)) > 0
-    if (short) assertUsable(component, component.type === 'SE' ? 'produção' : 'compra')
+    if (short) assertUsable(component, component.moldId ? 'produção' : 'compra')
   }
 
   const due = addDays(order.promisedDate, -1)
@@ -417,7 +417,7 @@ export function planOrder(state: ErpState, orderId: string, actor: string) {
     materials.push({ itemId: component.id, required: need, reserved: 0, picked: false })
     const shortfall = round(need - availableQty(state, component.id))
     if (shortfall <= 0) continue
-    if (component.type === 'SE') {
+    if (component.moldId) {
       created.push(createInjectionOp(state, order, component, Math.ceil(shortfall / 10) * 10, addDays(due, -2), actor).id)
     } else {
       requisitions.push(createRequisition(state, component.id, shortfall, `${order.id} · ${montId}`, addDays(due, -3), actor, order.id).id)

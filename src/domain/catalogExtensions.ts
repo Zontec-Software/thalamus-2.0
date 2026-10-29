@@ -2,11 +2,11 @@ import type { ErpState } from './engine'
 import { addDays, DomainError, getItem, lineNeed, log, nextId, now, today } from './engine'
 import { assertResourceChoice } from './resources'
 import {
-  assertGtin, canEdit, catalogOf, commit, createItem, currentPrice, editable, editorsLabel, findItem, needsStructure, sellable, track,
+  assertGtin, canEdit, catalogOf, commit, createItem, currentPrice, editable, editorsLabel, findItem, hasRouting, isKitVirtual, needsGtin, needsStructure, sellable, track,
   type Change,
 } from './catalog'
 import type {
-  Barcode, BarcodeKind, FiscalOperation, FiscalRule, Item, ItemMedia, ItemModel, ItemType, MediaKind, PriceTable, Role,
+  Barcode, BarcodeKind, FiscalOperation, FiscalRule, Item, ItemMedia, ItemModel, MediaKind, PriceTable, Role,
 } from '../types/domain'
 
 const round2 = (value: number) => Math.round(value * 100) / 100
@@ -73,7 +73,7 @@ export function removeBarcode(state: ErpState, itemId: string, code: string, act
   const catalog = editable(item, role, 'comercial')
   const target = catalog.barcodes.find(entry => entry.code === code)
   if (!target) throw new DomainError('Código não encontrado no item')
-  if (target.main && catalog.barcodes.length === 1 && catalog.lifecycle === 'Ativo' && (item.type === 'PA' || item.type === 'KF')) {
+  if (target.main && catalog.barcodes.length === 1 && catalog.lifecycle === 'Ativo' && needsGtin(item)) {
     throw new DomainError('Produto ativo precisa de um EAN principal. Cadastre outro antes de remover este')
   }
   catalog.barcodes = catalog.barcodes.filter(entry => entry.code !== code)
@@ -208,7 +208,7 @@ export interface RouteStepInput {
 function routingEditable(state: ErpState, itemId: string, role: Role) {
   const item = findItem(state, itemId)
   const catalog = editable(item, role, 'manufatura')
-  if (item.type !== 'PA' && item.type !== 'KF') throw new DomainError('Só produto acabado e kit físico têm roteiro de montagem')
+  if (!hasRouting(item)) throw new DomainError('Só produto fabricado tem roteiro')
   item.routing ??= []
   return { item, catalog, routing: item.routing }
 }
@@ -492,7 +492,6 @@ export function suggestTaxes(state: ErpState, item: Item, operation: FiscalOpera
   return { rule, cst: `${catalog.origin}${rule.cst}`, benefits }
 }
 
-const SPED_TYPE: Partial<Record<ItemType, string>> = { MP: '01', EM: '02', SE: '03', PA: '04', KF: '04', CP: '10', IM: '08', SV: '09' }
 const UNIT_NAME: Record<string, string> = { un: 'Unidade', kg: 'Quilograma', h: 'Hora', kit: 'Kit', saco: 'Saco', cento: 'Cento', milheiro: 'Milheiro', fardo: 'Fardo', cx: 'Caixa' }
 
 export function spedEligible(item: Item) {
@@ -508,13 +507,13 @@ export function spedRegisters(state: ErpState, items = state.items) {
   const body: string[] = []
   for (const item of eligible) {
     const catalog = catalogOf(item)
-    const type = SPED_TYPE[item.type] ?? '99'
+    const type = item.type
     const goods = catalog.nature === 'Bem'
     if (goods && !catalog.ncm) issues.push(`${item.code}: sem NCM, o 0200 sai incompleto`)
     const icms = suggestTaxes(state, item, 'Venda', COMPANY_UF)?.rule.icms
     units.add(item.unit)
     body.push(['', '0200', item.code, item.name.slice(0, 120), catalog.gtin, '', item.unit, type, goods ? catalog.ncm : '', catalog.exTipi,
-      goods && catalog.ncm ? catalog.ncm.slice(0, 2) : '', type === '09' ? '14.02' : '', icms !== undefined ? brNumber(icms) : '', catalog.cest.replace(/\D/g, ''), ''].join('|'))
+      goods && catalog.ncm ? catalog.ncm.slice(0, 2) : '', '', icms !== undefined ? brNumber(icms) : '', catalog.cest.replace(/\D/g, ''), ''].join('|'))
     for (const conversion of catalog.conversions) {
       units.add(conversion.unit)
       const barcode = catalog.barcodes.find(entry => entry.unit === conversion.unit)?.code ?? ''
@@ -583,7 +582,7 @@ export function createModel(state: ErpState, input: { templateId: string; name: 
   if (!canEdit(role, 'nucleo')) throw new DomainError(`Quem cria grade: ${editorsLabel('nucleo')}`)
   const template = findItem(state, input.templateId)
   const catalog = editable(template, role, 'nucleo')
-  if (template.type !== 'PA' && template.type !== 'KF') throw new DomainError('Grade vale para produto acabado e kit físico')
+  if (template.type !== '04' || isKitVirtual(template)) throw new DomainError('Grade vale para produto acabado')
   if (catalog.modelId) throw new DomainError('O item já pertence a uma grade')
   const name = input.name.trim()
   if (name.length < 3) throw new DomainError('Dê um nome ao modelo')
@@ -642,7 +641,7 @@ export function generateVariants(state: ErpState, modelId: string, combos: Recor
 export function explodeKitLines(state: ErpState, lines: { itemId: string; quantity: number; unitPrice: number }[]) {
   return lines.flatMap(line => {
     const item = getItem(state, line.itemId)
-    if (item.type !== 'KT') return [line]
+    if (!isKitVirtual(item)) return [line]
     if (!item.bom?.length) throw new DomainError(`${item.code} é kit virtual sem composição liberada`)
     const weights = item.bom.map(component => {
       const part = getItem(state, component.itemId)

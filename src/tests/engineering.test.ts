@@ -26,7 +26,7 @@ describe('atributos por classe', () => {
   it('atributo obrigatório sem valor impede a homologação e aparece como pendência', () => {
     const state = createSeedState()
     const classId = ensureClassPath(state, ['Produtos acabados', 'Linha Hard', 'Cases'])
-    const draft = createItem(state, { name: 'Case Rugged novo', type: 'PA', unit: 'un', classId }, 'Eduardo')
+    const draft = createItem(state, { name: 'Case Rugged novo', type: '04', unit: 'un', classId }, 'Eduardo')
     expect(missingAttributes(state, draft).length).toBeGreaterThan(0)
     expect(itemFlags(state, draft)).toContain('Atributos pendentes')
     expect(() => submitItem(state, draft.id, 'Eduardo')).toThrow(/atributos obrigatórios/)

@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ClipboardCheck, PackageCheck, Truck } from 'lucide-vue-next'
 import BaseModal from '../components/BaseModal.vue'
-import { stockable } from '../domain/catalog'
+import { ITEM_TYPE_LABEL, stockable } from '../domain/catalog'
 import { useErpStore } from '../stores/erp'
 import type { Item, ItemType } from '../types/domain'
 import { fmtDateTime, fmtNumber } from '../utils/format'
@@ -81,7 +81,7 @@ function saveCount() {
       <div><h2>Saldos de estoque</h2><p>Físico, reservado para OPs e disponível para novos pedidos</p></div>
       <div class="filter-row">
         <input v-model="query" class="filter" placeholder="Buscar item…" />
-        <select v-model="type" class="filter"><option value="">Todos os tipos</option><option value="PA">Acabados</option><option value="SE">Injetados</option><option value="MP">Matérias-primas</option><option value="CP">Componentes</option><option value="EM">Embalagens</option></select>
+        <select v-model="type" class="filter"><option value="">Todos os tipos</option><option v-for="(label, id) in ITEM_TYPE_LABEL" :key="id" :value="id">{{ id }} · {{ label }}</option></select>
       </div>
     </div>
     <table style="margin-top:12px">

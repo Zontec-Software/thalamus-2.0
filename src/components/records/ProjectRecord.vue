@@ -22,7 +22,7 @@ const project = computed(() => store.state.projects.find(entry => entry.id === p
 const participations = computed(() => store.state.projectParticipations.filter(entry => entry.projectId === props.id))
 const owners = computed(() => store.state.users.filter(entry => entry.role !== 'Operador'))
 const clients = computed(() => store.state.partners.filter(entry => roleIsOpen(entry, 'Cliente')))
-const products = computed(() => store.state.items.filter(entry => entry.type === 'PA'))
+const products = computed(() => store.state.items.filter(entry => entry.type === '04'))
 
 const form = reactive({
   name: props.context.name ?? '', kind: (props.context.opportunityId ? 'Cliente' : 'Produto novo') as Project['kind'],

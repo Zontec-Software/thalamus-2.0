@@ -3,9 +3,8 @@ import { computed, ref } from 'vue'
 import { Send } from 'lucide-vue-next'
 import StatusBadge from '../../../components/StatusBadge.vue'
 import {
-  APPROVAL_LABEL, APPROVER, LIFECYCLE, activationIssues, approvalIssues, canApprove, canEdit, catalogOf, editorsLabel, openPendencies, requiredApprovals,
+  APPROVAL_LABEL, LIFECYCLE, activationIssues, approvalIssues, catalogOf, editorsLabel, openPendencies, requiredApprovals,
 } from '../../../domain/catalog'
-import { hasFullAccess } from '../../../domain/access'
 import { useErpStore } from '../../../stores/erp'
 import { useUiStore } from '../../../stores/ui'
 import type { Item } from '../../../types/domain'
@@ -20,7 +19,7 @@ const portraits = computed(() => store.state.supplierHomologations.filter(entry 
 const life = computed(() => catalog.value.lifecycle)
 const issues = computed(() => activationIssues(store.state, props.item))
 const pendencies = computed(() => openPendencies(store.state, props.item.id))
-const canCycle = computed(() => canEdit(ui.role, 'ciclo') && !catalog.value.deletedAt)
+const canCycle = computed(() => store.can('produtos.ciclo.gerir') && !catalog.value.deletedAt)
 const past = (step: string) => LIFECYCLE.indexOf(step as typeof life.value) < LIFECYCLE.indexOf(life.value) && LIFECYCLE.indexOf(life.value) <= 2
 
 type Ask = 'return' | 'block' | 'reactivate' | 'obsolete' | 'inactivate' | 'reject-inactivation' | 'refuse'
@@ -50,7 +49,8 @@ function confirm(reason: string) {
   }[action]()
   if (done !== undefined) ask.value = ''
 }
-const canReturn = computed(() => (APPROVER[ui.role] ?? []).some(role => requiredApprovals(props.item).includes(role)) || canEdit(ui.role, 'ciclo'))
+const canApprove = (role: keyof typeof APPROVAL_LABEL) => store.can(`produtos.homologar.${role}`)
+const canReturn = computed(() => requiredApprovals(props.item).some(role => canApprove(role)) || store.can('produtos.ciclo.gerir'))
 </script>
 
 <template>
@@ -66,8 +66,8 @@ const canReturn = computed(() => (APPROVER[ui.role] ?? []).some(role => required
         <small v-if="catalog.approvals[role]">Por {{ catalog.approvals[role] }}</small>
         <ul v-else-if="approvalIssues(item, role).length"><li v-for="issue in approvalIssues(item, role)" :key="issue">{{ issue }}</li></ul>
         <small v-else>Pronto para aprovar.</small>
-        <button v-if="life === 'Em homologação' && !catalog.approvals[role]" class="button small" :disabled="!canApprove(ui.role, role) || approvalIssues(item, role).length > 0"
-          :title="canApprove(ui.role, role) ? '' : `O perfil ${ui.role} não aprova ${APPROVAL_LABEL[role].toLowerCase()}`" @click="store.approveItem(item.id, role)">Aprovar {{ APPROVAL_LABEL[role].toLowerCase() }}</button>
+        <button v-if="life === 'Em homologação' && !catalog.approvals[role]" class="button small" :disabled="!canApprove(role) || approvalIssues(item, role).length > 0"
+          :title="canApprove(role) ? '' : 'Seu perfil não aprova esta etapa.'" @click="store.approveItem(item.id, role)">Aprovar {{ APPROVAL_LABEL[role].toLowerCase() }}</button>
       </div>
     </div>
     <p v-if="issues.length" class="notice warning">Para ativar: {{ issues.join(' · ') }}</p>
@@ -96,7 +96,7 @@ const canReturn = computed(() => (APPROVER[ui.role] ?? []).some(role => required
   </div>
   <p v-if="life === 'Alteração pendente'" class="notice info" style="margin-top:10px">Há alteração aguardando aprovação. O cadastro vigente continua valendo em compra, produção e venda.</p>
   <p v-if="life === 'Inativação pendente'" class="notice warning" style="margin-top:10px">A inativação aguarda aprovação. Ao aprovar, solicitações ainda pendentes são negadas com o aviso de item inativado.</p>
-  <section v-if="item.type === 'MP'" class="layer">
+  <section v-if="item.type === '01'" class="layer">
     <h3 class="drawer-title">Retrato de homologação</h3>
     <p class="cell-sub">Leitura do outro submódulo, por fornecedor. Não se edita nem se decide aqui.</p>
     <div v-for="portrait in portraits" :key="portrait.id" class="list-row static">
@@ -117,8 +117,8 @@ const canReturn = computed(() => (APPROVER[ui.role] ?? []).some(role => required
       <span>{{ change.originModule }} {{ change.originId }} · {{ change.reason }} · {{ change.requestedBy }} em {{ change.requestedAt.slice(0, 10) }}<template v-if="change.decidedBy"> · {{ change.status.toLowerCase() }} por {{ change.decidedBy }}{{ change.note ? `: ${change.note}` : '' }}</template></span>
     </div>
     <div v-if="change.status === 'Pendente'" class="filter-row">
-      <button class="button small" :disabled="!hasFullAccess(ui.role) || change.requestedBy === ui.userName" :title="change.requestedBy === ui.userName ? 'Quem solicitou não aprova' : !hasFullAccess(ui.role) ? 'Decisão da gestão do cadastro' : ''" @click="store.decideKeyChange(item.id, change.id, true, '')">Aprovar</button>
-      <button class="button secondary small" :disabled="!hasFullAccess(ui.role) || change.requestedBy === ui.userName" @click="refusing = change.id; ask = 'refuse'">Recusar</button>
+      <button class="button small" :disabled="!store.can('produtos.excecao_campo_chave.decidir') || change.requestedBy === ui.userName" :title="change.requestedBy === ui.userName ? 'Quem solicitou não aprova' : !store.can('produtos.excecao_campo_chave.decidir') ? 'Seu perfil não decide esta exceção.' : ''" @click="store.decideKeyChange(item.id, change.id, true, '')">Aprovar</button>
+      <button class="button secondary small" :disabled="!store.can('produtos.excecao_campo_chave.decidir') || change.requestedBy === ui.userName" @click="refusing = change.id; ask = 'refuse'">Recusar</button>
     </div>
     <StatusBadge v-else :value="change.status" :tone="change.status === 'Aprovada' ? 'success' : 'danger'" />
   </div>

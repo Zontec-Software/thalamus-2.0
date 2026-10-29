@@ -68,13 +68,13 @@ export const MANUAL: ManualChapter[] = [
         screens: [{ label: 'Tela inicial', to: '/' }],
         tour: '/',
         blocks: [
-          { kind: 'p', text: 'O sistema é dividido em **sete áreas**: Cadastros, Suprimentos, Comercial, Operações, Serviços, Gestão e Finanças. A tela inicial mostra um bloco por área, todos na mesma linha. Cada bloco tem atalhos para as telas mais usadas. O clique no bloco abre o mapa da área, com um cartão por módulo liberado para o perfil. Quem só tem um módulo entra direto nele.' },
+          { kind: 'p', text: 'O sistema é dividido em **sete áreas**: Cadastros, Suprimentos, Comercial, Operações, Serviços, Gestão e Finanças. A tela inicial mostra um bloco por área, todos na mesma linha. Cada bloco tem atalhos para as telas mais usadas. O clique no bloco abre o mapa da área, com um cartão por módulo liberado para o perfil. Cada cartão diz, em uma linha, o que aquele módulo faz. Quem só tem um módulo entra direto nele.' },
           {
             kind: 'list', title: 'Elementos fixos da tela',
             items: [
               '**Barra superior**: marca, nome da área (volta ao mapa da área), seta para trocar de área, busca geral, perfil, sino de notificações e o botão de ajuda.',
               '**Barra de módulos**: faixa escura logo abaixo do topo, com os módulos da área em que você está. O módulo aberto fica sublinhado em ciano. À direita fica o indicador do Omie, que mostra se há falhas de integração.',
-              '**Abas do módulo**: Produtos e Orçamentos têm as telas internas numa faixa no topo, com a tela aberta sublinhada. Na ficha do produto, as abas do módulo somem e as seções do produto aparecem na mesma faixa horizontal.',
+              '**Abas do módulo**: Portfólio e Orçamentos têm as telas internas numa faixa no topo, com a tela aberta sublinhada. Na ficha do produto, as abas do módulo somem e as seções do produto aparecem na mesma faixa horizontal.',
             ],
           },
           {
@@ -170,7 +170,7 @@ export const MANUAL: ManualChapter[] = [
         id: 'itens-conceitos', title: 'Cadastro de produtos: núcleo e camadas',
         summary: 'Um código por produto, com camadas que dependem do tipo.',
         roles: ['Engenharia', 'Gestor'],
-        screens: [{ label: 'Produtos', to: '/produtos' }],
+        screens: [{ label: 'Portfólio', to: '/produtos' }],
         tour: '/produtos',
         blocks: [
           { kind: 'p', text: 'Tudo o que a empresa produz, compra, vende ou usa é um **produto** com um único código. O produto tem um **núcleo**, comum a todos os tipos (código, descrição, tipo, unidade base, classificação), e **camadas** que só aparecem quando o tipo precisa delas.' },
@@ -178,27 +178,23 @@ export const MANUAL: ManualChapter[] = [
             kind: 'table', title: 'Tipos de produto e camadas',
             head: ['Tipo', 'Natureza', 'Camadas', 'Observação'],
             rows: [
-              ['Produto acabado (PA)', 'Bem', 'Estoque, unidades, estrutura e roteiro, comercial, fiscal, mídia, projetos', 'Precisa de estrutura, roteiro, EAN e preço para ativar'],
-              ['Peça injetada (SE)', 'Bem', 'Estoque, unidades, estrutura, fiscal, mídia, projetos', 'Fabricada na injetora; vira OP de injeção'],
-              ['Matéria-prima (MP)', 'Bem', 'Estoque, unidades, fiscal, mídia, projetos', 'Comprada; entra no planejamento de materiais'],
-              ['Componente (CP)', 'Bem', 'Estoque, unidades, fiscal, mídia, projetos', 'Comprado; entra no planejamento de materiais'],
-              ['Embalagem (EM)', 'Bem', 'Estoque, unidades, fiscal, mídia, projetos', 'Comprada; entra no planejamento de materiais'],
-              ['Kit físico (KF)', 'Bem', 'Estoque, unidades, estrutura e roteiro, comercial, fiscal, mídia, projetos', 'Montado e estocado como produto próprio'],
-              ['Kit virtual (KT)', 'Kit virtual', 'Estrutura, comercial, fiscal, mídia, projetos', 'Não é estocado; explode em componentes na proposta aceita'],
-              ['Serviço (SV)', 'Serviço', 'Comercial, fiscal, projetos', 'Sem estoque e fora do planejamento'],
-              ['Imobilizado (IM)', 'Imobilizado', 'Fiscal, projetos', 'Não é vendido nem entra no planejamento'],
-              ['Ferramental (FE)', 'Imobilizado', 'Ferramental, fiscal, mídia, projetos', 'Molde, gabarito ou dispositivo; o roteiro aponta para ele'],
+              ['00 · Mercadoria para Revenda', 'Bem', 'Estoque, unidades, comercial, fiscal, mídia, projetos', 'Comprada e revendida, sem transformação'],
+              ['01 · Matéria Prima', 'Bem', 'Estoque, unidades, fiscal, mídia, projetos', 'Comprada e incorporada ao produto; entra no planejamento. Criticidade C1 exige fornecedor homologado'],
+              ['02 · Embalagem', 'Bem', 'Estoque, unidades, fiscal, mídia, projetos', 'Embalagem de expedição; entra no planejamento'],
+              ['03 · Produto em Processo', 'Bem', 'Estoque, unidades, estrutura e roteiro, fiscal, mídia, projetos', 'Fabricado e ainda em processo. Com molde, a falta vira OP de injeção'],
+              ['04 · Produto Acabado', 'Bem', 'Estoque, unidades, estrutura e roteiro, comercial, fiscal, mídia, projetos', 'Vendido. Precisa de estrutura, roteiro, EAN e preço. Kit físico é produto acabado com unidade kit. Kit virtual usa a natureza Kit virtual: sem estoque e sem roteiro, explode na proposta aceita'],
+              ['06 · Produto Intermediário', 'Bem', 'Estoque, unidades, estrutura e roteiro, fiscal, mídia, projetos', 'Fabricado e consumido na montagem seguinte. Com molde, a falta vira OP de injeção'],
+              ['07 · Material de Uso e Consumo', 'Bem', 'Estoque, unidades, fiscal, mídia, projetos', 'Uso interno; não entra na estrutura do produto vendido'],
+              ['08 · Ativo Imobilizado', 'Imobilizado', 'Fiscal, mídia, projetos', 'Não é vendido nem entra no planejamento. Molde, gabarito e dispositivo ganham a seção Ferramental'],
             ],
           },
           {
             kind: 'list', title: 'As telas do módulo Produtos',
             items: [
-              '**Produtos**: a lista de todos os produtos, com filtros, ordenação, colunas configuráveis e ações em lote.',
+              '**Portfólio**: a lista, com quatro guias da vida do cadastro. **Rascunho** é o que ainda não foi liberado. **Ativos** é a versão vigente. **Em Revisão** é uma versão em desenvolvimento, e o produto continua em Ativos enquanto a vigente vale. **Inativo** só aparece depois da inativação. Dentro da guia, os tipos e o filtro de cada coluna continuam valendo.',
               '**Ficha do produto**: abre ao clicar numa linha. No topo ficam a foto, a situação e os indicadores (custo, saldo, lead time, roteiro, onde é usado, mudanças); cada indicador leva à seção correspondente. Abaixo, as seções ficam numa faixa horizontal: Identificação, Engenharia, Logística, Comercial e fiscal, Documentos e Governança. O número marca o que pede ação.',
               '**Classificação**: a árvore que organiza os produtos e define os atributos que eles herdam.',
-              '**Estruturas e roteiros e Fiscal**: visões para quem trabalha nessa parte. O Fiscal também tem a matriz fiscal e a geração do SPED. Estoque e ferramental ficam na página do produto, não nestas abas.',
-              '**Mudanças**: a lista das mudanças de engenharia em aberto.',
-              '**Homologação**: as filas de aprovação e de pendências.',
+              '**Ações**: o que o perfil logado pode fazer agora. Entram homologação, cadastro incompleto, estrutura e roteiro, fiscal, mudança de engenharia e ciclo de vida. Quem não tem a funcionalidade não vê a linha. A matriz fiscal e o SPED ficam nesta aba para quem gere o fiscal. Estoque e ferramental continuam na página do produto.',
             ],
           },
           {
@@ -218,12 +214,12 @@ export const MANUAL: ManualChapter[] = [
         id: 'criar-item', title: 'Criar um produto',
         summary: 'Do novo rascunho até a homologação.',
         roles: ['Engenharia', 'Gestor'],
-        screens: [{ label: 'Produtos', to: '/produtos' }],
+        screens: [{ label: 'Portfólio', to: '/produtos' }],
         blocks: [
           {
             kind: 'steps',
             items: [
-              'Em Produtos → Produtos, clique em **Novo produto**.',
+              'Em Produtos → Portfólio, clique em **Novo produto**.',
               'Informe a descrição, o tipo, a unidade base e o nó da classificação.',
               'Se já existir produto com descrição parecida, o sistema lista os candidatos. Confira: se for o mesmo produto, cancele e use o existente. Se for outro, confirme com **É outro produto, criar**.',
               'O produto nasce em **Rascunho**, com código sequencial (RF-10007, RF-10008…) e abre a página dele.',
@@ -351,9 +347,9 @@ export const MANUAL: ManualChapter[] = [
         id: 'estrutura-versoes', title: 'Estrutura e roteiro: versões com vigência',
         summary: 'Alteração controlada da lista de materiais.',
         roles: ['Engenharia', 'PCP', 'Gestor'],
-        screens: [{ label: 'Estruturas', to: '/produtos/estruturas' }],
+        screens: [{ label: 'Ações', to: '/produtos/acoes' }],
         blocks: [
-          { kind: 'p', text: 'A **estrutura** (lista de materiais) diz quais componentes e quantidades formam um produto acabado, peça injetada ou kit. Ela nunca é editada direto: cada alteração nasce como uma **versão** (A, B, C…), é conferida e liberada com uma data de vigência. As versões anteriores ficam guardadas.' },
+          { kind: 'p', text: 'A **estrutura** (lista de materiais) diz quais componentes e quantidades formam um produto acabado, em processo, intermediário ou kit. Ela nunca é editada direto: cada alteração nasce como uma **versão** (A, B, C…), é conferida e liberada com uma data de vigência. As versões anteriores ficam guardadas.' },
           {
             kind: 'flow', title: 'Situações de uma versão',
             items: ['Rascunho', 'Programada (liberada com data futura)', 'Vigente', 'Substituída'],
@@ -396,7 +392,7 @@ export const MANUAL: ManualChapter[] = [
           {
             kind: 'rules',
             items: [
-              'Produto acabado e kit físico não liberam versão com roteiro vazio.',
+              'Produto acabado estocado não libera versão com roteiro vazio. Kit virtual não tem roteiro.',
               'Operação com molde só aceita injetora compatível com aquele molde.',
               'O posto vem de Cadastros → Postos. Posto inativo não entra em operação nova; a operação que já o usa permanece.',
               'Qualquer mudança no roteiro desmarca o checklist da versão.',
@@ -414,7 +410,7 @@ export const MANUAL: ManualChapter[] = [
         screens: [{ label: 'Ferramental', to: '/produtos/ferramental' }],
         tour: '/produtos/ferramental',
         blocks: [
-          { kind: 'p', text: 'Molde, gabarito e dispositivo são produtos do tipo **Ferramental (FE)**, com a seção **Ferramental** na ficha do produto. Esse produto guarda o que a engenharia usa no roteiro: cavidades, ciclo, postos compatíveis, dono e desgaste no custo. O roteiro aponta para este produto.' },
+          { kind: 'p', text: 'Molde, gabarito e dispositivo são **ativos imobilizados (tipo 08)** com a seção **Ferramental** na ficha do produto. Esse produto guarda o que a engenharia usa no roteiro: cavidades, ciclo, postos compatíveis, dono e desgaste no custo. O roteiro aponta para este produto.' },
           { kind: 'p', text: 'O bem físico que a manutenção acompanha fica em **Ativos**: contador de golpes, preventiva e ordem de serviço. O campo **Ativo na manutenção** liga os dois quando o ativo já existe. A opção inicial é **Não vinculado**. Cavidade, ciclo, posto e custo valem sem esse vínculo. A lista só mostra ativos já cadastrados; esta tela não cria o ativo. Dá para gravar o ferramental agora e apontar o ativo depois. O cadastro de Ativos ainda não foi revisto, então criar o ativo a partir daqui fica para essa revisão.' },
           {
             kind: 'table', title: 'Dados do ferramental',
@@ -445,8 +441,8 @@ export const MANUAL: ManualChapter[] = [
         id: 'mudancas-engenharia', title: 'Mudanças de engenharia (ECO)',
         summary: 'Alteração de estrutura, roteiro ou ferramental com impacto avaliado e data de efetividade.',
         roles: ['Engenharia', 'PCP', 'Gestor'],
-        screens: [{ label: 'Mudanças', to: '/produtos/mudancas' }],
-        tour: '/produtos/mudancas',
+        screens: [{ label: 'Ações', to: '/produtos/acoes' }],
+        tour: '/produtos/acoes',
         blocks: [
           { kind: 'p', text: 'Quando a alteração afeta estoque, OP ou pedido, ela passa por uma **mudança de engenharia**. A mudança reúne o motivo, os produtos, o destino do estoque atual e a data em que a versão nova passa a valer.' },
           { kind: 'flow', title: 'Etapas da mudança', items: ['Solicitada', 'Em análise', 'Aprovada', 'Implementada', 'ou Recusada'] },
@@ -474,7 +470,7 @@ export const MANUAL: ManualChapter[] = [
         id: 'custos-engenharia', title: 'Custo calculado pela engenharia',
         summary: 'Material, máquina, mão de obra, preparação e desgaste de ferramental.',
         roles: ['Engenharia', 'Gestor', 'Financeiro'],
-        screens: [{ label: 'Produtos', to: '/produtos' }],
+        screens: [{ label: 'Portfólio', to: '/produtos' }],
         blocks: [
           { kind: 'p', text: 'A seção **Custos** da ficha calcula o custo por unidade a partir da estrutura vigente e do roteiro, e compara com o custo-padrão.' },
           {
@@ -496,7 +492,7 @@ export const MANUAL: ManualChapter[] = [
         id: 'embalagem', title: 'Níveis de embalagem',
         summary: 'Unidade, caixa, master e palete, com GTIN, peso e medidas.',
         roles: ['Engenharia', 'Expedição', 'Gestor'],
-        screens: [{ label: 'Produtos', to: '/produtos' }],
+        screens: [{ label: 'Portfólio', to: '/produtos' }],
         blocks: [
           { kind: 'p', text: 'A seção **Embalagem** descreve como o produto é embalado em cada nível: quantas unidades, qual embalagem do catálogo, GTIN (EAN/DUN), peso e medidas.' },
           {
@@ -505,7 +501,7 @@ export const MANUAL: ManualChapter[] = [
               'O nível Unidade contém sempre 1.',
               'Cada nível acima contém mais unidades que o anterior, em múltiplo inteiro (10 por caixa, 400 por master = 40 caixas).',
               'O GTIN não pode se repetir entre níveis nem entre produtos.',
-              'O material de cada nível precisa ser um produto de Embalagem (EM).',
+              'O material de cada nível precisa ser um produto do tipo 02 · Embalagem.',
             ],
           },
         ],
@@ -515,7 +511,7 @@ export const MANUAL: ManualChapter[] = [
         id: 'comercial-fiscal', title: 'Camada comercial: descrição, marca e categorias',
         summary: 'O que o cliente enxerga e as dimensões de análise.',
         roles: ['Comercial', 'Gestor'],
-        screens: [{ label: 'Produtos', to: '/produtos' }],
+        screens: [{ label: 'Portfólio', to: '/produtos' }],
         blocks: [
           { kind: 'p', text: 'A aba **Comercial** guarda a **descrição comercial**, a **marca**, a **linha comercial** e as **categorias de e-commerce**. Abaixo ficam os códigos de barras, os preços por tabela e a grade. A nota fiscal sai pelo Omie.' },
           {
@@ -549,7 +545,7 @@ export const MANUAL: ManualChapter[] = [
             items: [
               'O código precisa ter o dígito verificador correto e o tamanho do tipo.',
               'O código é único em todo o cadastro: o sistema recusa um código já usado por outro produto e diz qual.',
-              'Produto acabado ou kit físico ativo não pode ficar sem código principal.',
+              'Produto acabado estocado não pode ficar sem código principal. Kit virtual não exige EAN.',
               '**GTIN × NCM**: o EAN registrado no cadastro nacional (CCG) traz um NCM. Se o NCM do produto for diferente, a lista mostra "GTIN × NCM divergente" e a aprovação fiscal não passa até a divergência ser resolvida.',
             ],
           },
@@ -575,7 +571,7 @@ export const MANUAL: ManualChapter[] = [
             kind: 'rules',
             items: [
               'A data de início não pode estar no passado nem ser igual ou anterior a outro preço já lançado na mesma tabela e unidade.',
-              'Produto acabado, kits e serviço precisam de preço vigente na **tabela padrão** para passar na aprovação comercial. Produto ativo sem preço aparece com a pendência "Sem preço".',
+              'Mercadoria para revenda, produto acabado e kit virtual precisam de preço vigente na **tabela padrão** para passar na aprovação comercial. Serviço fica no cadastro de serviços. Produto ativo sem preço aparece com a pendência "Sem preço".',
               'A proposta comercial puxa o preço vigente da tabela padrão. Sem preço, usa o custo com a margem padrão.',
             ],
           },
@@ -606,7 +602,7 @@ export const MANUAL: ManualChapter[] = [
         id: 'camada-fiscal', title: 'Camada fiscal, benefícios e reforma tributária',
         summary: 'NCM, Ex-TIPI, CEST, origem, benefícios por UF e cClassTrib com vigência.',
         roles: ['Financeiro', 'Gestor'],
-        screens: [{ label: 'Fiscal', to: '/produtos/fiscal' }],
+        screens: [{ label: 'Ações', to: '/produtos/acoes' }],
         blocks: [
           { kind: 'p', text: 'A aba **Fiscal** guarda o **NCM** (validado contra a tabela oficial), o **Ex-TIPI** quando há exceção de IPI, o **CEST** quando o NCM tem substituição tributária, a **origem** da mercadoria e o GTIN tributável quando ele é diferente do principal.' },
           {
@@ -644,7 +640,7 @@ export const MANUAL: ManualChapter[] = [
               'Alteração feita no Omie em produto sincronizado é aplicada no Thalamus e registrada na auditoria.',
               'Alteração no Omie com envio pendente do Thalamus vira conflito; nada é sobrescrito sozinho.',
               'Rascunho não sincroniza: o produto vai ao Omie na ativação.',
-              'Produto em conflito aparece na pendência "Fiscal em conflito com o Omie" e no contador do Fiscal.',
+              'Produto em conflito aparece na pendência "Fiscal em conflito com o Omie" e na aba Ações, para quem gere o fiscal.',
             ],
           },
         ],
@@ -654,9 +650,9 @@ export const MANUAL: ManualChapter[] = [
         id: 'matriz-fiscal', title: 'Matriz fiscal e SPED',
         summary: 'Regras de tributação por operação e o arquivo do Bloco 0.',
         roles: ['Financeiro', 'Gestor'],
-        screens: [{ label: 'Fiscal', to: '/produtos/fiscal' }],
+        screens: [{ label: 'Ações', to: '/produtos/acoes' }],
         blocks: [
-          { kind: 'p', text: 'A **matriz fiscal** (Produtos → Fiscal → Matriz fiscal) é a tabela de regras: operação, UF de origem, UF de destino, prefixo de NCM, CFOP, CST e alíquotas de ICMS, IPI, PIS e COFINS. Ela espelha a matriz do Omie, que continua emitindo a nota.' },
+          { kind: 'p', text: 'A **matriz fiscal** (Produtos → Ações → Matriz fiscal) é a tabela de regras: operação, UF de origem, UF de destino, prefixo de NCM, CFOP, CST e alíquotas de ICMS, IPI, PIS e COFINS. Ela espelha a matriz do Omie, que continua emitindo a nota. Só quem gere o fiscal vê essa ferramenta.' },
           {
             kind: 'rules', title: 'Qual regra vale',
             items: [
@@ -730,8 +726,8 @@ export const MANUAL: ManualChapter[] = [
         id: 'ciclo-vida', title: 'Ciclo de vida e homologação',
         summary: 'Seis situações e a aprovação de cada papel.',
         roles: ['Engenharia', 'Financeiro', 'PCP', 'Comercial', 'Gestor'],
-        screens: [{ label: 'Homologação', to: '/produtos/homologacao' }],
-        tour: '/produtos/homologacao',
+        screens: [{ label: 'Ações', to: '/produtos/acoes' }],
+        tour: '/produtos/acoes',
         blocks: [
           { kind: 'flow', title: 'Situações do produto', items: ['Rascunho', 'Em homologação', 'Ativo', 'Alteração pendente', 'Inativação pendente', 'Bloqueado', 'Obsoleto', 'Inativo'] },
           { kind: 'p', text: 'A análise do cadastro novo continua nesta tela. A **homologação de fornecedor** é de outro submódulo, só para matéria-prima, e aqui aparece como retrato somente leitura: fornecedor, situação, referência, validade e testes de P&D. Alteração de descrição, classificação, unidade ou NCM de produto ativo exige documento de origem (OS, OP, PAP, oportunidade ou outro) e aprovação; o valor vigente continua até lá. A inativação também é solicitada e aprovada. Depois dela, estoque, ordens e pedidos já abertos seguem, e solicitações que ainda estavam pendentes são negadas. Os papéis de cada aprovação ainda não foram definidos pela especificação; a demonstração mantém os papéis já usados na análise do cadastro.' },
@@ -752,8 +748,8 @@ export const MANUAL: ManualChapter[] = [
             head: ['Aprovação', 'Quem registra', 'Exigida para', 'O que é conferido'],
             rows: [
               ['Fiscal', 'Financeiro ou Gestor', 'Todos os tipos', 'NCM válido, CEST quando há ST, origem, cClassTrib e EAN sem divergência de NCM no CCG'],
-              ['PCP', 'PCP, Engenharia ou Gestor', 'Produto acabado, peça, kits', 'Estrutura liberada; roteiro para produto acabado e kit físico'],
-              ['Comercial', 'Comercial ou Gestor', 'Produto acabado, kits e serviço', 'Descrição comercial; preço vigente na tabela padrão; EAN para produto acabado e kit físico'],
+              ['PCP', 'PCP, Engenharia ou Gestor', 'Produto em processo, acabado, intermediário, kit virtual e ferramental', 'Estrutura liberada; roteiro para produto acabado estocado'],
+              ['Comercial', 'Comercial ou Gestor', 'Mercadoria para revenda, produto acabado e kit virtual', 'Descrição comercial; preço vigente na tabela padrão; EAN para produto acabado estocado'],
               ['Técnica', 'Engenharia ou Gestor', 'Produto com vínculo de projeto', 'Todo vínculo aponta a atividade da EAP'],
             ],
           },
@@ -846,13 +842,13 @@ export const MANUAL: ManualChapter[] = [
               ['Qualquer outra situação, ou com saldo', 'Exclusão recusada'],
             ],
           },
-          { kind: 'p', text: 'Para ver produtos excluídos logicamente, marque **Mostrar só excluídos logicamente** na lista. Só o Gestor restaura.' },
+          { kind: 'p', text: 'O produto excluído logicamente sai da lista. O histórico permanece e só o Gestor restaura.' },
         ],
       },
       {
         id: 'acoes-lote', title: 'Ações em lote e filas de homologação',
         summary: 'Trabalhar muitos produtos de uma vez.',
-        screens: [{ label: 'Produtos', to: '/produtos' }, { label: 'Homologação', to: '/produtos/homologacao' }],
+        screens: [{ label: 'Portfólio', to: '/produtos' }, { label: 'Ações', to: '/produtos/acoes' }],
         blocks: [
           {
             kind: 'steps', title: 'Ação em lote',
@@ -1565,7 +1561,7 @@ export const MANUAL: ManualChapter[] = [
               ['Roteiro', 'Sequência de operações de fabricação, com posto, tempo, preparação, equipe, ferramental e instruções. Faz parte da versão.'],
               ['Versão da estrutura', 'Cada alteração controlada da estrutura e do roteiro (A, B, C…), com vigência.'],
               ['ECO', 'Mudança de engenharia: motivo, produtos, impacto, destino do estoque e data de efetividade.'],
-              ['Ferramental', 'Produto FE em Produtos: molde, gabarito ou dispositivo usado no roteiro. O ativo de manutenção é outro cadastro; o vínculo é opcional.'],
+              ['Ferramental', 'Ativo imobilizado (tipo 08) com seção de ferramental: molde, gabarito ou dispositivo usado no roteiro. O ativo de manutenção é outro cadastro; o vínculo é opcional.'],
               ['Posto', 'Vaga da fábrica (injetora, célula, almoxarifado, qualidade ou expedição). Tem minutos por dia e custo-hora. O ativo físico aponta para ele.'],
               ['Ativo (patrimônio)', 'Bem físico acompanhado pela manutenção: máquina, molde ou equipamento, com ciclos e preventiva. Não substitui o produto de ferramental nem o posto.'],
               ['Cavidade ativa', 'Cavidade do molde em uso. Cavidade bloqueada não produz e aumenta o tempo por peça.'],

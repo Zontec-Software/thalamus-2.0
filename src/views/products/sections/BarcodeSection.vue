@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive } from 'vue'
 import { Star } from 'lucide-vue-next'
-import { catalogOf, gtinNcmConflict, validGtin } from '../../../domain/catalog'
+import { catalogOf, gtinNcmConflict, needsGtin, validGtin } from '../../../domain/catalog'
 import { BARCODE_KINDS, barcodeUnits, nextBarcode } from '../../../domain/catalogExtensions'
 import { useErpStore } from '../../../stores/erp'
 import { useUiStore } from '../../../stores/ui'
@@ -44,7 +44,7 @@ function add() {
       </tr>
     </tbody>
   </table>
-  <p v-else class="empty-note">Nenhum código de barras.{{ item.type === 'PA' || item.type === 'KF' ? ' Produto acabado precisa de EAN principal para a aprovação comercial.' : '' }}</p>
+  <p v-else class="empty-note">Nenhum código de barras.{{ needsGtin(item) ? ' Produto acabado precisa de EAN principal para a aprovação comercial.' : '' }}</p>
   <form class="filter-row" style="margin-top:8px" @submit.prevent="add">
     <fieldset class="layer filter-row" :disabled="disabled">
       <select v-model="form.kind" class="filter"><option v-for="kind in BARCODE_KINDS" :key="kind">{{ kind }}</option></select>

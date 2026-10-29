@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { GitBranch, Pencil } from 'lucide-vue-next'
 import StatusBadge from '../../components/StatusBadge.vue'
 import { changeImpact } from '../../domain/engineering'
+import { isTooling } from '../../domain/catalog'
 import { useErpStore } from '../../stores/erp'
 import type { ChangeStage, EngineeringChange } from '../../types/domain'
 import { fmtCurrency, fmtDateTime, fmtNumber } from '../../utils/format'
@@ -60,7 +61,7 @@ const STAGE_TONE: Record<ChangeStage, string> = { Solicitada: 'neutral', 'Em an�
           <td>{{ row.parents.length }}<span v-if="row.parents.length" class="cell-sub">{{ row.parents.slice(0, 3).map(parent => parent.code).join(', ') }}</span></td>
           <td>
             <template v-if="releasedOf(row.item.id)"><span class="status success">{{ releasedOf(row.item.id)!.code }} liberada</span></template>
-            <template v-else-if="row.item.type === 'FE'"><RouterLink :to="`/produtos/item/${row.item.id}?aba=ferramental`" class="cell-sub">ajustar no ferramental</RouterLink></template>
+            <template v-else-if="isTooling(row.item)"><RouterLink :to="`/produtos/item/${row.item.id}?aba=ferramental`" class="cell-sub">ajustar no ferramental</RouterLink></template>
             <template v-else-if="draftOf(row.item.id)?.changeId === change.id"><RouterLink :to="`/produtos/item/${row.item.id}?aba=manufatura`" class="status warning">{{ draftOf(row.item.id)!.code }} em rascunho</RouterLink></template>
             <template v-else-if="draftOf(row.item.id)"><span class="cell-sub">rascunho {{ draftOf(row.item.id)!.code }} de {{ draftOf(row.item.id)!.changeId ?? 'outra alteração' }}</span><button v-if="!draftOf(row.item.id)!.changeId && !closed" class="button ghost small" @click="store.openChangeRevision(change.id, row.item.id)">Vincular</button></template>
             <button v-else-if="!closed && change.stage !== 'Solicitada'" class="button secondary small" @click="store.openChangeRevision(change.id, row.item.id)"><GitBranch :size="12" /> Abrir versão</button>

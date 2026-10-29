@@ -68,11 +68,11 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('sync-omie', 'Pedidos vêm do Omie', 'Pedidos aprovados no Omie são importados aqui. Cliente, produto, quantidade e prazo chegam prontos.'),
     t('op-legend', 'Dois tipos de OP', 'Todo case gera OPs de dois tipos. A de injeção fabrica a peça plástica na máquina. A de montagem junta essas peças no case do cliente. Elas não são a mesma coisa.'),
     t('orders-table', 'Abra o pedido', 'Clique na linha. No painel, as OPs de injeção ficam no grupo azul e a OP de montagem no grupo verde, cada uma com a peça ou o case que produz.'),
-    t('plan-btn', 'Planejar com um clique', 'O sistema olha a estrutura: peça injetada em falta vira OP de injeção; componente comprado em falta vira requisição; o case vira a OP de montagem.'),
+    t('plan-btn', 'Planejar com um clique', 'O sistema olha a estrutura: produto fabricado na injetora em falta vira OP de injeção; matéria-prima em falta vira requisição; o case vira a OP de montagem.'),
   ],
   '/produtos': [
-    t('product-side', 'As abas do módulo', 'Produtos, classificação, estruturas, mudanças, fiscal e a análise do cadastro ficam na faixa do topo. O número marca o que pede ação. Ferramental e estoque ficam na página do produto. Ao abrir um produto, estas abas somem e as seções da ficha entram na mesma faixa.'),
-    t('product-list', 'Lista feita para milhares de produtos', 'A faixa acima da tabela filtra o tipo: todos, produto acabado, matéria-prima e os demais. Busque por código, descrição, EAN ou NCM e refine situação, classificação ou pendência. Marque vários produtos para agir em lote.'),
+    t('product-side', 'As abas do módulo', 'Portfólio e Classificação ficam na faixa do topo. Ações reúne o que o seu perfil pode fazer agora: completar cadastro, homologar, revisar estrutura, fiscal ou mudança. O número é a quantidade dessas pendências. Ao abrir um produto, estas abas somem e as seções da ficha entram na mesma faixa.'),
+    t('product-list', 'Lista feita para milhares de produtos', 'As guias separam a vida do produto. A versão vigente fica em Ativos; se outra versão está em desenvolvimento, o mesmo produto também aparece em Em Revisão. Inativo só mostra quem foi inativado. A faixa de tipos e o filtro de cada coluna continuam valendo dentro da guia aberta.'),
     t('new-record', 'Um código por produto', 'O produto nasce em rascunho, com código sequencial e sem significado. O sistema avisa se já existe descrição parecida. Rascunho não entra em pedido, compra nem produção.'),
   ],
   '/produtos/item': [
@@ -85,15 +85,11 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('class-tree', 'Árvore e atributos', 'Selecione um nó para ver os produtos, criar filhos e definir atributos. O que é definido num nó vale para todos os nós abaixo.'),
     t('class-attributes', 'Atributos da classe', 'Defina tipo, unidade, opções e se é obrigatório ou eixo de variação da grade. Os herdados de nós acima aparecem marcados.'),
   ],
-  '/produtos/mudancas': [
-    t('changes-board', 'Lista de mudanças', 'Cada linha é uma mudança em aberto. Ela anda de Solicitada a Implementada; a versão nova da estrutura e do roteiro só vale depois da implementação. Clique na linha para decidir.'),
-    t('changes-new', 'Solicitar mudança', 'Descreva o problema, escolha os produtos, o destino do estoque atual e a data de efetividade. O impacto (saldo, OPs, pedidos e compras) é calculado na hora.'),
+  '/produtos/acoes': [
+    t('product-actions', 'O que é seu agora', 'Cada linha é uma pendência que o perfil atual pode resolver: homologar, completar um campo, concluir estrutura, tratar fiscal, mudança ou ciclo de vida. Quem não tem a funcionalidade não vê a linha. Abra para ir direto à seção do produto.'),
   ],
   '/produtos/ferramental': [
     t('tooling-list', 'Moldes e gabaritos', 'Cavidades ativas, ciclo, postos compatíveis, vida útil e dono. O ativo de manutenção é opcional: sem ele, o contador de golpes fica em zero. A barra fica vermelha acima de 85% da vida quando o ativo está vinculado.'),
-  ],
-  '/produtos/homologacao': [
-    t('product-life', 'Filas em vez de quadro', 'Cada fila mostra um tipo de trabalho: o que espera a sua aprovação, rascunhos, exceções de campo-chave, ativos com cadastro incompleto, bloqueados e obsoletos com saldo.'),
   ],
   '/ajuda/manual': [
     t('manual-index', 'Manual do sistema', 'Cada capítulo cobre uma área e cada seção explica um processo: passo a passo, regras, quem participa e o atalho para a tela.'),

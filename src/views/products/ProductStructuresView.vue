@@ -37,7 +37,7 @@ const { page, size, pages, slice, range } = usePager(rows)
     <div class="list-meta">
       <div class="filter-row">
         <input v-model="query" class="filter" placeholder="Código ou descrição" />
-        <select v-model="type" class="filter"><option value="">Todos os tipos</option><option v-for="id in ['PA', 'SE', 'KF', 'KT']" :key="id" :value="id">{{ ITEM_TYPE_LABEL[id as 'PA'] }}</option></select>
+        <select v-model="type" class="filter"><option value="">Todos os tipos</option><option v-for="id in ['03', '04', '06']" :key="id" :value="id">{{ id }} · {{ ITEM_TYPE_LABEL[id as '04'] }}</option></select>
         <label class="filter-row"><input v-model="onlyDraft" type="checkbox" /> Só com versão em rascunho</label>
       </div>
     </div>

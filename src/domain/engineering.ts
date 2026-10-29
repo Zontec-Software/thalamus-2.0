@@ -1,6 +1,6 @@
 import type { ErpState } from './engine'
 import { DomainError, lineNeed, log, nextId, now, today } from './engine'
-import { assertGtin, canApprove, canEdit, catalogOf, commit, editable, editorsLabel, findItem, hasRouting, openBomVersion, track, type Change } from './catalog'
+import { assertGtin, canApprove, canEdit, catalogOf, commit, editable, editorsLabel, findItem, hasRouting, isKitVirtual, isTooling, openBomVersion, track, type Change } from './catalog'
 import { releaseRevision } from './enterprise'
 import { assertResourceChoice, keptCompatibleResources } from './resources'
 import { assertRoutingService } from './services'
@@ -24,7 +24,7 @@ export type ToolingInput = Omit<Tooling, 'assetId'> & { assetId?: string }
 export function toolOf(state: ErpState, toolId: string | undefined) {
   if (!toolId) return undefined
   const tool = state.items.find(entry => entry.id === toolId)
-  return tool?.type === 'FE' ? tool : undefined
+  return tool && isTooling(tool) ? tool : undefined
 }
 
 /** Minutos por peça de um molde: ciclo ÷ cavidades ativas. */
@@ -46,7 +46,7 @@ export function toolUsers(state: ErpState, toolId: string) {
 
 export function saveTooling(state: ErpState, itemId: string, input: ToolingInput, actor: string, role: Role = 'Gestor') {
   const item = findItem(state, itemId)
-  if (item.type !== 'FE') throw new DomainError('Dados de ferramental só existem em item do tipo ferramental')
+  if (item.type !== '08') throw new DomainError('Dados de ferramental só existem em ativo imobilizado')
   const catalog = editable(item, role, 'ferramental')
   const numbers = [input.cavities, input.activeCavities, input.cycleSeconds, input.shotWeightG, input.lifeShots, input.value]
   if (numbers.some(value => !(value >= 0))) throw new DomainError('Valores do ferramental não podem ser negativos')
@@ -282,7 +282,7 @@ export function savePackaging(state: ErpState, itemId: string, levels: Packaging
   for (const entry of list) {
     if (!(entry.units >= 1) || !Number.isInteger(entry.units)) throw new DomainError(`${entry.level}: a quantidade é inteira e a partir de 1`)
     if ([entry.weightKg, entry.lengthCm, entry.widthCm, entry.heightCm].some(value => !(value >= 0))) throw new DomainError(`${entry.level}: peso e medidas não podem ser negativos`)
-    if (entry.packageItemId && findItem(state, entry.packageItemId).type !== 'EM') throw new DomainError(`${entry.level}: o material de embalagem tem de ser item do tipo embalagem`)
+    if (entry.packageItemId && findItem(state, entry.packageItemId).type !== '02') throw new DomainError(`${entry.level}: o material de embalagem tem de ser do tipo 02`)
     if (entry.gtin) assertGtin(state, item, entry.gtin, `GTIN do nível ${entry.level}`)
   }
   for (let index = 1; index < list.length; index++) {
@@ -350,7 +350,7 @@ export function createChange(state: ErpState, input: ChangeInput, actor: string,
   const itemIds = [...new Set(input.itemIds)]
   for (const id of itemIds) {
     const item = findItem(state, id)
-    if (!hasRouting(item) && !['KT'].includes(item.type) && item.type !== 'FE') throw new DomainError(`${item.code} não tem estrutura nem roteiro para mudar`)
+    if (!hasRouting(item) && !isKitVirtual(item) && !isTooling(item)) throw new DomainError(`${item.code} não tem estrutura nem roteiro para mudar`)
   }
   if (input.effectiveDate && input.effectiveDate < today()) throw new DomainError('A data de efetividade não pode estar no passado')
   const at = now()
@@ -398,7 +398,7 @@ export function moveChange(state: ErpState, changeId: string, stage: ChangeStage
     if (!canApprove(role, 'tecnica')) throw new DomainError('A aprovação da mudança é técnica: Engenharia ou Gestor')
     const missing = change.itemIds.filter((id, index) => {
       const item = findItem(state, id)
-      return item.type !== 'FE' && !drafts[index]
+      return !isTooling(item) && !drafts[index]
     })
     if (missing.length) throw new DomainError(`Abra a versão em rascunho de: ${missing.map(id => findItem(state, id).code).join(', ')}`)
     change.approvedBy = actor

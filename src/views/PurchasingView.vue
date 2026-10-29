@@ -21,7 +21,7 @@ const COLUMNS: { status: RequisitionStatus; hint: string; action?: string; owner
 ]
 const showNew = ref(false)
 const form = ref({ itemId: 'mp-abs', quantity: 25, origin: 'Reposição de estoque' })
-const purchasable = computed(() => store.state.items.filter(item => ['MP', 'CP', 'EM'].includes(item.type)))
+const purchasable = computed(() => store.state.items.filter(item => ['00', '01', '02', '07'].includes(item.type)))
 
 const byStatus = (status: RequisitionStatus) => store.state.requisitions.filter(req => req.status === status).slice(0, status === 'Recebida' ? 6 : 50)
 const canAct = (owner: string) => hasFullAccess(ui.role) || ui.role === owner

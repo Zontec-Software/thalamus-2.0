@@ -110,7 +110,7 @@ function createProfile() {
 
   <section v-if="catalogHere" class="grid-2">
     <article class="card">
-      <div class="section-head"><div><h2><ShieldCheck :size="18" /> Perfis</h2><p>Administrador é do sistema, não pode ser apagado e sempre recebe tudo.</p></div></div>
+      <div class="section-head"><div><h2><ShieldCheck :size="18" /> Perfis</h2><p>O vínculo é aqui: escolha o perfil, marque as funcionalidades e salve. A conta recebe o perfil; o perfil define o que ela pode fazer. Administrador recebe todas e não se edita.</p></div></div>
       <select v-model="selectedId.value" class="filter"><option v-for="profile in profiles" :key="profile.id" :value="profile.id">{{ profile.name }}{{ profile.system ? ' · sistema' : '' }}</option></select>
       <template v-if="selected">
         <div class="form-grid" style="margin-top:12px"><div class="field"><label>Nome</label><input v-model="form.name" class="filter" :disabled="selected.system || !canEditAccess" /></div><div class="field"><label>Descrição</label><input v-model="form.description" class="filter" :disabled="selected.system || !canEditAccess" /></div></div>
@@ -121,12 +121,12 @@ function createProfile() {
               <strong>{{ module.module }}</strong>
               <label v-for="functionality in module.items" :key="functionality.id">
                 <input type="checkbox" :checked="selected.system || form.functionalityIds.includes(functionality.id)" :disabled="selected.system || !canEditAccess" @change="toggleFunctionality(functionality.id)" />
-                <span><b>{{ functionality.action === 'consultar' ? 'Consultar' : functionality.label }}</b><small>{{ functionality.description }}</small></span>
+                <span><b>{{ functionality.label }}</b><small>{{ functionality.description }}</small></span>
               </label>
             </div>
           </section>
         </div>
-        <div class="action-row"><button class="button small" :disabled="selected.system || !canEditAccess" @click="saveProfile">Salvar perfil</button><span v-if="selected.system" class="cell-sub">As funcionalidades futuras também entram automaticamente.</span></div>
+        <div class="action-row"><button class="button small" :disabled="selected.system || !canEditAccess" @click="saveProfile">Salvar perfil</button><span v-if="selected.system" class="cell-sub">Para vincular um conjunto menor, escolha outro perfil na lista ou crie um ao lado.</span></div>
       </template>
     </article>
     <article class="card">
@@ -154,11 +154,11 @@ function createProfile() {
   </article>
 
   <article v-else class="card flush" data-tour="permissions">
-    <div class="section-head"><div><h2>Pessoas e perfis da {{ scopeLabel }}</h2><p>{{ canEditHere ? 'Adicione perfis pelo + Perfil e retire pelo × da etiqueta. Quem ainda não entra nesta empresa recebe acesso sem vínculo, no fim da lista.' : 'Somente quem gere acessos altera os perfis.' }}</p></div></div>
+    <div class="section-head"><div><h2>Contas e perfis da {{ scopeLabel }}</h2><p>{{ canEditHere ? 'Adicione perfis pelo + Perfil e retire pelo × da etiqueta. Contas sem cadastro RH podem receber acesso e ser vinculadas depois.' : 'Somente quem gere acessos altera os perfis.' }}</p></div></div>
     <table>
-      <thead><tr><th>Pessoa</th><th>Setor</th><th>Perfis</th></tr></thead>
+      <thead><tr><th>Conta</th><th>Setor</th><th>Perfis</th></tr></thead>
       <tbody><tr v-for="user in companyUsers" :key="user.id">
-        <td><span class="cell-main">{{ user.name }}</span><span class="cell-sub">{{ store.state.persons.some(person => person.id === user.personId && person.tenantId === viewingTenantId) ? (user.email ?? 'Sem e-mail') : 'Acesso sem vínculo nesta empresa' }}</span></td><td>{{ store.state.persons.some(person => person.id === user.personId && person.tenantId === viewingTenantId) ? user.sector : '—' }}</td>
+        <td><span class="cell-main">{{ user.name }}</span><span class="cell-sub">{{ store.state.persons.some(person => person.id === user.personId && person.tenantId === viewingTenantId) ? (user.email ?? 'Sem e-mail') : (user.personId ? 'Acesso sem vínculo nesta empresa' : 'Conta sem cadastro RH') }}</span></td><td>{{ store.state.persons.some(person => person.id === user.personId && person.tenantId === viewingTenantId) ? user.sector : '—' }}</td>
         <td>
           <div class="profile-chips">
             <span v-for="profile in profiles.filter(entry => assigned(user.id, entry.id))" :key="profile.id" class="chip active">

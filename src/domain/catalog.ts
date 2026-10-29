@@ -9,8 +9,14 @@ import type {
 export const LIFECYCLE: ItemLifecycle[] = ['Rascunho', 'Em homologação', 'Ativo', 'Alteração pendente', 'Inativação pendente', 'Bloqueado', 'Obsoleto', 'Inativo']
 
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
-  PA: 'Produto acabado', SE: 'Peça injetada', MP: 'Matéria-prima', CP: 'Componente', EM: 'Embalagem',
-  SV: 'Serviço', KF: 'Kit físico', KT: 'Kit virtual', IM: 'Imobilizado', FE: 'Ferramental',
+  '00': 'Mercadoria para Revenda',
+  '01': 'Matéria Prima',
+  '02': 'Embalagem',
+  '03': 'Produto em Processo',
+  '04': 'Produto Acabado',
+  '06': 'Produto Intermediário',
+  '07': 'Material de Uso e Consumo',
+  '08': 'Ativo Imobilizado',
 }
 
 export const LAYER_LABEL: Record<CatalogLayer, string> = {
@@ -96,10 +102,22 @@ export function ncmInfo(code: string) {
 }
 
 export function natureOf(type: ItemType): ItemNature {
-  if (type === 'SV') return 'Serviço'
-  if (type === 'KT') return 'Kit virtual'
-  if (type === 'IM' || type === 'FE') return 'Imobilizado'
+  if (type === '08') return 'Imobilizado'
   return 'Bem'
+}
+
+export function isKitVirtual(item: Item) {
+  return catalogOf(item).nature === 'Kit virtual'
+}
+
+/** Molde, gabarito ou dispositivo: o roteiro aponta para este imobilizado. */
+export function isTooling(item: Item) {
+  return !!catalogOf(item).tooling
+}
+
+/** Fabricada na injetora. A falta no planejamento vira OP de injeção, não compra. */
+export function isInjected(item: Item) {
+  return !!item.moldId
 }
 
 export function isLocked(item: Item) {
@@ -116,34 +134,67 @@ export function inUse(life: string) {
   return life === 'Ativo' || life === 'Alteração pendente' || life === 'Inativação pendente'
 }
 
+/** Guias da lista. O mesmo produto pode ocupar mais de uma. */
+export const PRODUCT_LIFE_TABS = [
+  { id: 'draft', label: 'Rascunho' },
+  { id: 'active', label: 'Ativos' },
+  { id: 'review', label: 'Em Revisão' },
+  { id: 'inactive', label: 'Inativo' },
+] as const
+
+export type ProductLifeTab = (typeof PRODUCT_LIFE_TABS)[number]['id']
+
+const VIGENTE: ItemLifecycle[] = ['Ativo', 'Alteração pendente', 'Inativação pendente', 'Bloqueado', 'Obsoleto']
+
+/**
+ * Rascunho: cadastro ainda não liberado, inclusive em homologação.
+ * Ativos: a versão vigente continua valendo.
+ * Em Revisão: há outra versão em desenvolvimento, sem tirar a vigente de Ativos.
+ * Inativo: só depois da inativação, e não aparece nas outras guias.
+ */
+export function productLifeTabs(state: ErpState, item: Item): ProductLifeTab[] {
+  const life = catalogOf(item).lifecycle
+  if (life === 'Inativo') return ['inactive']
+  const tabs: ProductLifeTab[] = []
+  if (life === 'Rascunho' || life === 'Em homologação') tabs.push('draft')
+  if (VIGENTE.includes(life)) tabs.push('active')
+  if (tabs.includes('active') && state.productRevisions.some(entry => entry.itemId === item.id && entry.status === 'Rascunho')) tabs.push('review')
+  return tabs
+}
+
 /** Entra no planejamento de materiais. Obsoleto sai; bloqueado não gera transação nova. */
 export function plansMaterial(item: Item) {
   const catalog = catalogOf(item)
-  return ['SE', 'MP', 'CP', 'EM'].includes(item.type) && inUse(catalog.lifecycle) && catalog.nature === 'Bem' && !catalog.deletedAt
+  return ['00', '01', '02', '03', '06', '07'].includes(item.type) && inUse(catalog.lifecycle) && catalog.nature === 'Bem' && !catalog.deletedAt
 }
 
 export function needsStructure(item: Item) {
-  return ['PA', 'SE', 'KF', 'KT'].includes(item.type)
+  return ['03', '04', '06'].includes(item.type) || isKitVirtual(item)
 }
 
-/** Produto acabado, kit físico e peça injetada têm roteiro; a peça injetada roda no molde. */
+/** Acabado, em processo e intermediário têm roteiro. O kit virtual só tem estrutura. */
 export function hasRouting(item: Item) {
-  return ['PA', 'KF', 'SE'].includes(item.type)
+  return ['03', '04', '06'].includes(item.type) && !isKitVirtual(item)
 }
 
 export function sellable(item: Item) {
-  return ['PA', 'KF', 'KT', 'SV'].includes(item.type)
+  return item.type === '00' || item.type === '04'
+}
+
+/** Produto acabado estocado precisa de EAN. O kit virtual não. */
+export function needsGtin(item: Item) {
+  return item.type === '04' && !isKitVirtual(item)
 }
 
 export function layersOf(item: Item): CatalogLayer[] {
   const nature = catalogOf(item).nature
-  if (item.type === 'FE') return ['ferramental', 'fiscal', 'midia', 'projetos']
+  if (isTooling(item)) return ['ferramental', 'fiscal', 'midia', 'projetos']
   if (nature === 'Serviço') return ['comercial', 'fiscal', 'projetos']
   if (nature === 'Imobilizado') return ['fiscal', 'midia']
   if (nature === 'Kit virtual') return ['manufatura', 'comercial', 'fiscal', 'midia', 'projetos']
   const layers: CatalogLayer[] = ['estoque', 'unidades']
   if (needsStructure(item)) layers.push('manufatura')
-  if (item.type === 'PA' || item.type === 'KF') layers.push('comercial')
+  if (sellable(item)) layers.push('comercial')
   layers.push('fiscal', 'midia', 'projetos')
   return layers
 }
@@ -152,12 +203,12 @@ export function requiredApprovals(item: Item): ApprovalRole[] {
   const catalog = catalogOf(item)
   const list: ApprovalRole[] = []
   if (catalog.nature === 'Serviço') list.push('fiscal', 'comercial')
-  else if (item.type === 'FE') list.push('fiscal', 'pcp')
+  else if (isTooling(item)) list.push('fiscal', 'pcp')
   else if (catalog.nature === 'Imobilizado') list.push('fiscal')
   else {
     list.push('fiscal')
     if (needsStructure(item)) list.push('pcp')
-    if (item.type === 'PA' || item.type === 'KF' || item.type === 'KT') list.push('comercial')
+    if (sellable(item)) list.push('comercial')
   }
   if (catalog.projectLinks.length) list.push('tecnica')
   return list
@@ -192,12 +243,12 @@ export function approvalIssues(item: Item, approval: ApprovalRole): string[] {
   if (approval === 'fiscal' && !catalog.cClassTrib.trim()) issues.push('cClassTrib não informado')
   if (approval === 'pcp' && needsStructure(item)) {
     if (!item.bom?.length) issues.push('Sem estrutura liberada')
-    if ((item.type === 'PA' || item.type === 'KF') && !item.routing?.length) issues.push('Sem roteiro de produção')
+    if (hasRouting(item) && item.type === '04' && !item.routing?.length) issues.push('Sem roteiro de produção')
   }
-  if (approval === 'pcp' && item.type === 'FE') issues.push(...toolingIssues(catalog.tooling))
+  if (approval === 'pcp' && isTooling(item)) issues.push(...toolingIssues(catalog.tooling))
   if (approval === 'comercial') {
     if (!catalog.commercialName.trim()) issues.push('Descrição comercial vazia')
-    if ((item.type === 'PA' || item.type === 'KF') && !catalog.gtin) issues.push('EAN/GTIN principal não informado')
+    if (needsGtin(item) && !catalog.gtin) issues.push('EAN/GTIN principal não informado')
     if (sellable(item) && !currentPrice(item)) issues.push('Sem preço vigente na tabela padrão')
   }
   if (approval === 'tecnica') {
@@ -244,8 +295,8 @@ export function itemFlags(state: ErpState, item: Item): string[] {
     else if (ncm.st && !catalog.cest) flags.push('Sem CEST')
   }
   if (needsStructure(item) && !item.bom?.length) flags.push('Sem estrutura')
-  if ((item.type === 'PA' || item.type === 'KF') && !item.routing?.length) flags.push('Sem roteiro')
-  if ((item.type === 'PA' || item.type === 'KF') && !catalog.gtin) flags.push('Sem EAN')
+  if (hasRouting(item) && item.type === '04' && !item.routing?.length) flags.push('Sem roteiro')
+  if (needsGtin(item) && !catalog.gtin) flags.push('Sem EAN')
   if (gtinNcmConflict(item)) flags.push('GTIN × NCM divergente')
   if (sellable(item) && catalog.lifecycle === 'Ativo' && !currentPrice(item)) flags.push('Sem preço')
   if (catalog.keyChanges.some(change => change.status === 'Pendente')) flags.push('Exceção pendente')
@@ -253,7 +304,7 @@ export function itemFlags(state: ErpState, item: Item): string[] {
   if (catalog.lifecycle === 'Obsoleto' && item.stock > 0) flags.push('Obsoleto com saldo')
   if (missingAttributes(state, item).length) flags.push('Atributos pendentes')
   if (catalog.fiscalSync?.status === 'Conflito') flags.push('Fiscal em conflito com o Omie')
-  if (item.type === 'FE' && toolingIssues(catalog.tooling).length) flags.push('Ferramental incompleto')
+  if (isTooling(item) && toolingIssues(catalog.tooling).length) flags.push('Ferramental incompleto')
   return flags
 }
 
@@ -878,11 +929,11 @@ export function usageOf(item: Item): ItemUsage {
   if (saved) return { sellable: saved.sellable, purchasable: saved.purchasable, stockable: saved.stockable, manufacturable: saved.manufacturable, assetizable: saved.assetizable }
   const type = item.type
   return {
-    sellable: ['PA', 'KF', 'KT', 'SV'].includes(type),
-    purchasable: ['MP', 'CP', 'EM', 'IM', 'FE'].includes(type),
-    stockable: !['SV', 'KT'].includes(type),
-    manufacturable: ['PA', 'SE', 'KF'].includes(type),
-    assetizable: type === 'IM' || type === 'FE',
+    sellable: type === '00' || type === '04',
+    purchasable: ['00', '01', '02', '07', '08'].includes(type),
+    stockable: !isKitVirtual(item),
+    manufacturable: ['03', '04', '06'].includes(type) && !isKitVirtual(item),
+    assetizable: type === '08',
   }
 }
 
@@ -1024,7 +1075,7 @@ export function defaultCatalog(item: Pick<Item, 'id' | 'name' | 'type' | 'family
     createdAt: at, createdBy: 'Carga inicial', updatedAt: at, updatedBy: 'Carga inicial', version: 1,
     conversions: preset.conversions ?? typed.conversions ?? [],
     branches: preset.branches ?? [],
-    approvals: preset.approvals ?? (preset.lifecycle && preset.lifecycle !== 'Ativo' ? {} : Object.fromEntries(requiredFor(item.type, nature).map(role => [role, 'Carga inicial']))),
+    approvals: preset.approvals ?? (preset.lifecycle && preset.lifecycle !== 'Ativo' ? {} : Object.fromEntries(requiredFor(item, nature).map(role => [role, 'Carga inicial']))),
     keyChanges: preset.keyChanges ?? [],
     audit: preset.audit ?? [{ at, actor: 'Carga inicial', version: 1, text: 'Item incorporado ao cadastro único' }],
   }
@@ -1034,14 +1085,15 @@ export function defaultCatalog(item: Pick<Item, 'id' | 'name' | 'type' | 'family
 export function seedPath(item: Pick<Item, 'id' | 'type' | 'family'>): string[] {
   const custom = SEED_PATH[item.id]
   if (custom) return custom
-  if (item.type === 'PA') return ['Produtos acabados', item.family === 'Lite' ? 'Linha Lite' : 'Linha Hard', item.family === 'Lite' ? 'Mesas' : 'Cases']
-  if (item.type === 'SE') return ['Peças injetadas', 'Gabinete']
-  if (item.type === 'MP') return ['Matérias-primas', 'Resinas', 'Termoplásticos']
-  if (item.type === 'EM') return ['Embalagens', 'Expedição', 'Caixas']
-  if (item.type === 'SV') return ['Serviços', 'Campo']
-  if (item.type === 'KT' || item.type === 'KF') return ['Kits', 'Venda']
-  if (item.type === 'IM') return ['Patrimônio', 'Logística']
-  if (item.type === 'FE') return ['Ferramental', 'Moldes de injeção']
+  if (item.id.startsWith('fe-')) return ['Ferramental', 'Moldes de injeção']
+  if (item.id.startsWith('kf-') || item.id.startsWith('kt-')) return ['Kits', 'Venda']
+  if (item.type === '04') return ['Produtos acabados', item.family === 'Lite' ? 'Linha Lite' : 'Linha Hard', item.family === 'Lite' ? 'Mesas' : 'Cases']
+  if (item.type === '03' || item.type === '06') return ['Peças injetadas', 'Gabinete']
+  if (item.type === '01') return ['Matérias-primas', 'Resinas', 'Termoplásticos']
+  if (item.type === '02') return ['Embalagens', 'Expedição', 'Caixas']
+  if (item.type === '00') return ['Mercadorias', 'Revenda']
+  if (item.type === '07') return ['Uso e consumo']
+  if (item.type === '08') return ['Patrimônio', 'Logística']
   return ['Componentes', 'Diversos']
 }
 
@@ -1066,14 +1118,13 @@ const SEED_PATH: Record<string, string[]> = {
 }
 
 function typedDefaults(type: ItemType): Partial<ItemCatalog> {
-  if (type === 'PA') return { ncm: '39269090', cest: '28.061.00', weightKg: 0.8 }
-  if (type === 'SE') return { ncm: '39269090', cest: '28.061.00', lot: true, weightKg: 0.12 }
-  if (type === 'MP') return { ncm: '39033090', lot: true, conversions: [{ unit: 'saco', factor: 25, context: 'Compra' }] }
-  if (type === 'CP') return { ncm: '83024200' }
-  if (type === 'EM') return { ncm: '48191000', conversions: [{ unit: 'fardo', factor: 20, context: 'Compra' }] }
-  if (type === 'KT' || type === 'KF') return { ncm: '39269090', cest: '28.061.00' }
-  if (type === 'IM') return { ncm: '94032090' }
-  if (type === 'FE') return { ncm: '84807100' }
+  if (type === '04') return { ncm: '39269090', cest: '28.061.00', weightKg: 0.8 }
+  if (type === '03' || type === '06') return { ncm: '39269090', cest: '28.061.00', lot: true, weightKg: 0.12 }
+  if (type === '01') return { ncm: '39033090', lot: true, conversions: [{ unit: 'saco', factor: 25, context: 'Compra' }] }
+  if (type === '00') return { ncm: '85444200' }
+  if (type === '02') return { ncm: '48191000', conversions: [{ unit: 'fardo', factor: 20, context: 'Compra' }] }
+  if (type === '07') return { ncm: '40151900' }
+  if (type === '08') return { ncm: '84807100' }
   return {}
 }
 
@@ -1102,14 +1153,19 @@ const PRESET: Record<string, Partial<ItemCatalog>> = {
     lifecycle: 'Em homologação', ncm: '70071900', approvals: { fiscal: 'Patrícia Melo' },
     audit: [{ at: '2026-10-17T15:00:00.000Z', actor: 'Eduardo Freitas', version: 2, text: 'Enviado para homologação. Fiscal já validou o NCM.' }],
   },
-  'sv-campo': { commercialName: 'Visita técnica Roboflex' },
-  'kt-vitrine': { lifecycle: 'Em homologação', commercialName: 'Kit vitrine Impact + película', approvals: { fiscal: 'Patrícia Melo', pcp: 'Paulo Mendes' } },
+  'kt-vitrine': { nature: 'Kit virtual', lifecycle: 'Em homologação', commercialName: 'Kit vitrine Impact + película', approvals: { fiscal: 'Patrícia Melo', pcp: 'Paulo Mendes' } },
   'kf-frota': { commercialName: 'Kit frota Impact (5 cases)', gtin: withCheckDigit('789123450006') },
-  'im-rack': {},
+  'im-rack': {
+    ncm: '94032090',
+    lifecycle: 'Inativo',
+    audit: [{ at: '2026-09-12T11:00:00.000Z', actor: 'Patrícia Melo', version: 2, text: 'Rack retirado de uso. O saldo que restou fica no histórico.' }],
+  },
 }
 
-function requiredFor(type: ItemType, nature: ItemNature): ApprovalRole[] {
-  return requiredApprovals({ id: '', code: '', name: '', type, unit: '', stock: 0, minimum: 0, location: '', cost: 0, catalog: { ...blankCatalog(nature) } })
+function requiredFor(item: Pick<Item, 'id' | 'type'>, nature: ItemNature): ApprovalRole[] {
+  const catalog = blankCatalog(nature)
+  if (item.id.startsWith('fe-')) catalog.tooling = { kind: 'Molde', cavities: 1, activeCavities: 1, cycleSeconds: 1, shotWeightG: 0, compatibleResourceIds: [], owner: 'Roboflex', lifeShots: 1, value: 1 }
+  return requiredApprovals({ id: item.id, code: '', name: '', type: item.type, unit: '', stock: 0, minimum: 0, location: '', cost: 0, catalog })
 }
 
 export function blankCatalog(nature: ItemNature): ItemCatalog {

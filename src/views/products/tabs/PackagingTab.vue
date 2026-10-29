@@ -16,7 +16,7 @@ const ui = useUiStore()
 const catalog = computed(() => catalogOf(props.item))
 const disabled = computed(() => readOnly(props.item, ui.role, 'estoque'))
 const rows = reactive<PackagingLevel[]>([])
-const packages = computed(() => store.state.items.filter(entry => entry.type === 'EM' && !catalogOf(entry).deletedAt))
+const packages = computed(() => store.state.items.filter(entry => entry.type === '02' && !catalogOf(entry).deletedAt))
 const missingLevels = computed(() => PACKAGING_LEVELS.filter(level => !rows.some(row => row.level === level)))
 
 function load() {

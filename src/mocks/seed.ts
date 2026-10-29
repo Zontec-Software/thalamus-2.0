@@ -8,18 +8,18 @@ import { FUNCTIONALITIES, moduleFeature, profileCode, seededProfiles } from '../
 import type { BusinessPartner, Item, PartnerRoleName, RouteStep, SalesOrder } from '../types/domain'
 
 const mp = (id: string, code: string, name: string, stock: number, minimum: number, cost: number, supplier: string, leadTimeDays: number): Item =>
-  ({ id, code, name, type: 'MP', unit: 'kg', stock, minimum, cost, supplier, leadTimeDays, location: 'Silo / A-01' })
+  ({ id, code, name, type: '01', unit: 'kg', stock, minimum, cost, supplier, leadTimeDays, location: 'Silo / A-01' })
 
-const cp = (id: string, code: string, name: string, stock: number, minimum: number, cost: number, supplier: string, leadTimeDays: number, type: 'CP' | 'EM' = 'CP'): Item =>
-  ({ id, code, name, type, unit: 'un', stock, minimum, cost, supplier, leadTimeDays, location: type === 'EM' ? 'Estoque C-04' : 'Almox B-02' })
+const cp = (id: string, code: string, name: string, stock: number, minimum: number, cost: number, supplier: string, leadTimeDays: number, type: Item['type'] = '01'): Item =>
+  ({ id, code, name, type, unit: 'un', stock, minimum, cost, supplier, leadTimeDays, location: type === '02' ? 'Estoque C-04' : 'Almox B-02' })
 
-const se = (id: string, code: string, name: string, stock: number, moldId: string, cycleSeconds: number, cavities: number, resin: string, resinKg: number): Item =>
-  ({ id, code, name, type: 'SE', unit: 'un', stock, minimum: 50, cost: 6, moldId, cycleSeconds, cavities, bom: [{ itemId: resin, quantity: resinKg, loss: 3 }], location: 'Supermercado injeção' })
+const se = (id: string, code: string, name: string, stock: number, moldId: string, cycleSeconds: number, cavities: number, resin: string, resinKg: number, type: Item['type'] = '06'): Item =>
+  ({ id, code, name, type, unit: 'un', stock, minimum: 50, cost: 6, moldId, cycleSeconds, cavities, bom: [{ itemId: resin, quantity: resinKg, loss: 3 }], location: 'Supermercado injeção' })
 
 const step = (id: string, name: string, resourceId: string, minutesPerUnit: number, instructions: string[], extra: Partial<RouteStep> = {}): RouteStep => ({ id, name, resourceId, minutesPerUnit, instructions, ...extra })
 
 const fe = (id: string, code: string, name: string, cost: number): Item =>
-  ({ id, code, name, type: 'FE', unit: 'un', stock: 1, minimum: 0, cost, location: 'Ferramentaria' })
+  ({ id, code, name, type: '08', unit: 'un', stock: 1, minimum: 0, cost, location: 'Ferramentaria' })
 
 /** Roteiro da peça injetada: o tempo por peça sai do ciclo ÷ cavidades ativas do molde. */
 const injection = (toolId: string, resourceId: string, cycleSeconds: number, activeCavities: number, extraSteps: RouteStep[] = []): RouteStep[] => [
@@ -85,12 +85,12 @@ function baseState(): ErpState {
       cp('cp-paraf', 'CP-PAR-03', 'Parafuso inox M2 x 6', 4000, 800, 0.09, 'Fix Parafusos', 4),
       cp('cp-alca', 'CP-ALC-05', 'Alça de mão com velcro', 260, 60, 11, 'Têxtil Minas', 6),
       cp('cp-suporte', 'CP-SUP-03', 'Suporte articulado de mesa', 45, 20, 64, 'MetalFlex', 10),
-      cp('em-hard', 'EM-CX-07', 'Caixa individual Linha Hard', 420, 100, 3.2, 'Pack BH', 4, 'EM'),
-      cp('em-lite', 'EM-CX-02', 'Caixa individual Linha Lite', 80, 50, 2.1, 'Pack BH', 4, 'EM'),
+      cp('em-hard', 'EM-CX-07', 'Caixa individual Linha Hard', 420, 100, 3.2, 'Pack BH', 4, '02'),
+      cp('em-lite', 'EM-CX-02', 'Caixa individual Linha Lite', 80, 50, 2.1, 'Pack BH', 4, '02'),
       se('se-mold-a11', 'SE-MLD-A11', 'Moldura frontal Tab A11', 110, 'mold-a11f', 42, 2, 'mp-abs', 0.11),
       se('se-tampa-a11', 'SE-TMP-A11', 'Tampa traseira Tab A11', 200, 'mold-a11t', 48, 1, 'mp-abs', 0.16),
       se('se-bump-a11', 'SE-BMP-A11', 'Bumper TPU Tab A11', 100, 'mold-a11b', 55, 2, 'mp-tpu', 0.08),
-      se('se-mold-s9', 'SE-MLD-S9', 'Moldura frontal Tab S9 FE', 0, 'mold-s9f', 46, 2, 'mp-abs', 0.13),
+      se('se-mold-s9', 'SE-MLD-S9', 'Moldura frontal Tab S9 FE', 0, 'mold-s9f', 46, 2, 'mp-abs', 0.13, '03'),
       se('se-tampa-s9', 'SE-TMP-S9', 'Tampa traseira Tab S9 FE', 64, 'mold-s9t', 52, 1, 'mp-abs', 0.19),
       se('se-base-lite', 'SE-BAS-LT', 'Base Mesa Lite iPad', 70, 'mold-lite', 38, 1, 'mp-pc', 0.22),
       fe('fe-m112', 'FE-M112', 'Molde M-112 · Moldura A11', 148000),
@@ -101,7 +101,7 @@ function baseState(): ErpState {
       fe('fe-m090', 'FE-M090', 'Molde M-090 · Base Mesa Lite', 98000),
       fe('fe-g11', 'FE-G11', 'Gabarito G-11 · montagem Case A11', 4200),
       {
-        id: 'pa-a11-ext', code: 'RF-H-A11-EXT', name: 'Case Extreme', variant: 'Samsung Tab A11', family: 'Hard', revision: 'C', type: 'PA', unit: 'un', stock: 0, minimum: 0, cost: 186, location: 'Expedição E-01',
+        id: 'pa-a11-ext', code: 'RF-H-A11-EXT', name: 'Case Extreme', variant: 'Samsung Tab A11', family: 'Hard', revision: 'C', type: '04', unit: 'un', stock: 0, minimum: 0, cost: 186, location: 'Expedição E-01',
         bom: [{ itemId: 'se-mold-a11', quantity: 1 }, { itemId: 'se-tampa-a11', quantity: 1 }, { itemId: 'se-bump-a11', quantity: 1 }, { itemId: 'cp-cabo', quantity: 1 }, { itemId: 'cp-placa', quantity: 1 }, { itemId: 'cp-pelic', quantity: 1 }, { itemId: 'cp-paraf', quantity: 8 }, { itemId: 'cp-alca', quantity: 1 }, { itemId: 'em-hard', quantity: 1 }],
         routing: [
           step('mec', 'Montagem mecânica', 'mont1', 6, ['Encaixar tablet de teste no gabarito G-11', 'Fixar moldura com 8 parafusos (torque 0,4 N·m)', 'Aplicar película sem bolhas']),
@@ -111,7 +111,7 @@ function baseState(): ErpState {
         ],
       },
       {
-        id: 'pa-a11-imp', code: 'RF-H-A11-IMP', name: 'Case Impact', variant: 'Samsung Tab A11', family: 'Hard', revision: 'B', type: 'PA', unit: 'un', stock: 0, minimum: 0, cost: 112, location: 'Expedição E-01',
+        id: 'pa-a11-imp', code: 'RF-H-A11-IMP', name: 'Case Impact', variant: 'Samsung Tab A11', family: 'Hard', revision: 'B', type: '04', unit: 'un', stock: 0, minimum: 0, cost: 112, location: 'Expedição E-01',
         bom: [{ itemId: 'se-mold-a11', quantity: 1 }, { itemId: 'se-tampa-a11', quantity: 1 }, { itemId: 'se-bump-a11', quantity: 1 }, { itemId: 'cp-pelic', quantity: 1 }, { itemId: 'cp-paraf', quantity: 6 }, { itemId: 'em-hard', quantity: 1 }],
         routing: [
           step('mec', 'Montagem mecânica', 'mont2', 4, ['Encaixar bumper na tampa traseira', 'Fixar moldura com 6 parafusos', 'Aplicar película']),
@@ -119,7 +119,7 @@ function baseState(): ErpState {
         ],
       },
       {
-        id: 'pa-s9-min', code: 'RF-H-S9-MIN', name: 'Case Mining', variant: 'Galaxy Tab S9 FE', family: 'Hard', revision: 'A', type: 'PA', unit: 'un', stock: 0, minimum: 0, cost: 238, location: 'Expedição E-02',
+        id: 'pa-s9-min', code: 'RF-H-S9-MIN', name: 'Case Mining', variant: 'Galaxy Tab S9 FE', family: 'Hard', revision: 'A', type: '04', unit: 'un', stock: 0, minimum: 0, cost: 238, location: 'Expedição E-02',
         bom: [{ itemId: 'se-mold-s9', quantity: 1 }, { itemId: 'se-tampa-s9', quantity: 1 }, { itemId: 'cp-cabo', quantity: 1 }, { itemId: 'cp-placa', quantity: 1 }, { itemId: 'cp-pelic', quantity: 1 }, { itemId: 'cp-paraf', quantity: 10 }, { itemId: 'cp-alca', quantity: 1 }, { itemId: 'em-hard', quantity: 1 }],
         routing: [
           step('mec', 'Montagem mecânica', 'mont1', 7, ['Montar conjunto no gabarito G-21', 'Fixar 10 parafusos inox']),
@@ -130,7 +130,7 @@ function baseState(): ErpState {
         ],
       },
       {
-        id: 'pa-lite-ipad', code: 'RF-L-IP10-MSA', name: 'Mesa Lite', variant: 'iPad 10ª geração', family: 'Lite', revision: 'A', type: 'PA', unit: 'un', stock: 0, minimum: 0, cost: 96, location: 'Expedição E-03',
+        id: 'pa-lite-ipad', code: 'RF-L-IP10-MSA', name: 'Mesa Lite', variant: 'iPad 10ª geração', family: 'Lite', revision: 'A', type: '04', unit: 'un', stock: 0, minimum: 0, cost: 96, location: 'Expedição E-03',
         bom: [{ itemId: 'se-base-lite', quantity: 1 }, { itemId: 'cp-suporte', quantity: 1 }, { itemId: 'cp-paraf', quantity: 4 }, { itemId: 'em-lite', quantity: 1 }],
         routing: [
           step('mec', 'Montagem do suporte', 'mont2', 3, ['Fixar suporte articulado na base', 'Testar giro de 360°']),
@@ -139,17 +139,18 @@ function baseState(): ErpState {
       },
       mp('mp-abs-cinza', 'RF-10001', 'ABS cinza UV', 0, 0, 19, 'Polímeros Minas', 5),
       cp('cp-pelic-11', 'RF-10002', 'Película de vidro 11"', 0, 0, 11, 'GlassTech', 12),
-      { id: 'sv-campo', code: 'RF-10003', name: 'Visita técnica em campo', type: 'SV', unit: 'h', stock: 0, minimum: 0, cost: 280, location: '—' },
+      cp('mr-carregador', 'RF-10007', 'Carregador USB-C avulso', 36, 12, 48, 'Conecta Brasil', 7, '00'),
+      cp('uc-luva', 'RF-10008', 'Luva nitrílica descartável', 800, 200, 0.42, 'Pack BH', 4, '07'),
       {
-        id: 'kt-vitrine', code: 'RF-10004', name: 'Kit vitrine Impact', type: 'KT', unit: 'un', stock: 0, minimum: 0, cost: 0, location: '—',
+        id: 'kt-vitrine', code: 'RF-10004', name: 'Kit vitrine Impact', type: '04', unit: 'un', stock: 0, minimum: 0, cost: 0, location: '—',
         bom: [{ itemId: 'pa-a11-imp', quantity: 1 }, { itemId: 'cp-pelic', quantity: 2 }],
       },
       {
-        id: 'kf-frota', code: 'RF-10006', name: 'Kit frota Impact', type: 'KF', unit: 'kit', stock: 0, minimum: 0, cost: 0, location: 'Expedição E-01',
+        id: 'kf-frota', code: 'RF-10006', name: 'Kit frota Impact', type: '04', unit: 'kit', stock: 0, minimum: 0, cost: 0, location: 'Expedição E-01',
         bom: [{ itemId: 'pa-a11-imp', quantity: 5 }, { itemId: 'em-hard', quantity: 1 }],
         routing: [step('kit', 'Montagem do kit', 'mont2', 2, ['Conferir 5 cases Impact', 'Embalar na caixa master', 'Etiquetar kit'])],
       },
-      { id: 'im-rack', code: 'RF-10005', name: 'Rack de carga portuário', type: 'IM', unit: 'un', stock: 1, minimum: 0, cost: 2400, location: 'Expedição' },
+      { id: 'im-rack', code: 'RF-10005', name: 'Rack de carga portuário', type: '08', unit: 'un', stock: 1, minimum: 0, cost: 2400, location: 'Expedição' },
     ],
     jobOpenings: [],
     candidates: [],
@@ -766,7 +767,7 @@ function prepareCatalog(s: ErpState) {
     'se-base-lite': injection('fe-m090', 'inj1', 38, 1),
   }
   for (const [id, routing] of Object.entries(injectionRouting)) s.items.find(item => item.id === id)!.routing = routing
-  for (const item of s.items.filter(entry => entry.type === 'PA' || entry.type === 'KF')) {
+  for (const item of s.items.filter(entry => entry.type === '04' && !entry.moldId)) {
     for (const entry of item.routing ?? []) {
       entry.crew ??= 1
       entry.setupMinutes ??= entry.name.startsWith('Teste') ? 10 : 15
@@ -794,7 +795,7 @@ function prepareCatalog(s: ErpState) {
   const revC = s.productRevisions.find(entry => entry.id === 'rev-a11-c')
   if (revC) revC.validTo = undefined
 
-  for (const item of s.items.filter(entry => entry.bom?.length && ['PA', 'SE', 'KF', 'KT'].includes(entry.type))) {
+  for (const item of s.items.filter(entry => entry.bom?.length && ['03', '04', '06'].includes(entry.type))) {
     let current = s.productRevisions.find(entry => entry.itemId === item.id && entry.status === 'Liberada')
     if (!current) {
       current = {
@@ -868,7 +869,7 @@ function prepareExtendedLayers(s: ErpState) {
   price('pa-s9-min', 'TP-EXP', 139)
   price('pa-lite-ipad', 'TP-PADRAO', 246)
   price('pa-lite-ipad', 'TP-ECOM', 269)
-  price('sv-campo', 'TP-PADRAO', 480, '2026-08-01', 'h')
+  price('mr-carregador', 'TP-PADRAO', 89)
   price('kf-frota', 'TP-PADRAO', 2050, '2026-08-01', 'kit')
   price('kt-vitrine', 'TP-PADRAO', 470)
   const impPrices = catalogOf('pa-a11-imp').prices
@@ -901,8 +902,8 @@ function prepareExtendedLayers(s: ErpState) {
     Object.assign(catalogOf(id), { brand, productLine: line, categories, lengthCm: length, widthCm: width, heightCm: height })
   }
   for (const item of s.items) {
-    if (item.type === 'PA' || item.type === 'KF') item.catalog!.productionLeadDays = 3
-    if (item.type === 'SE') item.catalog!.productionLeadDays = 1
+    if (item.type === '04' && !item.moldId) item.catalog!.productionLeadDays = 3
+    if (item.moldId) item.catalog!.productionLeadDays = 1
   }
   Object.assign(catalogOf('mp-abs'), { minLot: 100, lotMultiple: 25 })
   Object.assign(catalogOf('cp-paraf'), { minLot: 1000, lotMultiple: 1000 })

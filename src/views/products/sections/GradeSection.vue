@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { canEdit, catalogOf, classAttributes, editorsLabel } from '../../../domain/catalog'
+import { canEdit, catalogOf, classAttributes, editorsLabel, isKitVirtual } from '../../../domain/catalog'
 import { combinations, missingCombinations, modelOf, variantsOf } from '../../../domain/catalogExtensions'
 import { useErpStore } from '../../../stores/erp'
 import { useUiStore } from '../../../stores/ui'
@@ -65,7 +65,7 @@ function generate() {
       <span class="cell-sub">Herdam fiscal, marca, categorias, dimensões e unidades do produto-modelo. EAN, preço, estrutura e foto ficam por variante.</span>
     </div>
   </template>
-  <template v-else-if="item.type === 'PA' || item.type === 'KF'">
+  <template v-else-if="item.type === '04' && !isKitVirtual(item)">
     <p class="cell-sub">Este produto não faz parte de grade. Transforme-o em produto-modelo para gerar variações (cor, modelo de tablet, tamanho) como produtos reais.</p>
     <fieldset class="layer" :disabled="!allowed">
       <div class="form-grid">

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
 import BaseModal from '../../components/BaseModal.vue'
-import { catalogOf, hasRouting } from '../../domain/catalog'
+import { catalogOf, hasRouting, isKitVirtual, isTooling } from '../../domain/catalog'
 import { DISPOSITIONS } from '../../domain/engineering'
 import { today } from '../../domain/engine'
 import { useErpStore } from '../../stores/erp'
@@ -23,7 +23,7 @@ watch(() => props.open, open => {
 })
 
 const candidates = computed(() => store.state.items
-  .filter(item => !catalogOf(item).deletedAt && (hasRouting(item) || item.type === 'KT' || item.type === 'FE') && !form.itemIds.includes(item.id))
+  .filter(item => !catalogOf(item).deletedAt && (hasRouting(item) || isKitVirtual(item) || isTooling(item)) && !form.itemIds.includes(item.id))
   .sort((a, b) => a.code.localeCompare(b.code)))
 
 function addItem() {

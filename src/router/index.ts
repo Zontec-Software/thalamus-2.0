@@ -17,15 +17,16 @@ export const router = createRouter({
       path: '/produtos',
       component: () => import('../views/products/ProductsLayout.vue'),
       children: [
-        { path: '', component: () => import('../views/products/ProductListView.vue'), meta: { title: 'Produtos', eyebrow: 'Cadastros' } },
+        { path: '', component: () => import('../views/products/ProductListView.vue'), meta: { title: 'Portfólio', eyebrow: 'Cadastros' } },
         { path: 'item/:id', component: () => import('../views/products/ProductItemView.vue'), meta: { title: 'Produto', eyebrow: 'Cadastros' } },
-        { path: 'homologacao', component: () => import('../views/products/ProductQueuesView.vue'), meta: { title: 'Homologação e pendências', eyebrow: 'Cadastros' } },
         { path: 'classificacao', component: () => import('../views/products/ProductClassesView.vue'), meta: { title: 'Classificação', eyebrow: 'Cadastros' } },
-        { path: 'estruturas', component: () => import('../views/products/ProductStructuresView.vue'), meta: { title: 'Estruturas e versões', eyebrow: 'Cadastros' } },
+        { path: 'acoes', component: () => import('../views/products/ProductActionsView.vue'), meta: { title: 'Ações', eyebrow: 'Cadastros' } },
+        { path: 'homologacao', redirect: '/produtos/acoes' },
+        { path: 'estruturas', redirect: '/produtos/acoes' },
+        { path: 'mudancas', redirect: '/produtos/acoes' },
+        { path: 'fiscal', redirect: '/produtos/acoes' },
         { path: 'estoque', component: () => import('../views/products/ProductStockView.vue'), meta: { title: 'Estoque, unidades e lotes', eyebrow: 'Cadastros' } },
-        { path: 'mudancas', component: () => import('../views/products/ProductChangesView.vue'), meta: { title: 'Mudanças de engenharia', eyebrow: 'Cadastros' } },
         { path: 'ferramental', component: () => import('../views/products/ProductToolingView.vue'), meta: { title: 'Ferramental', eyebrow: 'Cadastros' } },
-        { path: 'fiscal', component: () => import('../views/products/ProductFiscalView.vue'), meta: { title: 'Fiscal do produto', eyebrow: 'Cadastros' } },
       ],
     },
     {
@@ -86,7 +87,7 @@ function applyDocumentTitle(path: string, metaTitle: unknown) {
   const itemId = path.match(/^\/produtos\/item\/([^/]+)/)?.[1]
   const code = itemId ? useErpStore().state.items.find(entry => entry.id === decodeURIComponent(itemId))?.code : undefined
   const label = code ?? screenLabel(path, typeof metaTitle === 'string' ? metaTitle : undefined)
-  document.title = label || 'Thalamus'
+  document.title = label ? `Thalamus | ${label}` : 'Thalamus'
 }
 
 router.afterEach((to, from) => {

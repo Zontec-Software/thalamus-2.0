@@ -1,7 +1,8 @@
 export type SyncStatus = 'sincronizado' | 'pendente' | 'erro'
 
 /** PA acabado, SE semiacabado injetado, MP matéria-prima, CP componente, EM embalagem, SV serviço, KF kit físico, KT kit virtual, IM imobilizado */
-export type ItemType = 'PA' | 'SE' | 'MP' | 'CP' | 'EM' | 'SV' | 'KF' | 'KT' | 'IM' | 'FE'
+/** Tipo do item no padrão da escrituração: 00 revenda, 01 matéria-prima, 02 embalagem, 03 em processo, 04 acabado, 06 intermediário, 07 uso e consumo, 08 imobilizado. */
+export type ItemType = '00' | '01' | '02' | '03' | '04' | '06' | '07' | '08'
 
 export type ItemLifecycle = 'Rascunho' | 'Em homologação' | 'Ativo' | 'Alteração pendente' | 'Inativação pendente' | 'Bloqueado' | 'Obsoleto' | 'Inativo'
 export type ItemNature = 'Bem' | 'Serviço' | 'Kit virtual' | 'Imobilizado'
@@ -452,7 +453,7 @@ export interface Item {
   revision?: string
   bom?: BomLine[]
   routing?: RouteStep[]
-  /** SE */
+  /** Peça fabricada na injetora. O planejamento em falta abre OP de injeção. */
   moldId?: string
   cycleSeconds?: number
   cavities?: number

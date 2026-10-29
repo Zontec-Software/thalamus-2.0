@@ -5,7 +5,7 @@ import {
 } from '../domain/engine'
 import {
   DEFAULT_PRICE_TABLE, addConversion, approvalIssues, approveItem, blockItem, convertQuantity, createItem, currentPrice, decideKeyChange, deleteItem,
-  catalogOf, discardBomVersion, inactivateItem, itemFlags, obsoleteItem, openBomVersion, openPendencies, requestKeyChange, restoreItem, setBomLine, similarItems, submitItem,
+  catalogOf, discardBomVersion, inactivateItem, itemFlags, obsoleteItem, openBomVersion, openPendencies, productLifeTabs, requestKeyChange, restoreItem, setBomLine, similarItems, submitItem,
   updateCommercial, updateCore, withCheckDigit,
 } from '../domain/catalog'
 import {
@@ -21,7 +21,8 @@ import { absorbOmieCategories, acknowledgeAlert, applyBudgetApproach, applyBudge
 import { assetDepreciation, dreReading, dreStatement, periodLabel, superaEstimate } from '../domain/dre'
 import { createSeedState } from '../mocks/seed'
 import { MockOmieGateway } from '../services/omie/mockOmieGateway'
-import { FUNCTIONALITIES, profileCan } from '../domain/access'
+import { FUNCTIONALITIES, profileCan, syncAccessCatalog } from '../domain/access'
+import { productActions } from '../views/products/actions'
 import { provisionCompany, saveEconomicGroup, saveOmieConnection } from '../domain/platform'
 import { addRole, assertShipmentCarrier, carrierChoices, clientSalesBase, createPartner, decideAbcSuggestion, inactivateRole, registerAnnualBilling } from '../domain/partners'
 import { saveTooling } from '../domain/engineering'
@@ -40,9 +41,52 @@ describe('cenário de demonstração', () => {
     expect(administrator.functionalityIds).toEqual(FUNCTIONALITIES.map(entry => entry.id))
     expect(profileCan(administrator, 'organizacao.acessos.gerir')).toBe(true)
     const financeiro = state.accessProfiles.find(entry => entry.name === 'Financeiro')!
-    expect(profileCan(financeiro, 'orcamentos.gerir')).toBe(true)
+    expect(profileCan(financeiro, 'orcamentos.planejamento.gerir')).toBe(true)
     expect(profileCan(financeiro, 'orcamentos.liberar_saldo')).toBe(false)
     expect(state.users.some(user => user.platformMaster && !state.userProfileAssignments.some(entry => entry.userId === user.id))).toBe(true)
+  })
+
+  it('troca o catálogo antigo gravado no navegador pelas funcionalidades atuais', () => {
+    const state = createSeedState()
+    state.functionalities = [{ id: 'produtos.editar', module: 'Produtos', action: 'editar', label: 'Editar produtos', description: 'Antiga' }]
+    const financeiro = state.accessProfiles.find(entry => entry.name === 'Financeiro')!
+    financeiro.functionalityIds = ['produtos.editar', 'orcamentos.gerir']
+    syncAccessCatalog(state)
+    expect(state.functionalities.some(entry => entry.id === 'produtos.manufatura.gerir')).toBe(true)
+    expect(state.functionalities.some(entry => entry.label === 'Editar produtos')).toBe(false)
+    expect(profileCan(financeiro, 'orcamentos.planejamento.gerir')).toBe(true)
+    expect(financeiro.functionalityIds).not.toContain('produtos.editar')
+  })
+
+  it('a aba Ações só mostra pendência que o perfil pode resolver', () => {
+    const state = createSeedState()
+    expect(productActions(state, () => false, 'Lucas Lima')).toEqual([])
+    const fiscal = productActions(state, feature => feature === 'produtos.fiscal.gerir', 'Lucas Lima')
+    expect(fiscal.length).toBeGreaterThan(0)
+    expect(fiscal.every(action => action.kind === 'Fiscal')).toBe(true)
+    const structure = productActions(state, feature => feature === 'produtos.manufatura.gerir', 'Lucas Lima')
+    expect(structure.some(action => action.kind === 'Estrutura' || action.kind === 'Mudança')).toBe(true)
+    expect(structure.some(action => action.kind === 'Fiscal')).toBe(false)
+  })
+
+  it('a lista deixa a versão vigente em Ativos e a versão em desenvolvimento em Em Revisão', () => {
+    const state = createSeedState()
+    const ext = state.items.find(item => item.id === 'pa-a11-ext')!
+    expect(productLifeTabs(state, ext)).toEqual(['active', 'review'])
+    expect(productLifeTabs(state, state.items.find(item => item.id === 'mp-abs-cinza')!)).toEqual(['draft'])
+    expect(productLifeTabs(state, state.items.find(item => item.id === 'cp-pelic-11')!)).toEqual(['draft'])
+    expect(productLifeTabs(state, state.items.find(item => item.id === 'im-rack')!)).toEqual(['inactive'])
+    const abs = state.items.find(item => item.id === 'mp-abs')!
+    expect(productLifeTabs(state, abs)).toEqual(['active'])
+    for (const life of ['Bloqueado', 'Obsoleto', 'Inativação pendente'] as const) {
+      catalogOf(abs).lifecycle = life
+      expect(productLifeTabs(state, abs)).toEqual(['active'])
+    }
+    catalogOf(abs).lifecycle = 'Inativo'
+    expect(productLifeTabs(state, abs)).toEqual(['inactive'])
+    catalogOf(abs).lifecycle = 'Ativo'
+    state.productRevisions.push({ id: 'rev-abs-b', itemId: abs.id, code: 'B', status: 'Rascunho', createdAt: '', checklist: [], notes: '' })
+    expect(productLifeTabs(state, abs)).toEqual(['active', 'review'])
   })
 
   it('abre uma empresa zerada só com o Administrador e o catálogo do código', () => {
@@ -235,7 +279,7 @@ const materialDemand = (state: ErpState, itemId: string, quantity: number, extra
 describe('demandas, compras e orçamento', () => {
   it('atende pelo estoque com baixa e movimento de saída', () => {
     const state = createSeedState()
-    const item = state.items.find(entry => entry.type === 'MP' && availableQty(state, entry.id) >= 2)!
+    const item = state.items.find(entry => entry.type === '01' && availableQty(state, entry.id) >= 2)!
     const before = item.stock
     const demand = materialDemand(state, item.id, 2)
     attendDemandFromStock(state, demand.id, 'Almoxarifado')
@@ -647,7 +691,7 @@ describe('assistência e projetos', () => {
     const technical = createTechnicalOrder(state, { salesOrderId: shipped.id, description: 'Trava quebrada' }, 'Assistência')
     expect(technical.warranty).toBe(true)
     expect(state.nonConformities.some(nc => nc.id === technical.nonConformityId)).toBe(true)
-    const part = state.items.find(entry => entry.type === 'CP')!
+    const part = state.items.find(entry => entry.id === 'cp-cabo')!
     addTechnicalPart(state, technical.id, part.id, availableQty(state, part.id) + 5, 'Assistência')
     expect(technical.status).toBe('Aguardando peça')
     const demand = state.demands.find(entry => entry.id === technical.demandIds![0])!
@@ -666,8 +710,8 @@ describe('assistência e projetos', () => {
 
 describe('cadastro de itens', () => {
   const classOf = (state: ErpState) => state.itemClasses[0].id
-  const novo = (state: ErpState, extra: Partial<{ name: string; type: 'MP' | 'PA'; unit: string }> = {}) =>
-    createItem(state, { name: 'Resina experimental azul', type: 'MP', unit: 'kg', classId: classOf(state), ...extra }, 'Eduardo', 'Engenharia')
+  const novo = (state: ErpState, extra: Partial<{ name: string; type: '01' | '04'; unit: string }> = {}) =>
+    createItem(state, { name: 'Resina experimental azul', type: '01', unit: 'kg', classId: classOf(state), ...extra }, 'Eduardo', 'Engenharia')
 
   it('cria rascunho com código sequencial, exige classificação e respeita o papel', () => {
     const state = createSeedState()
@@ -675,14 +719,14 @@ describe('cadastro de itens', () => {
     expect(item.code).toMatch(/^RF-\d{5}$/)
     expect(Number(item.code.slice(3))).toBeGreaterThan(10006)
     expect(item.catalog?.lifecycle).toBe('Rascunho')
-    expect(() => createItem(state, { name: 'Sem nó', type: 'MP', unit: 'kg', classId: '' }, 'Eduardo', 'Engenharia')).toThrow(/Classifique/)
-    expect(() => createItem(state, { name: 'Pelo comercial', type: 'MP', unit: 'kg', classId: classOf(state) }, 'Camila', 'Comercial')).toThrow(/Engenharia/)
+    expect(() => createItem(state, { name: 'Sem nó', type: '01', unit: 'kg', classId: '' }, 'Eduardo', 'Engenharia')).toThrow(/Classifique/)
+    expect(() => createItem(state, { name: 'Pelo comercial', type: '01', unit: 'kg', classId: classOf(state) }, 'Camila', 'Comercial')).toThrow(/Engenharia/)
     expect(similarItems(state, 'ABS cinza especial', item.id).some(entry => entry.id === 'mp-abs-cinza')).toBe(true)
   })
 
   it('homologa por papel e só ativa com fiscal, estrutura e comercial completos', () => {
     const state = createSeedState()
-    const item = novo(state, { name: 'Case de teste', type: 'PA', unit: 'un' })
+    const item = novo(state, { name: 'Case de teste', type: '04', unit: 'un' })
     submitItem(state, item.id, 'Eduardo', 'Engenharia')
     expect(() => approveItem(state, item.id, 'fiscal', 'Camila', 'Comercial')).toThrow(/papel|perfil/)
     expect(() => approveItem(state, item.id, 'fiscal', 'Patrícia', 'Financeiro')).toThrow(/NCM/)
@@ -711,7 +755,7 @@ describe('cadastro de itens', () => {
     expect(() => addBarcode(state, item.id, { code: '7891000000001', kind: 'EAN-13', unit: 'kg', main: true }, 'Marina', 'Gestor')).toThrow(/verificador/)
     expect(() => addBarcode(state, item.id, { code: owner.catalog!.gtin, kind: 'EAN-13', unit: 'kg', main: true }, 'Marina', 'Gestor')).toThrow(owner.code)
     const before = item.catalog!.version
-    updateCore(state, item.id, { name: 'Resina azul', type: 'MP', unit: 'kg', classId: classOf(state) }, 'Eduardo', 'Engenharia')
+    updateCore(state, item.id, { name: 'Resina azul', type: '01', unit: 'kg', classId: classOf(state) }, 'Eduardo', 'Engenharia')
     expect(item.catalog!.version).toBe(before + 1)
     expect(item.catalog!.audit[0]).toMatchObject({ field: 'Descrição', from: 'Resina experimental azul', to: 'Resina azul', actor: 'Eduardo' })
   })
@@ -720,7 +764,7 @@ describe('cadastro de itens', () => {
     const state = createSeedState()
     const item = state.items.find(entry => entry.id === 'cp-paraf')!
     const core = { name: item.name, type: item.type, unit: item.unit, classId: item.catalog!.classId }
-    expect(() => updateCore(state, item.id, { ...core, type: 'MP' }, 'Eduardo', 'Engenharia')).toThrow(/tipo/)
+    expect(() => updateCore(state, item.id, { ...core, type: '07' }, 'Eduardo', 'Engenharia')).toThrow(/tipo/)
     expect(() => updateCore(state, item.id, { ...core, unit: 'cento' }, 'Eduardo', 'Engenharia')).toThrow(/origem/)
     expect(() => requestKeyChange(state, item.id, 'unit', 'pç', 'Padronizar com o Omie', 'Eduardo', 'Engenharia')).toThrow(/origem/)
     const request = requestKeyChange(state, item.id, 'unit', 'pç', 'Padronizar com o Omie', 'Eduardo', 'Engenharia', { module: 'OP', id: 'OP-10' })
@@ -937,7 +981,7 @@ describe('cadastro completo: camadas estendidas', () => {
 
   it('vínculo de projeto exige atividade da EAP para a aprovação técnica; mídia e roteiro ficam auditados', () => {
     const state = createSeedState()
-    const item = createItem(state, { name: 'Case S10 protótipo', type: 'PA', unit: 'un', classId: state.itemClasses[0].id }, 'Eduardo', 'Engenharia')
+    const item = createItem(state, { name: 'Case S10 protótipo', type: '04', unit: 'un', classId: state.itemClasses[0].id }, 'Eduardo', 'Engenharia')
     linkProject(state, item.id, { projectId: 'PRJ-26-014', note: 'Protótipo' }, 'Eduardo', 'Engenharia')
     expect(approvalIssues(item, 'tecnica')).toContain('Vínculo de projeto sem atividade da EAP')
     linkProject(state, item.id, { projectId: 'PRJ-26-014', milestoneId: 'm2', note: 'Protótipo' }, 'Eduardo', 'Engenharia')
@@ -1054,7 +1098,7 @@ describe('postos', () => {
 
   it('posto inativo sai das escolhas novas e a ordem que já está nele continua', () => {
     const state = createSeedState()
-    const item = createItem(state, { name: 'Case de prova', type: 'PA', unit: 'un', classId: state.itemClasses[0].id }, 'Eduardo', 'Engenharia')
+    const item = createItem(state, { name: 'Case de prova', type: '04', unit: 'un', classId: state.itemClasses[0].id }, 'Eduardo', 'Engenharia')
     saveRoutingStep(state, item.id, { name: 'Montagem', resourceId: 'mont1', minutesPerUnit: 4, instructions: ['Fixar'] }, 'Eduardo', 'Engenharia')
     const step = item.routing![0]
     inactivateResource(state, 'mont1', 'PCP')

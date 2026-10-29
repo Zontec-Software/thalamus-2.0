@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { Plus } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import StatusBadge from '../../components/StatusBadge.vue'
-import { catalogOf, ensureClassPath, toolingIssues } from '../../domain/catalog'
+import { catalogOf, ensureClassPath, isTooling, toolingIssues } from '../../domain/catalog'
 import { moldMinutesPerPiece, toolLife, toolUsers } from '../../domain/engineering'
 import { TOOL_LIFE_ALERT } from '../../domain/engine'
 import { useErpStore } from '../../stores/erp'
@@ -14,7 +14,7 @@ const store = useErpStore()
 const router = useRouter()
 const kind = ref('')
 const tools = computed(() => store.state.items
-  .filter(item => item.type === 'FE' && !catalogOf(item).deletedAt && (!kind.value || catalogOf(item).tooling?.kind === kind.value))
+  .filter(item => isTooling(item) && !catalogOf(item).deletedAt && (!kind.value || catalogOf(item).tooling?.kind === kind.value))
   .map(item => {
     const tooling = catalogOf(item).tooling
     return { item, tooling, life: toolLife(store.state, item), users: toolUsers(store.state, item.id), issues: toolingIssues(tooling) }
@@ -25,7 +25,7 @@ const nearEnd = computed(() => tools.value.filter(row => row.life.used >= TOOL_L
 
 function create() {
   const classId = store.state.itemClasses.find(entry => entry.name === 'Moldes de injeção')?.id ?? ensureClassPath(store.state, ['Ferramental', 'Moldes de injeção'])
-  const created = store.createCatalogItem({ name: 'Novo molde', type: 'FE', unit: 'un', classId })
+  const created = store.createCatalogItem({ name: 'Novo molde', type: '08', unit: 'un', classId })
   if (created && typeof created === 'object') router.push(`/produtos/item/${created.id}?aba=ferramental`)
 }
 </script>

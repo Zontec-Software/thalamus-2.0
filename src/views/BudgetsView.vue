@@ -66,7 +66,7 @@ watch(() => ui.budgetTab, value => {
 }, { immediate: true })
 
 const shortMonths = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-const canManage = computed(() => store.can('orcamentos.gerir'))
+const canManage = computed(() => store.can('orcamentos.planejamento.gerir') || store.can('orcamentos.categorias.gerir'))
 const priorYear = computed(() => String(Number(year.value) - 1))
 const economicGroup = computed(() => store.state.economicGroups.find(entry => entry.id === groupMemberTenants.value[0]?.groupId))
 const canEditHere = computed(() => canManage.value && !groupView.value && viewingTenantId.value === ui.activeTenantId)
@@ -259,7 +259,7 @@ const metaBase = computed(() => groupView.value && economicGroup.value
   ? groupPriorYearRealized(store.state, economicGroup.value.id, year.value, 'Receita')
   : leavesInGroup(store.state, viewingTenantId.value || ui.activeTenantId, RECEITA_GROUP).reduce((sum, leaf) => sum + realizedOfYear(store.state, leaf.id, priorYear.value), 0))
 const metaPreview = computed(() => growthForTarget(metaBase.value, metaValue.value))
-const canPlanGroup = computed(() => store.can('orcamentos.consultar_consolidado') && store.can('orcamentos.gerir'))
+const canPlanGroup = computed(() => store.can('orcamentos.consultar_consolidado') && store.can('orcamentos.planejamento.gerir'))
 const capexLines = computed(() => visibleStatement.value.filter(entry => entry.kind === 'conta'))
 const capexTotals = computed(() => capexLines.value.reduce((sum, line) => ({ budget: sum.budget + lineBudget(line), realized: sum.realized + lineRealized(line) }), { budget: 0, realized: 0 }))
 
@@ -388,7 +388,7 @@ function openRecord(line: StatementLine) {
 }
 
 /* ---------- Ações ---------- */
-const canResolve = (kind: string) => store.can(kind === 'Saldo excedido' ? 'orcamentos.liberar_saldo' : 'orcamentos.gerir')
+const canResolve = (kind: string) => store.can(kind === 'Saldo excedido' ? 'orcamentos.liberar_saldo' : 'orcamentos.excecao.tratar')
 const seesException = (entry: BudgetException) => seesBudgetException(store.state, entry, ui.sessionUserId, ui.role)
 const tenantExceptions = computed(() => store.state.budgetExceptions.filter(entry => entry.tenantId === ui.activeTenantId && seesException(entry)))
 const pendingExceptions = computed(() => tenantExceptions.value.filter(entry => entry.status === 'Pendente').length)
@@ -402,7 +402,7 @@ function linkInvoice(id: string) {
   if (module && documentId && store.linkBudgetInvoice(id, module as InvoiceLinkModule, documentId)) delete decisionLink[id]
 }
 const waitingFor = (kind: string) => {
-  const feature: FunctionalityId = kind === 'Saldo excedido' ? 'orcamentos.liberar_saldo' : 'orcamentos.gerir'
+  const feature: FunctionalityId = kind === 'Saldo excedido' ? 'orcamentos.liberar_saldo' : 'orcamentos.excecao.tratar'
   const names = store.state.accessProfiles.filter(profile => profile.tenantId === ui.activeTenantId && !profile.system && profileCan(profile, feature)).map(profile => profile.name)
   return names.length ? `Aguardando ${names.join(' ou ')}` : 'Aguardando o Administrador da empresa'
 }

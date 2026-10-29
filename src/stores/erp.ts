@@ -13,7 +13,7 @@ import * as organization from '../domain/organization'
 import * as directory from '../domain/directory'
 import * as resources from '../domain/resources'
 import * as serviceCatalog from '../domain/services'
-import { profileCan } from '../domain/access'
+import { profileCan, syncAccessCatalog } from '../domain/access'
 import { provisionCompany, saveEconomicGroup, saveOmieConnection } from '../domain/platform'
 import type { ErpState } from '../domain/engine'
 import { createSeedState } from '../mocks/seed'
@@ -22,7 +22,7 @@ import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NonConformity, Resource, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v50'
+const STORAGE_KEY = 'thalamus-erp-v51'
 
 function load(): ErpState {
   const seed = createSeedState()
@@ -51,6 +51,7 @@ export const useErpStore = defineStore('erp', () => {
   const omie: OmieGateway = omieGateway
   let saveTimer: ReturnType<typeof setTimeout> | undefined
 
+  syncAccessCatalog(state)
   watch(state, () => {
     clearTimeout(saveTimer)
     saveTimer = setTimeout(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(state)), 300)
@@ -289,51 +290,55 @@ export const useErpStore = defineStore('erp', () => {
   const toggleMilestone = bind(enterprise.toggleMilestone, 'Marco atualizado')
   const setProjectStatus = bind(enterprise.setProjectStatus, project => `${project.id}: ${project.status}`)
   const addProjectRisk = bind(enterprise.addProjectRisk, 'Risco registrado')
+  const budgetRole = (feature: FunctionalityId): Role => {
+    requireFeature(feature)
+    return 'Administrador'
+  }
   const createBudget = (input: { categoryId: string; period: string; amount: number; reason?: string }) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.setBudget(state, tenantId(), input.categoryId, input.period, input.amount, input.reason ?? 'Planejamento inicial', actor(), ui.role) }, 'Orçamento anual informado')
+    run(() => budget.setBudget(state, tenantId(), input.categoryId, input.period, input.amount, input.reason ?? 'Planejamento inicial', actor(), budgetRole('orcamentos.planejamento.gerir')), 'Orçamento anual informado')
   const distributeGroupBudget = (group: string, period: string, amount: number, reason: string) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.setGroupBudget(state, tenantId(), group, period, amount, reason, actor(), ui.role) }, 'Orçamento anual dividido entre as categorias')
+    run(() => budget.setGroupBudget(state, tenantId(), group, period, amount, reason, actor(), budgetRole('orcamentos.planejamento.gerir')), 'Orçamento anual dividido entre as categorias')
   const setAnnualBudget = (categoryId: string, period: string, amount: number) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.setBudget(state, tenantId(), categoryId, period, amount, 'Ajuste direto', actor(), ui.role) }, 'Orçamento anual informado')
+    run(() => budget.setBudget(state, tenantId(), categoryId, period, amount, 'Ajuste direto', actor(), budgetRole('orcamentos.planejamento.gerir')), 'Orçamento anual informado')
   const adjustBudget = (id: string, amount: number, reason: string) => {
     const entry = state.budgets.find(item => item.id === id)
-    return entry ? run(() => { requireFeature('orcamentos.gerir'); return budget.setBudget(state, tenantId(), entry.categoryId, entry.period, amount, reason, actor(), ui.role) }, 'Orçamento ajustado') : undefined
+    return entry ? run(() => budget.setBudget(state, tenantId(), entry.categoryId, entry.period, amount, reason, actor(), budgetRole('orcamentos.planejamento.gerir')), 'Orçamento ajustado') : undefined
   }
   const createBudgetCategory = (input: Parameters<typeof budget.createBudgetCategory>[2]) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.createBudgetCategory(state, tenantId(), input, actor(), ui.role) }, 'Categoria criada')
+    run(() => budget.createBudgetCategory(state, tenantId(), input, actor(), budgetRole('orcamentos.categorias.gerir')), 'Categoria criada')
   const updateBudgetCategory = (id: string, patch: Parameters<typeof budget.updateBudgetCategory>[3], reason: string) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.updateBudgetCategory(state, tenantId(), id, patch, reason, actor(), ui.role) }, 'Categoria atualizada')
+    run(() => budget.updateBudgetCategory(state, tenantId(), id, patch, reason, actor(), budgetRole('orcamentos.categorias.gerir')), 'Categoria atualizada')
   const configureBudget = (id: string, threshold: number, block: boolean) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.configureBudget(state, tenantId(), id, threshold, block, actor(), ui.role) }, 'Regra atualizada')
+    run(() => budget.configureBudget(state, tenantId(), id, threshold, block, actor(), budgetRole('orcamentos.categorias.gerir')), 'Regra atualizada')
   const decideBudgetException = (id: string, approve: boolean, note: string, categoryId?: string) =>
     run(() => {
       const exception = state.budgetExceptions.find(entry => entry.id === id)
-      requireFeature(exception?.kind === 'Saldo excedido' ? 'orcamentos.liberar_saldo' : 'orcamentos.gerir')
-      return budget.decideBudgetException(state, tenantId(), id, approve, note, actor(), ui.role, categoryId)
+      const feature = exception?.kind === 'Saldo excedido' ? 'orcamentos.liberar_saldo' : 'orcamentos.excecao.tratar'
+      return budget.decideBudgetException(state, tenantId(), id, approve, note, actor(), budgetRole(feature), categoryId)
     }, entry => entry.status === 'Resolvida'
       ? 'Pagamento reclassificado e lançado no realizado' : entry.status === 'Autorizada' ? 'Previsão liberada acima do saldo' : 'Exceção rejeitada')
-  const acknowledgeBudgetAlert = (id: string) => run(() => budget.acknowledgeAlert(state, id, ui.sessionUserId, actor(), ui.role), 'Alerta marcado como ciente')
+  const acknowledgeBudgetAlert = (id: string) => run(() => budget.acknowledgeAlert(state, id, ui.sessionUserId, actor(), budgetRole('orcamentos.alerta.reconhecer')), 'Alerta marcado como ciente')
   const linkBudgetInvoice = (exceptionId: string, module: Parameters<typeof budget.linkBudgetInvoice>[3], documentId: string) =>
-    run(() => budget.linkBudgetInvoice(state, tenantId(), exceptionId, module, documentId, actor(), ui.role), 'Nota vinculada ao documento')
+    run(() => budget.linkBudgetInvoice(state, tenantId(), exceptionId, module, documentId, actor(), budgetRole('orcamentos.excecao.vincular')), 'Nota vinculada ao documento')
   const applyBudgetGrowth = (categoryIds: string[], year: string, growthPct: number, reason = '') =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.applyGrowthToCategories(state, tenantId(), categoryIds, year, growthPct, reason, actor(), ui.role) }, applied => `${applied.length} categoria(s) atualizada(s) com ${growthPct}% sobre o realizado`)
+    run(() => budget.applyGrowthToCategories(state, tenantId(), categoryIds, year, growthPct, reason, actor(), budgetRole('orcamentos.planejamento.gerir')), applied => `${applied.length} categoria(s) atualizada(s) com ${growthPct}% sobre o realizado`)
   const applyRevenueTarget = (year: string, targetRevenue: number, reason = '') =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.applyRevenueTarget(state, tenantId(), year, targetRevenue, reason, actor(), ui.role) }, result => `Meta aplicada: ${result.growthPct >= 0 ? '+' : ''}${result.growthPct}% sobre ${year === '' ? '' : Number(year) - 1}`)
+    run(() => budget.applyRevenueTarget(state, tenantId(), year, targetRevenue, reason, actor(), budgetRole('orcamentos.planejamento.gerir')), result => `Meta aplicada: ${result.growthPct >= 0 ? '+' : ''}${result.growthPct}% sobre ${year === '' ? '' : Number(year) - 1}`)
   const applyBudgetApproach = (year: string, approachId: BudgetApproachId) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.applyBudgetApproach(state, tenantId(), year, approachId, actor(), ui.role) }, result => `Abordagem ${result.label} aplicada. Meta de receita ${result.revenueTarget.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`)
+    run(() => budget.applyBudgetApproach(state, tenantId(), year, approachId, actor(), budgetRole('orcamentos.planejamento.gerir')), result => `Abordagem ${result.label} aplicada. Meta de receita ${result.revenueTarget.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`)
   const applyPriorSeasonality = (categoryIds: string[], year: string) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.applyPriorSeasonality(state, tenantId(), categoryIds, year, actor(), ui.role) }, applied => `Sazonalidade de ${Number(year) - 1} aplicada a ${applied.length} conta(s)`)
+    run(() => budget.applyPriorSeasonality(state, tenantId(), categoryIds, year, actor(), budgetRole('orcamentos.planejamento.gerir')), applied => `Sazonalidade de ${Number(year) - 1} aplicada a ${applied.length} conta(s)`)
   const setMonthlyBudget = (categoryId: string, year: string, monthlyAmounts: number[], reason = '') =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.setMonthlyBudget(state, tenantId(), categoryId, year, monthlyAmounts, reason, actor(), ui.role) }, 'Distribuição mensal salva')
+    run(() => budget.setMonthlyBudget(state, tenantId(), categoryId, year, monthlyAmounts, reason, actor(), budgetRole('orcamentos.planejamento.gerir')), 'Distribuição mensal salva')
   const setSectorAllocations = (categoryId: string, year: string, lines: { sectorId: string; amount: number }[]) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.setSectorAllocations(state, tenantId(), categoryId, year, lines, actor(), ui.role) }, 'Valores destinados aos setores')
+    run(() => budget.setSectorAllocations(state, tenantId(), categoryId, year, lines, actor(), budgetRole('orcamentos.categorias.gerir')), 'Valores destinados aos setores')
   const setCategoryAssignment = (id: string, responsibleUserId: string, executorSectorId: string) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.setCategoryAssignment(state, tenantId(), id, { responsibleUserId, executorSectorId }, actor(), ui.role) }, 'Responsável e executor salvos')
+    run(() => budget.setCategoryAssignment(state, tenantId(), id, { responsibleUserId, executorSectorId }, actor(), budgetRole('orcamentos.categorias.gerir')), 'Responsável e executor salvos')
   const createBudgetGroup = (code: string, name: string) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.createBudgetGroup(state, tenantId(), { code, name }, actor(), ui.role) }, 'Categoria mãe criada')
+    run(() => budget.createBudgetGroup(state, tenantId(), { code, name }, actor(), budgetRole('orcamentos.categorias.gerir')), 'Categoria mãe criada')
   const createPlannedCompany = (input: { legalName: string; tradeName: string; document: string; city: string; adminName: string; adminEmail: string }) =>
     run(() => {
-      requireFeature('orcamentos.gerir')
+      requireFeature('orcamentos.planejamento.gerir')
       const groupId = state.tenants.find(entry => entry.id === tenantId())?.groupId
       if (!groupId) throw new engine.DomainError('A empresa ativa não está num grupo')
       const created = provisionCompany(state, input)
@@ -343,23 +348,27 @@ export const useErpStore = defineStore('erp', () => {
       return created
     }, 'Empresa criada no grupo, com orçamento vazio')
   const saveBudgetSimulation = (year: string) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.saveBudgetSimulation(state, tenantId(), year, actor(), ui.role) }, 'Simulação salva')
+    run(() => budget.saveBudgetSimulation(state, tenantId(), year, actor(), budgetRole('orcamentos.planejamento.gerir')), 'Simulação salva')
   const applyBudgetSimulation = (year: string) =>
-    run(() => { requireFeature('orcamentos.gerir'); return budget.applyBudgetSimulation(state, tenantId(), year, actor(), ui.role) }, 'Simulação aplicada ao orçamento')
-  const requireGroupPlanning = () => { requireFeature('orcamentos.consultar_consolidado'); requireFeature('orcamentos.gerir') }
+    run(() => budget.applyBudgetSimulation(state, tenantId(), year, actor(), budgetRole('orcamentos.planejamento.gerir')), 'Simulação aplicada ao orçamento')
+  const requireGroupPlanning = () => { requireFeature('orcamentos.consultar_consolidado'); requireFeature('orcamentos.planejamento.gerir') }
   const applyGroupGrowth = (groupId: string, year: string, growthPct: number, reason = '') =>
     run(() => { requireGroupPlanning(); return budget.applyGroupGrowth(state, groupId, year, growthPct, reason, actor(), ui.role) }, perTenant => `Planejamento aplicado a ${perTenant.length} empresa(s) do grupo`)
   const applyGroupRevenueTarget = (groupId: string, year: string, targetRevenue: number, reason = '') =>
     run(() => { requireGroupPlanning(); return budget.applyGroupRevenueTarget(state, groupId, year, targetRevenue, reason, actor(), ui.role) }, result => `Meta do grupo aplicada: ${result.growthPct >= 0 ? '+' : ''}${result.growthPct}% a cada empresa`)
   const createUser = (input: Omit<Parameters<typeof enterprise.createUser>[1], 'role'> & { profileId: string }) => run(() => {
+    requireFeature('organizacao.acessos.gerir')
     const profile = state.accessProfiles.find(entry => entry.id === input.profileId && entry.tenantId === tenantId())
     if (!profile) throw new Error('Escolha um perfil desta empresa')
     const user = enterprise.createUser(state, { name: input.name, email: input.email, sector: input.sector, positionId: input.positionId, shift: input.shift, role: profile.simulatedRole ?? 'Operador' }, actor())
-    people.ensureOpeningAssignment(state, user.id, engine.today(), actor())
-    organization.ensurePerson(state, user, tenantId(), actor())
+    user.homeTenantId = tenantId()
     organization.grantCompanyAccess(state, user.id, tenantId(), profile.id, actor())
     return user
-  }, user => `${user.name} cadastrado`)
+  }, user => `${user.name} cadastrado como conta sem cadastro RH`)
+  const linkAccountToPerson = (userId: string, personId: string) => run(() => {
+    requireFeature('organizacao.acessos.gerir')
+    return organization.linkAccountToPerson(state, userId, personId, tenantId(), actor())
+  }, 'Conta vinculada à ficha de RH')
   const updatePerson = bind(organization.updatePerson, 'Ficha atualizada')
   const setPersonPhoto = bind(organization.setPersonPhoto, person => person.photo ? 'Foto atualizada' : 'Foto removida')
   const updateEmployment = bind(organization.updateEmployment, 'Vínculo atualizado')
@@ -464,34 +473,38 @@ export const useErpStore = defineStore('erp', () => {
     if (!can(feature)) throw new Error('Seu perfil não possui esta funcionalidade')
   }
   const as = <T>(action: (actorName: string, role: Role) => T, success?: string | ((result: T) => string), feature?: FunctionalityId) =>
-    run(() => { if (feature) requireFeature(feature); return action(actor(), ui.role) }, success)
-  const releaseRevision = (revisionId: string, validFrom?: string) => as((name, role) => {
-    const revision = state.productRevisions.find(entry => entry.id === revisionId)
-    if (revision && !catalog.canEdit(role, 'manufatura')) throw new Error(`O perfil ${role} não libera estrutura. Quem libera: ${catalog.editorsLabel('manufatura')}`)
-    return enterprise.releaseRevision(state, revisionId, name, validFrom)
-  }, revision => `Versão ${revision.code} liberada`)
-  const newRevision = (itemId: string, notes = '') => as((name, role) => catalog.openBomVersion(state, itemId, notes, name, role), revision => `Versão ${revision.code} aberta em rascunho`)
-  const toggleRevisionCheck = (revisionId: string, label: string) => as((_name, role) => catalog.toggleRevisionCheck(state, revisionId, label, role))
-  const setBomLine = (revisionId: string, componentId: string, quantity: number, loss?: number) => as((name, role) => catalog.setBomLine(state, revisionId, componentId, quantity, name, role, loss))
-  const removeBomLine = (revisionId: string, componentId: string) => as((name, role) => catalog.removeBomLine(state, revisionId, componentId, name, role))
-  const discardBomVersion = (revisionId: string) => as((name, role) => catalog.discardBomVersion(state, revisionId, name, role), 'Versão descartada')
+    run(() => {
+      if (feature) {
+        requireFeature(feature)
+        // O domínio legado ainda recebe Role; a autorização real já foi feita
+        // pela funcionalidade específica antes de executar a regra.
+        return action(actor(), 'Administrador')
+      }
+      return action(actor(), ui.role)
+    }, success)
+  const releaseRevision = (revisionId: string, validFrom?: string) => as((name) => enterprise.releaseRevision(state, revisionId, name, validFrom), revision => `Versão ${revision.code} liberada`, 'produtos.revisao.liberar')
+  const newRevision = (itemId: string, notes = '') => as((name, role) => catalog.openBomVersion(state, itemId, notes, name, role), revision => `Versão ${revision.code} aberta em rascunho`, 'produtos.manufatura.gerir')
+  const toggleRevisionCheck = (revisionId: string, label: string) => as((_name, role) => catalog.toggleRevisionCheck(state, revisionId, label, role), undefined, 'produtos.manufatura.gerir')
+  const setBomLine = (revisionId: string, componentId: string, quantity: number, loss?: number) => as((name, role) => catalog.setBomLine(state, revisionId, componentId, quantity, name, role, loss), undefined, 'produtos.manufatura.gerir')
+  const removeBomLine = (revisionId: string, componentId: string) => as((name, role) => catalog.removeBomLine(state, revisionId, componentId, name, role), undefined, 'produtos.manufatura.gerir')
+  const discardBomVersion = (revisionId: string) => as((name, role) => catalog.discardBomVersion(state, revisionId, name, role), 'Versão descartada', 'produtos.manufatura.gerir')
 
-  const createCatalogItem = (input: catalog.NewItemInput) => as((name, role) => catalog.createItem(state, input, name, role), item => `${item.code} salvo como rascunho`, 'produtos.editar')
-  const updateItemCore = (itemId: string, patch: catalog.CorePatch) => as((name, role) => catalog.updateCore(state, itemId, patch, name, role), 'Núcleo salvo', 'produtos.editar')
-  const updateItemCommercial = (itemId: string, patch: Parameters<typeof catalog.updateCommercial>[2]) => as((name, role) => catalog.updateCommercial(state, itemId, patch, name, role), 'Camada comercial salva', 'produtos.editar')
-  const updateItemFiscal = (itemId: string, patch: Parameters<typeof catalog.updateFiscal>[2]) => as((name, role) => catalog.updateFiscal(state, itemId, patch, name, role), 'Camada fiscal salva', 'produtos.editar')
-  const updateItemStock = (itemId: string, patch: catalog.StockPatch) => as((name, role) => catalog.updateStockLayer(state, itemId, patch, name, role), 'Estoque salvo', 'produtos.editar')
-  const updateItemBranch = (itemId: string, branch: string, patch: Parameters<typeof catalog.updateBranch>[3]) => as((name, role) => catalog.updateBranch(state, itemId, branch, patch, name, role), 'Filial salva')
-  const addItemConversion = (itemId: string, conversion: UnitConversion) => as((name, role) => catalog.addConversion(state, itemId, conversion, name, role), 'Conversão adicionada')
-  const removeItemConversion = (itemId: string, index: number) => as((name, role) => catalog.removeConversion(state, itemId, index, name, role), 'Conversão removida')
-  const requestKeyChange = (itemId: string, field: 'unit' | 'ncm' | 'name' | 'class', to: string, reason: string, origin: { module: string; id: string }) => as((name, role) => catalog.requestKeyChange(state, itemId, field, to, reason, name, role, origin), 'Alteração enviada para aprovação')
-  const requestInactivation = (itemId: string, reason: string) => as((name, role) => catalog.requestInactivation(state, itemId, reason, name, role), 'Inativação enviada para aprovação')
-  const approveInactivation = (itemId: string) => as((name, role) => catalog.approveInactivation(state, itemId, name, role), 'Item inativado. O que já estava aberto segue')
-  const rejectInactivation = (itemId: string, reason: string) => as((name, role) => catalog.rejectInactivation(state, itemId, reason, name, role), 'Inativação recusada')
-  const setItemUsage = (itemId: string, usage: catalog.ItemUsage) => as((name, role) => catalog.setItemUsage(state, itemId, usage, name, role), 'Indicadores de uso salvos')
-  const decideKeyChange = (itemId: string, requestId: string, approve: boolean, note: string) => as((name, role) => catalog.decideKeyChange(state, itemId, requestId, approve, note, name, role), approve ? 'Exceção aprovada e aplicada' : 'Exceção recusada')
-  const submitItem = (itemId: string) => as((name, role) => catalog.submitItem(state, itemId, name, role), 'Item enviado para homologação')
-  const approveItem = (itemId: string, approval: ApprovalRole) => as((name, role) => catalog.approveItem(state, itemId, approval, name, role), result => result === 'Ativo' ? 'Aprovação registrada: item ativado' : 'Aprovação registrada')
+  const createCatalogItem = (input: catalog.NewItemInput) => as((name, role) => catalog.createItem(state, input, name, role), item => `${item.code} salvo como rascunho`, 'produtos.nucleo.gerir')
+  const updateItemCore = (itemId: string, patch: catalog.CorePatch) => as((name, role) => catalog.updateCore(state, itemId, patch, name, role), 'Núcleo salvo', 'produtos.nucleo.gerir')
+  const updateItemCommercial = (itemId: string, patch: Parameters<typeof catalog.updateCommercial>[2]) => as((name, role) => catalog.updateCommercial(state, itemId, patch, name, role), 'Camada comercial salva', 'produtos.comercial.gerir')
+  const updateItemFiscal = (itemId: string, patch: Parameters<typeof catalog.updateFiscal>[2]) => as((name, role) => catalog.updateFiscal(state, itemId, patch, name, role), 'Camada fiscal salva', 'produtos.fiscal.gerir')
+  const updateItemStock = (itemId: string, patch: catalog.StockPatch) => as((name, role) => catalog.updateStockLayer(state, itemId, patch, name, role), 'Estoque salvo', 'produtos.estoque.gerir')
+  const updateItemBranch = (itemId: string, branch: string, patch: Parameters<typeof catalog.updateBranch>[3]) => as((name, role) => catalog.updateBranch(state, itemId, branch, patch, name, role), 'Filial salva', 'produtos.estoque.gerir')
+  const addItemConversion = (itemId: string, conversion: UnitConversion) => as((name, role) => catalog.addConversion(state, itemId, conversion, name, role), 'Conversão adicionada', 'produtos.estoque.gerir')
+  const removeItemConversion = (itemId: string, index: number) => as((name, role) => catalog.removeConversion(state, itemId, index, name, role), 'Conversão removida', 'produtos.estoque.gerir')
+  const requestKeyChange = (itemId: string, field: 'unit' | 'ncm' | 'name' | 'class', to: string, reason: string, origin: { module: string; id: string }) => as((name, role) => catalog.requestKeyChange(state, itemId, field, to, reason, name, role, origin), 'Alteração enviada para aprovação', field === 'ncm' ? 'produtos.fiscal.gerir' : 'produtos.nucleo.gerir')
+  const requestInactivation = (itemId: string, reason: string) => as((name, role) => catalog.requestInactivation(state, itemId, reason, name, role), 'Inativação enviada para aprovação', 'produtos.ciclo.gerir')
+  const approveInactivation = (itemId: string) => as((name, role) => catalog.approveInactivation(state, itemId, name, role), 'Item inativado. O que já estava aberto segue', 'produtos.ciclo.gerir')
+  const rejectInactivation = (itemId: string, reason: string) => as((name, role) => catalog.rejectInactivation(state, itemId, reason, name, role), 'Inativação recusada', 'produtos.ciclo.gerir')
+  const setItemUsage = (itemId: string, usage: catalog.ItemUsage) => as((name, role) => catalog.setItemUsage(state, itemId, usage, name, role), 'Indicadores de uso salvos', 'produtos.nucleo.gerir')
+  const decideKeyChange = (itemId: string, requestId: string, approve: boolean, note: string) => as((name, role) => catalog.decideKeyChange(state, itemId, requestId, approve, note, name, role), approve ? 'Exceção aprovada e aplicada' : 'Exceção recusada', 'produtos.excecao_campo_chave.decidir')
+  const submitItem = (itemId: string) => as((name, role) => catalog.submitItem(state, itemId, name, role), 'Item enviado para homologação', 'produtos.nucleo.gerir')
+  const approveItem = (itemId: string, approval: ApprovalRole) => as((name, role) => catalog.approveItem(state, itemId, approval, name, role), result => result === 'Ativo' ? 'Aprovação registrada: item ativado' : 'Aprovação registrada', `produtos.homologar.${approval}` as FunctionalityId)
   const finishActivation = (itemId: string) => as((name, role) => catalog.finishActivation(state, itemId, name, role), 'Item ativado')
   const returnItem = (itemId: string, reason: string) => as((name, role) => catalog.returnItem(state, itemId, reason, name, role), 'Item devolvido a rascunho')
   const blockItem = (itemId: string, reason: string) => as((name, role) => catalog.blockItem(state, itemId, reason, name, role), 'Item bloqueado')
@@ -506,16 +519,16 @@ export const useErpStore = defineStore('erp', () => {
 
   type ExtArgs<F> = F extends (state: ErpState, ...args: infer A) => unknown ? Required<A> extends [...infer Rest, string, Role] ? Rest : never : never
   /** Liga uma regra das camadas estendidas: estado, usuário e papel entram sozinhos. */
-  function ext<F extends (state: ErpState, ...args: never[]) => unknown>(rule: F, success?: string | ((result: ReturnType<F>) => string)) {
-    return (...args: ExtArgs<F>) => as((name, role) => (rule as unknown as (...all: unknown[]) => ReturnType<F>)(state, ...(args as unknown[]), name, role), success)
+  function ext<F extends (state: ErpState, ...args: never[]) => unknown>(rule: F, success?: string | ((result: ReturnType<F>) => string), feature: FunctionalityId = 'produtos.nucleo.gerir') {
+    return (...args: ExtArgs<F>) => as((name, role) => (rule as unknown as (...all: unknown[]) => ReturnType<F>)(state, ...(args as unknown[]), name, role), success, feature)
   }
-  const addBarcode = ext(extensions.addBarcode, 'Código de barras incluído')
-  const removeBarcode = ext(extensions.removeBarcode, 'Código de barras removido')
-  const setMainBarcode = ext(extensions.setMainBarcode, 'EAN principal alterado')
-  const createPriceTable = ext(extensions.createPriceTable, table => `Tabela ${table.name} criada`)
-  const setPrice = ext(extensions.setPrice, 'Preço lançado')
-  const removePrice = ext(extensions.removePrice, 'Preço programado removido')
-  const setStandardCost = ext(extensions.setStandardCost, 'Custo-padrão lançado')
+  const addBarcode = ext(extensions.addBarcode, 'Código de barras incluído', 'produtos.nucleo.gerir')
+  const removeBarcode = ext(extensions.removeBarcode, 'Código de barras removido', 'produtos.nucleo.gerir')
+  const setMainBarcode = ext(extensions.setMainBarcode, 'EAN principal alterado', 'produtos.nucleo.gerir')
+  const createPriceTable = ext(extensions.createPriceTable, table => `Tabela ${table.name} criada`, 'produtos.comercial.gerir')
+  const setPrice = ext(extensions.setPrice, 'Preço lançado', 'produtos.comercial.gerir')
+  const removePrice = ext(extensions.removePrice, 'Preço programado removido', 'produtos.comercial.gerir')
+  const setStandardCost = ext(extensions.setStandardCost, 'Custo-padrão lançado', 'produtos.comercial.gerir')
   const updateProductionLead = ext(extensions.updateProductionLead, 'Lead time de produção salvo')
   const saveRoutingStep = ext(extensions.saveRoutingStep, 'Roteiro salvo')
   const removeRoutingStep = ext(extensions.removeRoutingStep, 'Operação removida do roteiro')
@@ -667,6 +680,6 @@ export const useErpStore = defineStore('erp', () => {
     createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk,
     createBudget, distributeGroupBudget, setAnnualBudget, adjustBudget, createBudgetCategory, updateBudgetCategory, configureBudget, decideBudgetException, acknowledgeBudgetAlert, linkBudgetInvoice,
     applyBudgetGrowth, applyRevenueTarget, applyBudgetApproach, applyPriorSeasonality, setMonthlyBudget, setSectorAllocations, setCategoryAssignment, createBudgetGroup, createPlannedCompany, saveBudgetSimulation, applyBudgetSimulation, applyGroupGrowth, applyGroupRevenueTarget,
-    createUser, updateUser, updatePerson, setPersonPhoto, updateEmployment, createSector, createJob, createPosition, updatePosition, removePosition, placeSector, setSectorLeadership, suggestIdentity, confirmIdentity, refuseIdentity, addProjectParticipation, grantCompanyAccess, openLinkedEmployment, resetPin, provisionDirectoryAccount, retryDirectoryAccount, createJobOpening, updateJobOpening, setJobStatus, addPeopleChecklistItem, registerCandidate, noteCandidateView, prepareBriefing, reviewBriefing, scheduleInterview, setInterviewConfirmation, recordSelectionResult, setApplicationStage, setPeopleChecklistItem, hireCandidate, changeAssignment, recordReview, startOffboarding, revokeAccess, closeOffboarding, createPartner, updatePartnerMaster, addPartnerContact, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, setServiceStatus, openServiceRoutingChange, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
+    createUser, linkAccountToPerson, updateUser, updatePerson, setPersonPhoto, updateEmployment, createSector, createJob, createPosition, updatePosition, removePosition, placeSector, setSectorLeadership, suggestIdentity, confirmIdentity, refuseIdentity, addProjectParticipation, grantCompanyAccess, openLinkedEmployment, resetPin, provisionDirectoryAccount, retryDirectoryAccount, createJobOpening, updateJobOpening, setJobStatus, addPeopleChecklistItem, registerCandidate, noteCandidateView, prepareBriefing, reviewBriefing, scheduleInterview, setInterviewConfirmation, recordSelectionResult, setApplicationStage, setPeopleChecklistItem, hireCandidate, changeAssignment, recordReview, startOffboarding, revokeAccess, closeOffboarding, createPartner, updatePartnerMaster, addPartnerContact, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, setServiceStatus, openServiceRoutingChange, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
   }
 })

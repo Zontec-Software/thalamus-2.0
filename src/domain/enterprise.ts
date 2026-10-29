@@ -1,4 +1,4 @@
-import { APPROVER, currentPrice, requiredApprovals } from './catalog'
+import { APPROVER, currentPrice, hasRouting, requiredApprovals } from './catalog'
 import { explodeKitLines } from './catalogExtensions'
 import { hasFullAccess } from './access'
 import * as budgetDomain from './budget'
@@ -531,7 +531,7 @@ function acceptProposal(state: ErpState, proposal: Proposal, actor: string) {
     opportunity.probability = 100
     opportunity.value = Math.round(total)
   }
-  const first = orderLines.find(line => ['PA', 'KF', 'SE'].includes(getItem(state, line.itemId).type)) ?? orderLines[0]
+  const first = orderLines.find(line => ['03', '04', '06'].includes(getItem(state, line.itemId).type)) ?? orderLines[0]
   const orderId = `PV-2026-${String(state.counters.PV = (state.counters.PV ?? 1056) + 1)}`
   const omieId = `OM-${String(state.counters.OM = (state.counters.OM ?? 98510) + 1)}`
   state.salesOrders.unshift({
@@ -799,7 +799,7 @@ export function releaseRevision(state: ErpState, revisionId: string, actor: stri
   if (revision.checklist.some(entry => !entry.done)) throw new DomainError('Complete o checklist antes de liberar')
   if (revision.lines && !revision.lines.length) throw new DomainError('A versão precisa ter ao menos um componente')
   const owner = state.items.find(entry => entry.id === revision.itemId)
-  if (revision.routing && !revision.routing.length && (owner?.type === 'PA' || owner?.type === 'KF')) throw new DomainError('A versão precisa de ao menos uma operação no roteiro')
+  if (revision.routing && !revision.routing.length && owner && hasRouting(owner) && owner.type === '04') throw new DomainError('A versão precisa de ao menos uma operação no roteiro')
   if (validFrom < today()) throw new DomainError('A vigência não pode começar no passado')
   if (state.productRevisions.some(entry => entry.itemId === revision.itemId && entry.status === 'Liberada' && (entry.validFrom ?? '') > today())) {
     throw new DomainError('Já existe uma versão programada para vigorar. Aguarde a vigência ou ajuste aquela versão')

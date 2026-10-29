@@ -15,7 +15,7 @@ const props = defineProps<{ item: Item }>()
 const store = useErpStore()
 const ui = useUiStore()
 
-const form = reactive({ name: '', type: 'PA' as ItemType, unit: '', classId: '' })
+const form = reactive({ name: '', type: '04' as ItemType, unit: '', classId: '' })
 const locked = computed(() => isLocked(props.item))
 const disabled = computed(() => readOnly(props.item, ui.role, 'nucleo'))
 const classes = computed(() => classOptions(store.state))
@@ -44,8 +44,8 @@ watch(() => [props.item.id, catalog.value.version], load, { immediate: true })
     <div class="form-grid">
       <div class="field"><label>Código (SKU)</label><input :value="item.code" disabled /><small>A convenção do código ainda não foi definida. Nesta demonstração o número é sequencial e não muda.</small></div>
       <div class="field"><label>Tipo</label>
-        <select v-model="form.type" :disabled="locked"><option v-for="(label, id) in ITEM_TYPE_LABEL" :key="id" :value="id">{{ label }}</option></select>
-        <small v-if="form.type === 'SE'">Peça em processo tem cadastro próprio quando é armazenada, movimentada, inspecionada ou reutilizada. Etapa só de passagem fica na ordem de produção.</small>
+        <select v-model="form.type" :disabled="locked"><option v-for="(label, id) in ITEM_TYPE_LABEL" :key="id" :value="id">{{ id }} · {{ label }}</option></select>
+        <small v-if="form.type === '03' || form.type === '06'">Peça fabricada tem cadastro próprio quando é armazenada, movimentada, inspecionada ou reutilizada. Etapa só de passagem fica na ordem de produção.</small>
         <small>{{ locked ? 'Congelado: o tipo define as camadas do produto.' : 'Mudar o tipo zera as aprovações já registradas.' }}</small>
       </div>
       <div class="field wide">
@@ -73,7 +73,7 @@ watch(() => [props.item.id, catalog.value.version], load, { immediate: true })
       </div>
       <small v-if="locked">Depois da ativação, estes indicadores mudam por solicitação com origem.</small>
     </div>
-    <div v-if="item.type === 'MP'" class="field">
+    <div v-if="item.type === '01'" class="field">
       <label>Criticidade</label>
       <select :value="item.criticality ?? ''" @change="store.setItemCriticality(item.id, ($event.target as HTMLSelectElement).value as '' | 'C1' | 'C2' | 'C3')">
         <option value="">Sem classe</option>

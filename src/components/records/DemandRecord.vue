@@ -20,7 +20,7 @@ const router = useRouter()
 
 const isNew = computed(() => props.id === 'new')
 const demand = computed(() => store.state.demands.find(entry => entry.id === props.id))
-const materials = computed(() => store.state.items.filter(entry => ['MP', 'CP', 'EM'].includes(entry.type)))
+const materials = computed(() => store.state.items.filter(entry => ['00', '01', '02', '07'].includes(entry.type)))
 const suppliers = computed(() => store.state.partners.filter(entry => roleIsOpen(entry, 'Fornecedor')))
 const STEPS = ['Aberta', 'Em atendimento', 'Atendida'] as const
 

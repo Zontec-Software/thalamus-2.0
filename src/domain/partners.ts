@@ -187,7 +187,7 @@ export function assertSupplierOpen(state: ErpState, partnerId: string) {
 export function assertPurchaseAllowed(state: ErpState, supplierId: string, itemId: string) {
   assertSupplierOpen(state, supplierId)
   const item = getItem(state, itemId)
-  if (item.type !== 'MP' || item.criticality !== 'C1') return
+  if (item.type !== '01' || item.criticality !== 'C1') return
   const homologated = state.supplierHomologations.some(entry => entry.partnerId === supplierId && entry.itemId === itemId && entry.status === 'Homologado')
   if (!homologated) {
     const partner = findPartner(state, supplierId)
@@ -197,7 +197,7 @@ export function assertPurchaseAllowed(state: ErpState, supplierId: string, itemI
 
 export function setItemCriticality(state: ErpState, itemId: string, value: '' | 'C1' | 'C2' | 'C3', actor: string) {
   const item = getItem(state, itemId)
-  if (item.type !== 'MP') throw new DomainError('C1, C2 e C3 valem só para matéria-prima')
+  if (item.type !== '01') throw new DomainError('C1, C2 e C3 valem só para matéria-prima')
   const before = item.criticality ?? 'sem classe'
   item.criticality = value || undefined
   log(state, 'Produtos', actor, `${item.code}: criticidade ${before} → ${value || 'sem classe'}. Os critérios objetivos ainda não foram definidos.`, undefined, item.id)

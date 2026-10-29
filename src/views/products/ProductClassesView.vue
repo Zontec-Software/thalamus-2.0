@@ -2,20 +2,18 @@
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChevronDown, ChevronRight, FolderPlus, Pencil, Trash2 } from 'lucide-vue-next'
-import { canEdit, catalogOf, classDescendants, classLabel, editorsLabel } from '../../domain/catalog'
+import { catalogOf, classDescendants, classLabel, editorsLabel } from '../../domain/catalog'
 import { useErpStore } from '../../stores/erp'
-import { useUiStore } from '../../stores/ui'
 import type { ItemClass } from '../../types/domain'
 import ClassAttributesSection from './sections/ClassAttributesSection.vue'
 import { listState } from './shared'
 
 const store = useErpStore()
-const ui = useUiStore()
 const router = useRouter()
 
 const open = reactive<Record<string, boolean>>({})
 const selectedId = ref('')
-const editable = computed(() => canEdit(ui.role, 'nucleo'))
+const editable = computed(() => store.can('produtos.nucleo.gerir'))
 const children = (parentId?: string) => store.state.itemClasses.filter(entry => entry.parentId === parentId).sort((a, b) => a.name.localeCompare(b.name))
 const direct = computed(() => {
   const map: Record<string, number> = {}

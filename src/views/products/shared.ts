@@ -1,11 +1,19 @@
 import { computed, reactive, ref, watch, type Ref } from 'vue'
-import { canEdit, catalogOf } from '../../domain/catalog'
+import { catalogOf, type ProductLifeTab } from '../../domain/catalog'
+import { productFeature } from '../../domain/access'
+import { useErpStore } from '../../stores/erp'
 import type { CatalogLayer, Item, ItemLifecycle, ItemType, Role } from '../../types/domain'
 
 /** Espelha a regra do domínio para travar o formulário antes de o usuário tentar salvar. */
 export function readOnly(item: Item, role: Role, layer: CatalogLayer) {
   const catalog = catalogOf(item)
-  return !!catalog.deletedAt || catalog.lifecycle === 'Inativo' || !canEdit(role, layer)
+  void role // Mantém a assinatura estável para as abas enquanto a UI migra para funcionalidades.
+  const capabilityLayer: Record<CatalogLayer, string> = {
+    nucleo: 'nucleo.gerir', estoque: 'estoque.gerir', unidades: 'estoque.gerir', manufatura: 'manufatura.gerir',
+    ferramental: 'ferramental.gerir', comercial: 'comercial.gerir', fiscal: 'fiscal.gerir', midia: 'midia.gerir',
+    projetos: 'projetos.gerir', ciclo: 'ciclo.gerir',
+  }
+  return !!catalog.deletedAt || catalog.lifecycle === 'Inativo' || !useErpStore().can(productFeature(capabilityLayer[layer]))
 }
 
 export const LIFE_TONE: Record<ItemLifecycle, string> = {
@@ -31,6 +39,36 @@ export function usePager<T>(rows: Ref<T[]>, initial = 25) {
   })
   watch([() => rows.value.length, size], () => { if (page.value > pages.value) page.value = 1 })
   return { page, size, pages, slice, range }
+}
+
+export type HeaderFilterOp = 'starts' | 'ends' | 'contains' | 'not-contains' | 'equals' | 'not-equals'
+export const HEADER_FILTER_OPS: { id: HeaderFilterOp; label: string }[] = [
+  { id: 'starts', label: 'Começa com' },
+  { id: 'ends', label: 'Termina com' },
+  { id: 'contains', label: 'Contém' },
+  { id: 'not-contains', label: 'Não contém' },
+  { id: 'equals', label: 'Igual a' },
+  { id: 'not-equals', label: 'Diferente de' },
+]
+
+export type HeaderFilterColumn = 'code' | 'name' | 'type' | 'class' | 'brand' | 'abc' | 'price' | 'model' | 'unit' | 'stock' | 'ncm' | 'gtin' | 'version' | 'updated' | 'lifecycle' | 'flags'
+
+export function blankHeaderFilters(): Record<HeaderFilterColumn, { value: string; op: HeaderFilterOp }> {
+  const columns: HeaderFilterColumn[] = ['code', 'name', 'type', 'class', 'brand', 'abc', 'price', 'model', 'unit', 'stock', 'ncm', 'gtin', 'version', 'updated', 'lifecycle', 'flags']
+  return Object.fromEntries(columns.map(id => [id, { value: '', op: 'contains' as HeaderFilterOp }])) as Record<HeaderFilterColumn, { value: string; op: HeaderFilterOp }>
+}
+
+/** Compara o texto exibido na célula com a condição escolhida no cabeçalho. */
+export function headerFilterMatches(text: string, value: string, op: HeaderFilterOp) {
+  const needle = value.trim().toLowerCase()
+  if (!needle) return true
+  const hay = text.toLowerCase()
+  if (op === 'starts') return hay.startsWith(needle)
+  if (op === 'ends') return hay.endsWith(needle)
+  if (op === 'contains') return hay.includes(needle)
+  if (op === 'not-contains') return !hay.includes(needle)
+  if (op === 'equals') return hay === needle
+  return hay !== needle
 }
 
 export type ListColumn = 'type' | 'class' | 'brand' | 'abc' | 'price' | 'model' | 'unit' | 'stock' | 'ncm' | 'gtin' | 'version' | 'updated' | 'flags'
@@ -63,6 +101,7 @@ const savedColumns = (() => {
 /** Filtros da lista sobrevivem à ida e volta da página do item. */
 export const listState = reactive({
   query: '',
+  life: 'active' as ProductLifeTab,
   type: '' as ItemType | '',
   lifecycle: '' as ItemLifecycle | '',
   classId: '',
@@ -74,6 +113,7 @@ export const listState = reactive({
   sort: 'code' as 'code' | 'name' | 'lifecycle' | 'stock' | 'updated',
   desc: false,
   columns: savedColumns ?? ['type', 'class', 'stock', 'ncm', 'flags'] as ListColumn[],
+  headerFilters: blankHeaderFilters(),
 })
 
 watch(() => [...listState.columns], columns => localStorage.setItem(COLUMNS_KEY, JSON.stringify(columns)))

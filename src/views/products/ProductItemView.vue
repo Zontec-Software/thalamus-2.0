@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Compon
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw, Trash2 } from 'lucide-vue-next'
 import StatusBadge from '../../components/StatusBadge.vue'
-import { ITEM_TYPE_LABEL, catalogOf, classLabel, hasRouting, itemFlags, layersOf, missingAttributes, references } from '../../domain/catalog'
+import { ITEM_TYPE_LABEL, catalogOf, classLabel, hasRouting, isTooling, itemFlags, layersOf, missingAttributes, references } from '../../domain/catalog'
 import { hasFullAccess } from '../../domain/access'
 import { mainPhoto } from '../../domain/catalogExtensions'
 import { costBreakdown, parentsOf, toolLife, toolUsers } from '../../domain/engineering'
@@ -58,9 +58,9 @@ const groups = computed<{ label: string; links: SectionLink[] }[]>(() => {
     { label: 'Engenharia', links: [
       has('manufatura') && { id: 'manufatura', label: hasRouting(item.value) ? 'Estrutura e roteiro' : 'Estrutura' },
       has('ferramental') && { id: 'ferramental', label: 'Ferramental' },
-      (has('manufatura') || item.value.type === 'FE') && physical && { id: 'custos', label: 'Custos' },
+      (has('manufatura') || isTooling(item.value)) && physical && { id: 'custos', label: 'Custos' },
       { id: 'mudancas', label: 'Mudanças', count: openChanges.value.length || undefined, alert: openChanges.value.length > 0 },
-      { id: 'uso', label: 'Onde é usado', count: (item.value.type === 'FE' ? toolUsers(store.state, item.value.id).length : parents.value.length) || undefined },
+      { id: 'uso', label: 'Onde é usado', count: (isTooling(item.value) ? toolUsers(store.state, item.value.id).length : parents.value.length) || undefined },
     ] },
     { label: 'Logística', links: [
       has('estoque') && { id: 'estoque', label: 'Estoque e unidades' },
@@ -138,7 +138,7 @@ const kpis = computed<Kpi[]>(() => {
   const entry = item.value
   const layer = catalog.value
   if (!entry || !layer) return []
-  if (entry.type === 'FE') {
+  if (isTooling(entry)) {
     const tooling = layer.tooling
     const life = toolLife(store.state, entry)
     return [
@@ -173,8 +173,8 @@ function remove(reason: string) {
 
 <template>
   <nav class="crumb-bar" aria-label="Caminho">
-    <RouterLink to="/produtos" class="crumb-back" title="Voltar para Produtos"><ArrowLeft :size="16" /></RouterLink>
-    <RouterLink to="/produtos" class="crumb">Produtos</RouterLink>
+    <RouterLink to="/produtos" class="crumb-back" title="Voltar para Portfólio"><ArrowLeft :size="16" /></RouterLink>
+    <RouterLink to="/produtos" class="crumb">Portfólio</RouterLink>
     <ChevronRight :size="14" class="sep" />
     <button v-if="item && section !== 'nucleo'" type="button" class="crumb" :title="item.name" @click="section = 'nucleo'">{{ item.code }} · {{ item.name }}</button>
     <span v-else class="crumb here">{{ item ? `${item.code} · ${item.name}` : 'Produto não encontrado' }}</span>

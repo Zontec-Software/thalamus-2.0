@@ -44,7 +44,7 @@ const preview = computed(() => {
       const need = Math.round(line.quantity * order.quantity * 1000) / 1000
       const available = Math.max(0, store.available(component.id))
       const shortfall = Math.max(0, need - available)
-      const action = shortfall === 0 ? 'Reservar do estoque' : component.type === 'SE' ? `OP de injeção (${Math.ceil(shortfall / 10) * 10} un.)` : 'Requisição de compra'
+      const action = shortfall === 0 ? 'Reservar do estoque' : component.moldId ? `OP de injeção (${Math.ceil(shortfall / 10) * 10} un.)` : 'Requisição de compra'
       return { component, need, available, shortfall, action }
     }),
     routing: product.routing ?? [],
@@ -109,7 +109,7 @@ function confirmPlan() {
             <td>{{ fmtNumber(line.need, 2) }} {{ line.component.unit }}</td>
             <td>{{ fmtNumber(line.available, 2) }}</td>
             <td :class="{ 'risk-text': line.shortfall }">{{ fmtNumber(line.shortfall, 2) }}</td>
-            <td><StatusBadge :value="line.action" :tone="line.shortfall === 0 ? 'success' : line.component.type === 'SE' ? 'info' : 'warning'" /></td>
+            <td><StatusBadge :value="line.action" :tone="line.shortfall === 0 ? 'success' : line.component.moldId ? 'info' : 'warning'" /></td>
           </tr>
         </tbody>
       </table>

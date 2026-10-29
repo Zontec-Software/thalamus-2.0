@@ -3,7 +3,7 @@ import { computed, reactive, ref } from 'vue'
 import { CheckCircle2, Plus, Send, Trash2, XCircle } from 'lucide-vue-next'
 import RecordHeader from './RecordHeader.vue'
 import RecordTimeline from './RecordTimeline.vue'
-import { DEFAULT_PRICE_TABLE, currentPrice, sellable } from '../../domain/catalog'
+import { DEFAULT_PRICE_TABLE, currentPrice, isKitVirtual, sellable } from '../../domain/catalog'
 import { today } from '../../domain/engine'
 import { deliveryLead, proposalTotal } from '../../domain/enterprise'
 import { useErpStore } from '../../stores/erp'
@@ -38,7 +38,7 @@ function tablePrice(itemId?: string) {
 }
 
 const newLine = reactive({ kind: 'item' as 'item' | 'service', id: '', quantity: 1 })
-const products = computed(() => store.state.items.filter(entry => sellable(entry) && entry.type !== 'SV'))
+const products = computed(() => store.state.items.filter(entry => sellable(entry)))
 const services = computed(() => store.state.services.filter(entry => entry.sellable && entry.status === 'Ativo'))
 const rejecting = ref(false)
 const rejection = ref('')
@@ -110,7 +110,7 @@ function openOrder(id: string) {
               <td>
                 <b>{{ line.description }}</b>
                 <small class="cell-sub">
-                  <template v-if="line.itemId">{{ store.item(line.itemId).type === 'KT' ? 'Kit virtual · explode em componentes no aceite' : `Produto · disponível ${store.available(line.itemId)} un.` }}</template>
+                  <template v-if="line.itemId">{{ isKitVirtual(store.item(line.itemId)) ? 'Kit virtual · explode em componentes no aceite' : `Produto · disponível ${store.available(line.itemId)} un.` }}</template>
                   <template v-else>Serviço</template>
                 </small>
               </td>

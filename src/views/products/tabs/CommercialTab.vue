@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
-import { catalogOf } from '../../../domain/catalog'
+import { catalogOf, isKitVirtual } from '../../../domain/catalog'
 import { useErpStore } from '../../../stores/erp'
 import { useUiStore } from '../../../stores/ui'
 import type { Item } from '../../../types/domain'
@@ -58,5 +58,5 @@ function addCategory(category: string) {
 
   <BarcodeSection v-if="!service" :item="item" />
   <PriceSection :item="item" />
-  <GradeSection v-if="item.type === 'PA' || item.type === 'KF'" :item="item" />
+  <GradeSection v-if="item.type === '04' && !isKitVirtual(item)" :item="item" />
 </template>

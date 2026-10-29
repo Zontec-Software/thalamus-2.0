@@ -20,7 +20,7 @@ const isNew = computed(() => props.id === 'new')
 const technical = computed(() => store.state.technicalServiceOrders.find(entry => entry.id === props.id))
 const orders = computed(() => store.state.salesOrders.filter(entry => entry.shipment || entry.planned))
 const technicians = computed(() => store.state.users.filter(entry => entry.role === 'Assistência' || entry.role === 'Manutenção'))
-const parts = computed(() => store.state.items.filter(entry => entry.type === 'CP' || entry.type === 'SE'))
+const parts = computed(() => store.state.items.filter(entry => entry.type === '01' || entry.type === '03' || entry.type === '06'))
 const STEPS = ['Aberta', 'Agendada', 'Em execução', 'Concluída'] as const
 const stepIndex = computed(() => {
   const status = technical.value?.status === 'Aguardando peça' ? 'Agendada' : technical.value?.status

@@ -392,6 +392,22 @@ export function grantCompanyAccess(state: ErpState, userId: string, tenantId: st
   return user
 }
 
+/** Associa uma conta já existente à ficha de RH sem criar vínculo empregatício. */
+export function linkAccountToPerson(state: ErpState, userId: string, personId: string, tenantId: string, actor: string) {
+  const user = find(state.users, userId, 'Conta')
+  const person = find(state.persons, personId, 'Pessoa')
+  if (user.platformMaster) throw new DomainError('O mestre da plataforma não pode ser vinculado a uma pessoa')
+  if (person.tenantId !== tenantId) throw new DomainError('A pessoa pertence a outra empresa')
+  if (user.personId && user.personId !== personId) throw new DomainError('A conta já está vinculada a outra pessoa')
+  if (state.users.some(entry => entry.id !== userId && entry.personId === personId && entry.homeTenantId === tenantId)) throw new DomainError('Esta pessoa já possui uma conta na empresa')
+  user.personId = personId
+  user.homeTenantId ??= tenantId
+  user.name = person.fullName
+  user.email = person.corporateEmail || user.email
+  log(state, 'Organização', actor, `Conta ${user.name} vinculada à ficha de RH sem criar vínculo empregatício`, undefined, user.id)
+  return user
+}
+
 /** Segundo vínculo formal. Nasce outro cadastro, só com nome e contato, ligado por confirmação humana. */
 export function openLinkedEmployment(state: ErpState, sourcePersonId: string, tenantId: string, input: { sector: string; positionId?: string; contractType: string; startedOn: string; profileId: string; shift: User['shift'] }, actor: string) {
   const source = find(state.persons, sourcePersonId, 'Pessoa')

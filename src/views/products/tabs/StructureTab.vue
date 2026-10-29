@@ -85,7 +85,7 @@ function addLine() {
 <template>
   <PermHint :item="item" layer="manufatura" />
   <p v-if="catalogOf(item).nature === 'Kit virtual'" class="notice info">Kit virtual: não é estocado. A estrutura explode em componentes na proposta e no pedido.</p>
-  <p v-else-if="item.type === 'KF'" class="notice info">Kit físico: é montado e estocado como produto próprio. A montagem baixa os componentes da versão vigente.</p>
+  <p v-else-if="item.unit === 'kit'" class="notice info">Kit físico: é montado e estocado como produto próprio. A montagem baixa os componentes da versão vigente.</p>
 
   <div class="rev-bar" data-tour="product-versions">
     <div class="rev-chips">

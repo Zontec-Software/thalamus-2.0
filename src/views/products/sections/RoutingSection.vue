@@ -2,7 +2,7 @@
 import { computed, reactive, ref } from 'vue'
 import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from 'lucide-vue-next'
 import BaseModal from '../../../components/BaseModal.vue'
-import { catalogOf } from '../../../domain/catalog'
+import { catalogOf, isInjected, isTooling } from '../../../domain/catalog'
 import { moldMinutesPerPiece } from '../../../domain/engineering'
 import { resourceIsOpen, resourceOffered } from '../../../domain/resources'
 import { useErpStore } from '../../../stores/erp'
@@ -23,7 +23,7 @@ const editing = ref<string | 'new' | ''>('')
 const form = reactive({ name: '', resourceId: '', minutesPerUnit: 1, setupMinutes: 0, crew: 1, toolId: '', firstPiece: false, instructions: '', serviceId: '' })
 const copyFrom = ref('')
 
-const tools = computed(() => store.state.items.filter(entry => entry.type === 'FE' && !catalogOf(entry).deletedAt && catalogOf(entry).tooling))
+const tools = computed(() => store.state.items.filter(entry => isTooling(entry) && !catalogOf(entry).deletedAt))
 const compatibleTools = computed(() => tools.value.filter(tool => catalogOf(tool).tooling!.compatibleResourceIds.includes(form.resourceId)))
 const chosenTool = computed(() => tools.value.find(tool => tool.id === form.toolId))
 const moldTime = computed(() => {
@@ -43,7 +43,7 @@ const modalTitle = computed(() => editing.value === 'new' ? 'Nova operação' : 
 
 function edit(step?: RouteStep) {
   editing.value = step?.id ?? 'new'
-  const fallback = store.state.resources.find(entry => entry.tenantId === ui.activeTenantId && resourceIsOpen(entry) && entry.kind === (props.item.type === 'SE' ? 'Injetora' : 'Montagem'))?.id ?? ''
+  const fallback = store.state.resources.find(entry => entry.tenantId === ui.activeTenantId && resourceIsOpen(entry) && entry.kind === (isInjected(props.item) ? 'Injetora' : 'Montagem'))?.id ?? ''
   Object.assign(form, step
     ? { name: step.name, resourceId: step.resourceId, minutesPerUnit: step.minutesPerUnit, setupMinutes: step.setupMinutes ?? 0, crew: step.crew ?? 1, toolId: step.toolId ?? '', firstPiece: !!step.firstPiece, instructions: step.instructions.join('\n'), serviceId: step.serviceId ?? '' }
     : { name: '', resourceId: fallback, minutesPerUnit: 1, setupMinutes: 0, crew: 1, toolId: '', firstPiece: false, instructions: '', serviceId: '' })
@@ -89,7 +89,7 @@ function copy() {
       </tbody>
     </table>
   </div>
-  <p v-if="!steps.length" class="empty-note">{{ item.type === 'SE' ? 'Sem roteiro: inclua a operação de injeção com o molde.' : 'Sem roteiro: o produto não pode ser planejado nem aprovado pelo PCP.' }}</p>
+  <p v-if="!steps.length" class="empty-note">{{ isInjected(item) ? 'Sem roteiro: inclua a operação de injeção com o molde.' : 'Sem roteiro: o produto não pode ser planejado nem aprovado pelo PCP.' }}</p>
 
   <BaseModal :open="editing !== ''" :title="modalTitle" width="720px"
     :subtitle="isDraft ? 'A operação entra na versão em rascunho.' : 'Versão liberada: dá para ler, sem alterar. Para mudar o roteiro, abra uma nova versão.'"
