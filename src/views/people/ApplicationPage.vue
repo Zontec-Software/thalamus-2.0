@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ChevronRight } from 'lucide-vue-next'
+import { ChevronRight } from 'lucide-vue-next'
+import CrumbBack from '../../components/CrumbBack.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import PersonPhoto from './PersonPhoto.vue'
 import { suggestDirectoryEmail } from '../../domain/directory'
@@ -103,7 +104,7 @@ watch(() => route.params.id, rememberView)
 
 <template>
   <nav class="crumb-bar" aria-label="Caminho">
-    <RouterLink :to="job ? `/pessoas/admissao/${job.id}` : '/pessoas/admissao'" class="crumb-back" title="Voltar para a vaga"><ArrowLeft :size="16" /></RouterLink>
+    <CrumbBack :fallback="job ? `/pessoas/admissao/${job.id}` : '/pessoas/admissao'" title="Voltar para a vaga" />
     <RouterLink to="/pessoas/admissao" class="crumb">Admissão</RouterLink>
     <ChevronRight :size="14" class="sep" />
     <RouterLink v-if="job" :to="`/pessoas/admissao/${job.id}`" class="crumb">{{ job.title }}</RouterLink>

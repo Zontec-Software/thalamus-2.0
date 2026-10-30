@@ -31,7 +31,7 @@ function cellText(entry: Opportunity, column: OpportunityColumn) {
   if (column === 'owner') return store.userName(entry.ownerId)
   if (column === 'temperature') return entry.temperature ?? 'Morno'
   if (column === 'source') return entry.source
-  if (column === 'segment') return entry.segment ?? ''
+  if (column === 'segment') return store.state.partners.find(item => item.id === entry.partnerId)?.vertical ?? entry.segment ?? ''
   if (column === 'probability') return `${entry.probability}%`
   if (column === 'close') return fmtDate(entry.expectedClose)
   if (column === 'created') return entry.createdAt ? fmtDate(entry.createdAt) : ''
@@ -154,7 +154,7 @@ onUnmounted(() => document.removeEventListener('click', closeMenu))
           <td v-if="shown('owner')">{{ store.userName(entry.ownerId) }}</td>
           <td v-if="shown('temperature')"><StatusBadge :value="entry.temperature ?? 'Morno'" /></td>
           <td v-if="shown('source')"><span class="cell-sub">{{ entry.source }}</span></td>
-          <td v-if="shown('segment')"><span class="cell-sub">{{ entry.segment ?? '—' }}</span></td>
+          <td v-if="shown('segment')"><span class="cell-sub">{{ store.state.partners.find(item => item.id === entry.partnerId)?.vertical ?? '—' }}</span></td>
           <td v-if="shown('probability')">{{ entry.probability }}%</td>
           <td v-if="shown('close')" :class="{ 'risk-text': lifeOf(entry) === 'open' && entry.expectedClose < today() }">{{ fmtDate(entry.expectedClose) }}</td>
           <td v-if="shown('created')"><span class="cell-sub">{{ entry.createdAt ? fmtDate(entry.createdAt) : '—' }}</span></td>

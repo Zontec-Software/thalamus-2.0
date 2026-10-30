@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ChevronRight, Mail, MapPin, Phone, Plus, Search, UserRound } from 'lucide-vue-next'
+import { ChevronRight, Mail, MapPin, Phone, Plus, Search, UserRound } from 'lucide-vue-next'
+import CrumbBack from '../components/CrumbBack.vue'
 import BaseModal from '../components/BaseModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import ReasonModal from './products/ReasonModal.vue'
-import { ADDRESS_PURPOSES, clientSalesBase, duplicatePartner, homologationsOf, phaseOf, roleStatus, supplierReceiptBase } from '../domain/partners'
+import { ADDRESS_PURPOSES, CLIENT_VERTICALS, clientSalesBase, duplicatePartner, homologationsOf, phaseOf, roleStatus, supplierReceiptBase } from '../domain/partners'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 import type { AddressPurpose, BusinessPartner, PartnerRoleName } from '../types/domain'
@@ -33,9 +34,11 @@ const form = reactive({
   personType: 'Jurídica' as 'Física' | 'Jurídica',
   legalName: '', tradeName: '', document: '',
   roles: [] as Role[],
+  vertical: '',
   contactName: '', duty: 'Comercial', phone: '', email: '',
   purpose: 'Sede' as AddressPurpose, line: '', city: '', state: '',
 })
+const contactFromQuery = ref(false)
 const contact = reactive({ name: '', duty: '', phone: '', email: '' })
 const address = reactive({ purpose: 'Entrega' as AddressPurpose, line: '', city: '', state: '' })
 const master = reactive({ personType: 'Jurídica' as 'Física' | 'Jurídica', legalName: '', tradeName: '', document: '' })
@@ -108,7 +111,19 @@ watch(partner, value => {
   if (!TABS.value.some(entry => entry.id === tab.value)) tab.value = 'cadastro'
   Object.assign(master, { personType: value.personType, legalName: value.legalName, tradeName: value.tradeName, document: value.document })
 }, { immediate: true })
-watch(selectedId, () => { tab.value = 'cadastro' })
+watch(selectedId, () => {
+  contactFromQuery.value = false
+  const aba = route.query.aba
+  tab.value = aba === 'contatos' || aba === 'cliente' || aba === 'fornecedor' || aba === 'historico' ? aba : 'cadastro'
+}, { immediate: true })
+watch(() => route.query.novo, value => {
+  if (value === 'cliente' && !selectedId.value && !creating.value) startNew('Cliente')
+  if (value === 'contato' && partner.value && !contactFromQuery.value) {
+    contactFromQuery.value = true
+    tab.value = 'contatos'
+    openContact()
+  }
+}, { immediate: true })
 
 const tone = (status?: string) => status === 'Ativo' || status === 'Homologado' ? 'success' : status === 'Inativo' || status === 'Reprovado' ? 'danger' : 'warning'
 const roleClass = (entry: BusinessPartner, role: PartnerRoleName) => roleStatus(entry, role) === 'Inativo' ? 'off' : roleStatus(entry, role) === 'Ativo' ? 'on' : 'draft'
@@ -126,10 +141,14 @@ const item = (id: string) => store.state.items.find(entry => entry.id === id)
 function open(id: string) {
   router.push(`/parceiros/${id}`)
 }
-function startNew() {
+function startNew(role?: Role) {
   duplicateAck.value = false
-  Object.assign(form, { personType: 'Jurídica', legalName: '', tradeName: '', document: '', roles: [], contactName: '', duty: 'Comercial', phone: '', email: '', purpose: 'Sede', line: '', city: '', state: '' })
+  Object.assign(form, { personType: 'Jurídica', legalName: '', tradeName: '', document: '', roles: role ? [role] : [], vertical: '', contactName: '', duty: 'Comercial', phone: '', email: '', purpose: 'Sede', line: '', city: '', state: '' })
   creating.value = true
+}
+function closeCreate() {
+  creating.value = false
+  if (route.query.novo) router.replace({ path: '/parceiros' })
 }
 function toggleRole(role: Role) {
   form.roles = form.roles.includes(role) ? form.roles.filter(entry => entry !== role) : [...form.roles, role]
@@ -140,8 +159,14 @@ function saveNew() {
     contacts: form.contactName.trim() ? [{ name: form.contactName, duty: form.duty, phone: form.phone, email: form.email }] : [],
     addresses: form.city.trim() || form.line.trim() ? [{ purpose: form.purpose, line: form.line, city: form.city, state: form.state }] : [],
     forceDuplicate: duplicateAck.value,
+    vertical: form.roles.includes('Cliente') ? form.vertical : undefined,
   })
-  if (created && created !== true) { creating.value = false; open(created.id) }
+  if (created && created !== true) {
+    creating.value = false
+    const next = `/parceiros/${created.id}`
+    if (route.query.novo) router.replace(next)
+    else router.push(next)
+  }
 }
 function saveMaster() {
   if (partner.value) store.updatePartnerMaster(partner.value.id, { ...master })
@@ -150,8 +175,17 @@ function openContact() {
   Object.assign(contact, { name: '', duty: '', phone: '', email: '' })
   addingContact.value = true
 }
+function closeContact() {
+  addingContact.value = false
+  if (route.query.novo === 'contato') router.replace({ path: route.path, query: { aba: 'contatos' } })
+}
 function saveContact() {
-  if (partner.value && store.addPartnerContact(partner.value.id, { ...contact }) !== undefined) addingContact.value = false
+  if (!partner.value || store.addPartnerContact(partner.value.id, { ...contact }) === undefined) return
+  addingContact.value = false
+  if (route.query.novo) router.replace({ path: route.path, query: { aba: 'contatos' } })
+}
+function saveVertical(value: string) {
+  if (partner.value) store.setPartnerVertical(partner.value.id, value)
 }
 function openAddress() {
   Object.assign(address, { purpose: 'Entrega', line: '', city: '', state: '' })
@@ -171,10 +205,10 @@ function inactivate(reason: string) {
   <article v-if="!selectedId" class="card flush" data-tour="partner-list">
     <div class="section-head">
       <div data-tour="partner-idea">
-        <h2>Parceiros</h2>
+        <h2><CrumbBack only-history fallback="/parceiros" title="Voltar" /> Parceiros</h2>
         <p>Um cadastro por empresa ou pessoa. Cliente e fornecedor são papéis desse cadastro, com situação e perfil próprios.</p>
     </div>
-    <button data-tour="new-partner" class="button" @click="startNew"><Plus :size="15" /> Novo parceiro</button>
+    <button data-tour="new-partner" class="button" @click="startNew()"><Plus :size="15" /> Novo parceiro</button>
   </div>
     <div class="partner-filters">
       <label class="search-inline"><Search :size="15" /><input v-model="query" placeholder="Nome, razão social, documento ou cidade" /></label>
@@ -206,7 +240,7 @@ function inactivate(reason: string) {
   <!-- Página do parceiro -->
   <template v-else>
     <nav class="crumb-bar" aria-label="Caminho">
-      <RouterLink to="/parceiros" class="crumb-back" title="Voltar para Parceiros"><ArrowLeft :size="16" /></RouterLink>
+      <CrumbBack fallback="/parceiros" title="Voltar para Parceiros" />
       <RouterLink to="/parceiros" class="crumb">Parceiros</RouterLink>
       <ChevronRight :size="14" class="sep" />
       <span class="crumb here">{{ partner?.name ?? 'Parceiro não encontrado' }}</span>
@@ -300,6 +334,16 @@ function inactivate(reason: string) {
 
         <!-- Cliente -->
         <template v-else-if="tab === 'cliente' && sales">
+          <div class="form-grid" style="max-width:420px">
+            <div class="field">
+              <label>Vertical</label>
+              <select :value="partner.vertical ?? ''" @change="saveVertical(($event.target as HTMLSelectElement).value)">
+                <option value="">Não informada</option>
+                <option v-for="vertical in CLIENT_VERTICALS" :key="vertical">{{ vertical }}</option>
+              </select>
+              <small>A oportunidade usa esta vertical. Ela se escolhe aqui, no cliente.</small>
+            </div>
+          </div>
           <section class="metrics cols-3">
             <article class="metric"><div class="metric-head">Pedidos em Vendas</div><strong>{{ sales.count }}</strong><small>{{ fmtCurrency(sales.total) }}{{ sales.from ? ` · ${fmtDate(sales.from)} a ${fmtDate(sales.to!)}` : '' }}</small></article>
             <article class="metric"><div class="metric-head">Ticket médio</div><strong class="pending-value">Sem fórmula</strong><small>Não é publicado enquanto Vendas não definir a conta.</small></article>
@@ -371,7 +415,7 @@ function inactivate(reason: string) {
   </template>
 
   <!-- Novo parceiro -->
-  <BaseModal :open="creating" title="Novo parceiro" subtitle="Um registro só. Cliente, fornecedor ou os dois, agora ou depois." width="720px" @close="creating = false">
+  <BaseModal :open="creating" title="Novo parceiro" subtitle="Um registro só. Cliente, fornecedor ou os dois, agora ou depois." width="720px" @close="closeCreate">
     <form id="new-partner" @submit.prevent="saveNew">
       <div class="form-grid">
         <div class="field"><label>Pessoa</label><select v-model="form.personType"><option>Jurídica</option><option>Física</option></select></div>
@@ -391,6 +435,7 @@ function inactivate(reason: string) {
         </div>
         <small>Sem papel, o cadastro fica em cadastro.</small>
       </div>
+      <div v-if="form.roles.includes('Cliente')" class="field"><label>Vertical</label><select v-model="form.vertical"><option value="">Não informada</option><option v-for="vertical in CLIENT_VERTICALS" :key="vertical">{{ vertical }}</option></select><small>Fica no cliente e aparece na oportunidade.</small></div>
       <h3 class="partner-h">Contato principal</h3>
       <div class="form-grid">
         <div class="field"><label>Nome</label><input v-model="form.contactName" /></div>
@@ -407,12 +452,12 @@ function inactivate(reason: string) {
       </div>
     </form>
     <template #footer>
-      <button class="button secondary" type="button" @click="creating = false">Cancelar</button>
+      <button class="button secondary" type="button" @click="closeCreate">Cancelar</button>
       <button class="button" type="submit" form="new-partner" :disabled="!!duplicate && !duplicateAck">Salvar parceiro</button>
       </template>
   </BaseModal>
 
-  <BaseModal :open="addingContact" title="Novo contato" @close="addingContact = false">
+  <BaseModal :open="addingContact" title="Novo contato" @close="closeContact">
     <form id="new-contact" class="form-grid" @submit.prevent="saveContact">
       <div class="field"><label>Nome</label><input v-model="contact.name" required /></div>
       <div class="field"><label>Função</label><input v-model="contact.duty" /></div>
@@ -420,7 +465,7 @@ function inactivate(reason: string) {
       <div class="field"><label>E-mail</label><input v-model="contact.email" type="email" /></div>
     </form>
     <template #footer>
-      <button class="button secondary" type="button" @click="addingContact = false">Cancelar</button>
+      <button class="button secondary" type="button" @click="closeContact">Cancelar</button>
       <button class="button" type="submit" form="new-contact">Incluir contato</button>
       </template>
   </BaseModal>

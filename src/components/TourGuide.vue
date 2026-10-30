@@ -85,23 +85,30 @@ const highlightStyle = computed(() => rect.value && {
   height: `${rect.value.height + PAD * 2}px`,
 })
 
+const MIN_CARD = 320
+
 const popoverStyle = computed(() => {
   const box = rect.value
-  if (!box) return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
   const viewportWidth = window.innerWidth
   const viewportHeight = window.innerHeight
-  if (box.left > viewportWidth * 0.52) {
-    const top = Math.min(Math.max(16, box.top - 12), viewportHeight - 300)
-    return { top: `${top}px`, left: `${Math.max(16, box.left - POPOVER_WIDTH - 22)}px` }
-  }
+  const margin = 16
+  if (!box) return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)', maxHeight: 'calc(100vh - 32px)' }
+  const room = (top: number) => `${Math.max(MIN_CARD, viewportHeight - top - margin)}px`
   if (box.width < 320 && box.right + POPOVER_WIDTH + 30 < viewportWidth) {
-    const top = Math.min(Math.max(16, box.top), viewportHeight - 260)
-    return { top: `${top}px`, left: `${box.right + 18}px` }
+    const top = Math.max(margin, Math.min(box.top, viewportHeight - MIN_CARD - margin))
+    return { top: `${top}px`, left: `${box.right + 18}px`, maxHeight: room(top) }
   }
-  const left = Math.min(Math.max(16, box.left), viewportWidth - POPOVER_WIDTH - 16)
-  if (box.bottom + 250 < viewportHeight) return { top: `${box.bottom + 16}px`, left: `${left}px` }
-  if (box.top > 260) return { top: `${box.top - 16}px`, left: `${left}px`, transform: 'translateY(-100%)' }
-  return { top: `${Math.max(16, viewportHeight - 280)}px`, left: `${left}px` }
+  if (box.left > viewportWidth * 0.52) {
+    const top = Math.max(margin, Math.min(box.top - 12, viewportHeight - MIN_CARD - margin))
+    return { top: `${top}px`, left: `${Math.max(margin, box.left - POPOVER_WIDTH - 22)}px`, maxHeight: room(top) }
+  }
+  const left = Math.min(Math.max(margin, box.left), viewportWidth - POPOVER_WIDTH - margin)
+  const spaceBelow = viewportHeight - box.bottom - margin - 16
+  const spaceAbove = box.top - margin - 16
+  if (spaceBelow >= MIN_CARD) return { top: `${box.bottom + 16}px`, left: `${left}px`, maxHeight: `${spaceBelow}px` }
+  if (spaceAbove >= MIN_CARD) return { bottom: `${viewportHeight - box.top + 16}px`, left: `${left}px`, maxHeight: `${spaceAbove}px` }
+  // O alvo ocupa a tela. O cartão fica no canto, alto o bastante para o texto rolar.
+  return { top: `${margin}px`, left: `${margin}px`, maxHeight: `${viewportHeight - margin * 2}px` }
 })
 
 function next() {

@@ -22,7 +22,7 @@ import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NonConformity, Resource, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v54'
+const STORAGE_KEY = 'thalamus-erp-v56'
 
 function load(): ErpState {
   const seed = createSeedState()
@@ -444,6 +444,7 @@ export const useErpStore = defineStore('erp', () => {
   const createPartner = bind(partners.createPartner, partner => `${partner.name} cadastrado`)
   const updatePartnerMaster = bind(partners.updatePartnerMaster, 'Dados gerais salvos')
   const addPartnerContact = bind(partners.addContact, 'Contato incluído')
+  const setPartnerVertical = bind(partners.setPartnerVertical, 'Vertical do cliente salva')
   const addPartnerAddress = bind(partners.addAddress, 'Endereço incluído')
   const addPartnerRole = bind(partners.addRole, partner => `${partner.name} atualizado`)
   const inactivatePartnerRole = bind(partners.inactivateRole, 'Papel inativado. Novas solicitações deste papel ficam bloqueadas')
@@ -682,6 +683,6 @@ export const useErpStore = defineStore('erp', () => {
     createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk,
     createBudget, distributeGroupBudget, setAnnualBudget, adjustBudget, createBudgetCategory, updateBudgetCategory, configureBudget, decideBudgetException, acknowledgeBudgetAlert, linkBudgetInvoice,
     applyBudgetGrowth, applyRevenueTarget, applyBudgetApproach, applyPriorSeasonality, setMonthlyBudget, setSectorAllocations, setCategoryAssignment, createBudgetGroup, createPlannedCompany, saveBudgetSimulation, applyBudgetSimulation, applyGroupGrowth, applyGroupRevenueTarget,
-    createUser, linkAccountToPerson, updateUser, updatePerson, setPersonPhoto, updateEmployment, createSector, createJob, createPosition, updatePosition, removePosition, placeSector, setSectorLeadership, suggestIdentity, confirmIdentity, refuseIdentity, addProjectParticipation, grantCompanyAccess, openLinkedEmployment, resetPin, provisionDirectoryAccount, retryDirectoryAccount, createJobOpening, updateJobOpening, setJobStatus, addPeopleChecklistItem, registerCandidate, noteCandidateView, prepareBriefing, reviewBriefing, scheduleInterview, setInterviewConfirmation, recordSelectionResult, setApplicationStage, setPeopleChecklistItem, hireCandidate, changeAssignment, recordReview, startOffboarding, revokeAccess, closeOffboarding, createPartner, updatePartnerMaster, addPartnerContact, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, setServiceStatus, openServiceRoutingChange, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
+    createUser, linkAccountToPerson, updateUser, updatePerson, setPersonPhoto, updateEmployment, createSector, createJob, createPosition, updatePosition, removePosition, placeSector, setSectorLeadership, suggestIdentity, confirmIdentity, refuseIdentity, addProjectParticipation, grantCompanyAccess, openLinkedEmployment, resetPin, provisionDirectoryAccount, retryDirectoryAccount, createJobOpening, updateJobOpening, setJobStatus, addPeopleChecklistItem, registerCandidate, noteCandidateView, prepareBriefing, reviewBriefing, scheduleInterview, setInterviewConfirmation, recordSelectionResult, setApplicationStage, setPeopleChecklistItem, hireCandidate, changeAssignment, recordReview, startOffboarding, revokeAccess, closeOffboarding, createPartner, updatePartnerMaster, addPartnerContact, setPartnerVertical, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, setServiceStatus, openServiceRoutingChange, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
   }
 })

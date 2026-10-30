@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ChevronRight } from 'lucide-vue-next'
+import { ChevronRight } from 'lucide-vue-next'
+import CrumbBack from '../../components/CrumbBack.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import { matchingCandidate, peopleBoard } from '../../domain/people'
 import { today } from '../../domain/engine'
@@ -100,7 +101,7 @@ watch(() => route.path, path => {
 
 <template>
   <nav class="crumb-bar" aria-label="Caminho">
-    <RouterLink to="/pessoas/admissao" class="crumb-back" title="Voltar para Admissão"><ArrowLeft :size="16" /></RouterLink>
+    <CrumbBack fallback="/pessoas/admissao" title="Voltar para Admissão" />
     <RouterLink to="/pessoas/admissao" class="crumb">Admissão</RouterLink>
     <ChevronRight :size="14" class="sep" />
     <span class="crumb here">{{ isNew ? 'Nova vaga' : job?.title ?? 'Vaga não encontrada' }}</span>

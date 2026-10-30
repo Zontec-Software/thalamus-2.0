@@ -1048,6 +1048,8 @@ export interface BusinessPartner {
   contacts: PartnerContact[]
   addresses: PartnerAddress[]
   city: string
+  /** Vertical do papel Cliente. A oportunidade lê daqui. */
+  vertical?: string
   contact: string
   email: string
   status: EntityStatus

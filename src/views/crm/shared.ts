@@ -10,7 +10,7 @@ export const CRM_YEAR = 2026
 export const CRM_MONTH = '2026-10'
 
 export const CRM_SOURCES = ['Feira e Eventos', 'Canais Digitais', 'Prospecção Passiva', 'Prospecção Ativa', 'Indicação', 'Carteira', 'Site']
-export const CRM_VERTICALS = ['Mineração', 'Logística', 'Automotivo', 'Farmacêutico', 'Energia', 'Agro', 'Indústria', 'Varejo']
+export { CLIENT_VERTICALS as CRM_VERTICALS } from '../../domain/partners'
 export const LOSS_REASONS = ['Preço', 'Prazo', 'Concorrente', 'Projeto cancelado', 'Sem retorno']
 
 /** Vendedor e grupo valem para todas as abas do CRM. */

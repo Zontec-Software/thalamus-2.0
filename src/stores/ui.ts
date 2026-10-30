@@ -13,13 +13,13 @@ export interface Toast {
 export type RecordKind = 'proposal' | 'demand' | 'purchase' | 'technical' | 'project' | 'budget' | 'person' | 'asset'
 export interface RecordRef { kind: RecordKind; id: string; context?: Record<string, string> }
 
-const TOUR_KEY = 'thalamus-tours-v3'
-const TOUR_REFRESH = ['/pessoas', '/servicos', '/ativos', '/demandas', '/crm', '/crm/oportunidades', '/crm/funil', '/crm/propostas', '/crm/oportunidade', '/assistencia', '/projetos', '/orcamentos', '/compras', '/dre', '/contas-pagar', '/contas-receber']
+const TOUR_KEY = 'thalamus-tours-v4'
+const TOUR_REFRESH = ['/crm', '/crm/oportunidades', '/crm/funil', '/crm/oportunidade']
 
 function loadSeenTours() {
   const current = localStorage.getItem(TOUR_KEY)
   if (current) return JSON.parse(current) as string[]
-  const previous = JSON.parse(localStorage.getItem('thalamus-tours-v2') ?? '[]') as string[]
+  const previous = JSON.parse(localStorage.getItem('thalamus-tours-v3') ?? localStorage.getItem('thalamus-tours-v2') ?? '[]') as string[]
   return previous.filter(key => !TOUR_REFRESH.includes(key))
 }
 

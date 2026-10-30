@@ -139,15 +139,15 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
   ],
   '/crm': [
     t('crm-areas', 'O CRM em cinco abas', 'Painel, Oportunidades, Funil, Propostas e Agenda. O número em cada aba é o que pede ação. Vendedor e grupo, à direita, filtram todas as abas.'),
-    t('crm-goal', 'Meta do mês ou do ano', 'O MRR conquistado contra a meta anual da empresa. O mês usa um doze avos. Definir meta fica com quem gerencia o comercial.'),
+    t('crm-goal', 'Meta, MRR e ticket', 'MRR é a receita mensal recorrente: o valor que passa a entrar todo mês quando o negócio fecha. A meta compara a soma do MRR conquistado com o alvo. O mês vale um doze avos da meta anual. Em aberto é o MRR ainda em negociação, e o ponderado aplica a probabilidade da fase. Win rate é a parte das encerradas que virou conquista. O ticket, valor do negócio, fica na ficha e na lista. Definir meta fica com quem gerencia o comercial.'),
     t('crm-attention', 'Precisa de atenção', 'Oportunidades sem status, sem próxima ação ou com fechamento vencido. Clique para abrir a ficha e resolver.'),
   ],
   '/crm/oportunidades': [
-    t('record-list', 'Todas as oportunidades', 'Guias por situação, atalhos de temperatura e de alerta, e filtro em cada coluna. Clique na linha para abrir a ficha.'),
+    t('record-list', 'Todas as oportunidades', 'Guias por situação, atalhos de temperatura e de alerta, e filtro em cada coluna. Ticket é o valor do negócio. MRR é a receita mensal recorrente, a que conta para a meta. Clique na linha para abrir a ficha.'),
     t('new-record', 'Nova oportunidade', 'Cliente, vendedor, origem e a próxima ação com data. A ação já entra na agenda e a ficha abre em seguida.'),
   ],
   '/crm/funil': [
-    t('crm-funnel', 'Funil comercial', 'Cada coluna é uma fase e soma o MRR. Avançar move uma fase; Conquista só vem pelo aceite da proposta. Clique no cartão para abrir a ficha.'),
+    t('crm-funnel', 'Funil comercial', 'Cada coluna soma o MRR da fase, a receita mensal recorrente. No cartão, o ticket é o valor do negócio. Avançar move uma fase. Conquista só vem pelo aceite da proposta. Clique no cartão para abrir a ficha.'),
   ],
   '/crm/agenda': [
     t('crm-agenda', 'Agenda comercial', 'As próximas ações de todas as oportunidades, das atrasadas às dos próximos dias. Concluir marca a atividade como feita; a linha abre a ficha em Ações.'),
@@ -155,7 +155,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
   '/crm/oportunidade': [
     t('opp-header', 'Ficha da oportunidade', 'Cliente, vendedor e empresa no topo, com os alertas abertos. Criar proposta monta o rascunho com os produtos de interesse. Marcar como perdida pede o motivo e recusa as propostas abertas.'),
     t('opp-stages', 'A fase anda com o trabalho', 'Clique numa fase para avançar ou voltar. Conquista não é um clique: a oportunidade só é conquistada quando o cliente aceita a proposta.'),
-    t('opp-kpis', 'Números que importam', 'Ticket, MRR, temperatura, fechamento, próxima ação e custo das demandas. Cada indicador abre a aba onde ele se resolve.'),
+    t('opp-kpis', 'O que cada número é', 'Ticket é o valor do negócio, estimado pelos produtos ou trazido pela última proposta. MRR é a receita mensal recorrente e entra na meta. Temperatura é o julgamento do vendedor: Quente, Morno ou Frio. A probabilidade acompanha a fase, de 10% na prospecção a 55% na proposta. Fechamento é a data prevista. Próxima ação abre a agenda. Custo total soma as demandas de material. Cada indicador abre a aba onde ele se resolve.'),
     t('opp-tabs', 'Abas da ficha', 'Dados se editam e se salvam aqui. Ações é a agenda desta oportunidade. Observações guarda o texto livre. Desenvolvimento abre o PAP, as demandas e o projeto.'),
   ],
   '/crm/propostas': [

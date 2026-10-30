@@ -12,7 +12,10 @@ export interface NewPartnerInput {
   addresses: PartnerAddress[]
   /** O usuário viu o aviso de documento repetido e decidiu criar outro registro. */
   forceDuplicate?: boolean
+  vertical?: string
 }
+
+export const CLIENT_VERTICALS = ['Mineração', 'Logística', 'Automotivo', 'Farmacêutico', 'Energia', 'Agro', 'Indústria', 'Varejo'] as const
 
 const digits = (value: string) => value.replace(/\D/g, '')
 
@@ -78,6 +81,7 @@ export function createPartner(state: ErpState, input: NewPartnerInput, actor: st
     contacts: input.contacts.filter(entry => entry.name.trim()).map(entry => ({ ...entry, name: entry.name.trim() })),
     addresses: input.addresses.filter(entry => entry.city.trim() || entry.line.trim()),
     city: '',
+    vertical: input.roles.includes('Cliente') ? input.vertical || undefined : undefined,
     contact: '',
     email: '',
     status: 'Ativo',
@@ -108,6 +112,17 @@ export function updatePartnerMaster(state: ErpState, id: string, patch: { legalN
   mirror(partner)
   const after = `${partner.legalName} · ${partner.document}`
   if (before !== after) audit(partner, actor, 'Dados gerais alterados', before, after)
+  return partner
+}
+
+export function setPartnerVertical(state: ErpState, id: string, vertical: string, actor: string) {
+  const partner = findPartner(state, id)
+  if (!partner.roles.includes('Cliente')) throw new DomainError('A vertical fica no papel Cliente')
+  const next = vertical.trim()
+  if (next && !CLIENT_VERTICALS.includes(next as typeof CLIENT_VERTICALS[number])) throw new DomainError('Vertical desconhecida')
+  const before = partner.vertical ?? ''
+  partner.vertical = next || undefined
+  if (before !== (partner.vertical ?? '')) audit(partner, actor, 'Vertical alterada', before || '—', partner.vertical ?? '—')
   return partner
 }
 

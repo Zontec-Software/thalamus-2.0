@@ -25,7 +25,7 @@ import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import { FUNCTIONALITIES, profileCan, syncAccessCatalog } from '../domain/access'
 import { productActions } from '../views/products/actions'
 import { provisionCompany, saveEconomicGroup, saveOmieConnection } from '../domain/platform'
-import { addRole, assertShipmentCarrier, carrierChoices, clientSalesBase, createPartner, decideAbcSuggestion, inactivateRole, registerAnnualBilling } from '../domain/partners'
+import { addRole, assertShipmentCarrier, carrierChoices, clientSalesBase, createPartner, decideAbcSuggestion, inactivateRole, registerAnnualBilling, setPartnerVertical } from '../domain/partners'
 import { saveTooling } from '../domain/engineering'
 import { createResource, inactivateResource, removeResource, updateResource } from '../domain/resources'
 import { createService, openServiceRoutingChange, serviceRoutingUses, updateService } from '../domain/services'
@@ -1027,6 +1027,14 @@ describe('parceiros', () => {
     contacts: [{ name: 'Helena', duty: 'Comercial', phone: '', email: 'helena@oficinanorte.com.br' }],
     addresses: [{ purpose: 'Sede' as const, line: 'Rua 1', city: 'Sabará', state: 'MG' }],
   }
+
+  it('a vertical pertence ao cliente', () => {
+    const state = createSeedState()
+    expect(state.partners.find(entry => entry.id === 'c1')?.vertical).toBe('Mineração')
+    setPartnerVertical(state, 'c1', 'Energia', 'Camila')
+    expect(state.partners.find(entry => entry.id === 'c1')?.vertical).toBe('Energia')
+    expect(() => setPartnerVertical(state, 'f1', 'Agro', 'Camila')).toThrow(/Cliente/)
+  })
 
   it('o papel transportadora entra na expedição e sai quando é inativado', () => {
     const state = createSeedState()

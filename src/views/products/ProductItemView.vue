@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw, Trash2 } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, RotateCcw, Trash2 } from 'lucide-vue-next'
+import CrumbBack from '../../components/CrumbBack.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import { ITEM_TYPE_LABEL, catalogOf, classLabel, hasRouting, isTooling, itemFlags, layersOf, missingAttributes, references } from '../../domain/catalog'
 import { hasFullAccess } from '../../domain/access'
@@ -173,7 +174,7 @@ function remove(reason: string) {
 
 <template>
   <nav class="crumb-bar" aria-label="Caminho">
-    <RouterLink to="/produtos" class="crumb-back" title="Voltar para Portfólio"><ArrowLeft :size="16" /></RouterLink>
+    <CrumbBack fallback="/produtos" title="Voltar para Portfólio" />
     <RouterLink to="/produtos" class="crumb">Portfólio</RouterLink>
     <ChevronRight :size="14" class="sep" />
     <button v-if="item && section !== 'nucleo'" type="button" class="crumb" :title="item.name" @click="section = 'nucleo'">{{ item.code }} · {{ item.name }}</button>

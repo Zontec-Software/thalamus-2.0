@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, CalendarPlus, ChevronRight, FilePlus2, FolderPlus, ThumbsDown } from 'lucide-vue-next'
+import { CalendarPlus, ChevronRight, FilePlus2, FolderPlus, ThumbsDown } from 'lucide-vue-next'
 import BaseModal from '../../components/BaseModal.vue'
+import CrumbBack from '../../components/CrumbBack.vue'
 import RichText from '../../components/RichText.vue'
 import RecordTimeline from '../../components/records/RecordTimeline.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
@@ -13,7 +14,7 @@ import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import type { CrmActivity, Opportunity } from '../../types/domain'
 import { fmtCurrency, fmtDate, fmtDateTime } from '../../utils/format'
-import { CRM_SOURCES, CRM_VERTICALS, LOSS_REASONS, attentionOf, useCrmScope } from './shared'
+import { CRM_SOURCES, LOSS_REASONS, attentionOf, useCrmScope } from './shared'
 
 type Tab = 'dados' | 'acoes' | 'observacoes' | 'propostas' | 'desenvolvimento' | 'historico'
 
@@ -57,12 +58,28 @@ const editable = () => {
   const entry = opportunity.value
   return {
     partnerId: entry?.partnerId ?? '', title: entry?.title ?? '', contact: entry?.contact ?? '', phone: entry?.phone ?? '', email: entry?.email ?? '',
-    ownerId: entry?.ownerId ?? '', source: entry?.source ?? '', segment: entry?.segment ?? '', temperature: entry?.temperature ?? 'Morno' as Opportunity['temperature'],
+    ownerId: entry?.ownerId ?? '', source: entry?.source ?? '', temperature: entry?.temperature ?? 'Morno' as Opportunity['temperature'],
     expectedClose: entry?.expectedClose ?? today(), value: entry?.value ?? 0, mrr: entry?.mrr ?? 0, quantity: entry?.quantity ?? 1,
     itemIds: [...(entry?.itemIds ?? [])], statusNote: entry?.statusNote ?? '', nextAction: entry?.nextAction ?? '', notes: entry?.notes ?? '',
   }
 }
 const form = reactive(editable())
+const formPartner = computed(() => store.state.partners.find(entry => entry.id === form.partnerId))
+const knownContact = computed(() => formPartner.value?.contacts.some(entry => entry.name === form.contact) ?? false)
+function pickContact() {
+  const entry = formPartner.value?.contacts.find(item => item.name === form.contact)
+  if (!entry) return
+  form.phone = entry.phone ?? ''
+  form.email = entry.email ?? ''
+}
+watch(() => form.contact, pickContact)
+watch(() => form.partnerId, (id, previous) => {
+  if (!previous || id === previous) return
+  const first = store.state.partners.find(entry => entry.id === id)?.contacts[0]
+  form.contact = first?.name ?? ''
+  form.phone = first?.phone ?? ''
+  form.email = first?.email ?? ''
+})
 const observation = ref('')
 const resetObservation = () => { observation.value = opportunity.value?.observation ?? '' }
 const observationDirty = computed(() => observation.value !== (opportunity.value?.observation ?? ''))
@@ -74,7 +91,7 @@ watch(() => opportunity.value?.id, () => { reset(); resetObservation() }, { imme
 const dirty = computed(() => JSON.stringify(form) !== JSON.stringify(editable()))
 const estimate = computed(() => form.itemIds.reduce((sum, itemId) => sum + Math.round(store.item(itemId).cost * 2.4) * form.quantity, 0))
 function save() {
-  if (opportunity.value && store.updateOpportunity(opportunity.value.id, { ...form, contact: form.contact || partner.value?.contact })) reset()
+  if (opportunity.value && store.updateOpportunity(opportunity.value.id, { ...form, segment: formPartner.value?.vertical, contact: form.contact || partner.value?.contact })) reset()
 }
 
 function move(stage: Opportunity['stage']) {
@@ -112,7 +129,7 @@ function askDemand() {
 
 <template>
   <nav class="crumb-bar" aria-label="Caminho">
-    <RouterLink to="/crm/oportunidades" class="crumb-back" title="Voltar para Oportunidades"><ArrowLeft :size="16" /></RouterLink>
+    <CrumbBack fallback="/crm/oportunidades" title="Voltar para Oportunidades" />
     <RouterLink to="/crm/oportunidades" class="crumb">Oportunidades</RouterLink>
     <ChevronRight :size="14" class="sep" />
     <span class="crumb here">{{ opportunity ? `${opportunity.id} · ${opportunity.title}` : 'Oportunidade não encontrada' }}</span>
@@ -125,7 +142,7 @@ function askDemand() {
       <div class="item-head">
         <div class="item-photo placeholder">{{ initials }}</div>
         <div class="item-head-main">
-          <span class="eyebrow">{{ opportunity.id }} · {{ opportunity.dealType ?? 'Venda' }} · {{ opportunity.segment ?? 'Sem vertical' }} · {{ opportunity.source }}</span>
+          <span class="eyebrow">{{ opportunity.id }} · {{ opportunity.dealType ?? 'Venda' }} · {{ partner?.vertical ?? 'Sem vertical' }} · {{ opportunity.source }}</span>
           <h2>{{ opportunity.title }}</h2>
           <div class="meta">
             <RouterLink :to="`/parceiros/${opportunity.partnerId}`">{{ store.partnerName(opportunity.partnerId) }}</RouterLink>
@@ -176,10 +193,10 @@ function askDemand() {
         <section class="person-section">
           <h3>Cliente e contato</h3>
           <div class="form-grid">
-            <div class="field"><label>Cliente</label><select v-model="form.partnerId" :disabled="closed"><option v-for="client in clients" :key="client.id" :value="client.id">{{ client.document }} · {{ client.name }}</option></select></div>
-            <div class="field"><label>Contato</label><input v-model="form.contact" :disabled="closed" :placeholder="partner?.contact" /></div>
-            <div class="field"><label>Telefone</label><input v-model="form.phone" :disabled="closed" /></div>
-            <div class="field"><label>E-mail</label><input v-model="form.email" :disabled="closed" /></div>
+            <div class="field"><label>Cliente</label><select v-model="form.partnerId" :disabled="closed"><option v-for="client in clients" :key="client.id" :value="client.id">{{ client.document }} · {{ client.name }}</option></select><small v-if="!closed"><button type="button" class="link" @click="router.push({ path: '/parceiros', query: { novo: 'cliente' } })">Cadastrar cliente</button></small></div>
+            <div class="field"><label>Contato</label><select v-model="form.contact" :disabled="closed || !formPartner?.contacts.length"><option v-if="form.contact && !knownContact" :value="form.contact">{{ form.contact }}</option><option v-for="entry in formPartner?.contacts ?? []" :key="entry.name" :value="entry.name">{{ entry.name }}<template v-if="entry.duty"> · {{ entry.duty }}</template></option></select><small v-if="!closed && form.partnerId"><button type="button" class="link" @click="router.push({ path: `/parceiros/${form.partnerId}`, query: { aba: 'contatos', novo: 'contato' } })">Cadastrar contato</button><template v-if="!formPartner?.contacts.length"> · este cliente ainda não tem contato</template></small></div>
+            <div class="field"><label>Telefone</label><input :value="form.phone || '—'" disabled /><small>Vem do contato cadastrado.</small></div>
+            <div class="field"><label>E-mail</label><input :value="form.email || '—'" disabled /></div>
           </div>
         </section>
         <section class="person-section">
@@ -189,7 +206,7 @@ function askDemand() {
             <div class="field"><label>Vendedor</label><select v-model="form.ownerId" :disabled="closed"><option v-for="seller in sellers" :key="seller.id" :value="seller.id">{{ seller.name }}</option></select></div>
             <div class="field"><label>Tipo</label><select disabled><option>Venda</option></select></div>
             <div class="field"><label>Origem</label><select v-model="form.source" :disabled="closed"><option v-for="source in CRM_SOURCES" :key="source">{{ source }}</option></select></div>
-            <div class="field"><label>Vertical</label><select v-model="form.segment" :disabled="closed"><option v-for="vertical in CRM_VERTICALS" :key="vertical">{{ vertical }}</option></select></div>
+            <div class="field"><label>Vertical</label><input :value="formPartner?.vertical || 'Não informada no cliente'" disabled /><small v-if="!closed && form.partnerId"><button type="button" class="link" @click="router.push({ path: `/parceiros/${form.partnerId}`, query: { aba: 'cliente' } })">Editar no cadastro do cliente</button></small></div>
             <div class="field"><label>Temperatura</label><select v-model="form.temperature" :disabled="closed"><option>Quente</option><option>Morno</option><option>Frio</option></select></div>
             <div class="field"><label>Previsão de fechamento</label><input v-model="form.expectedClose" type="date" :disabled="closed" /></div>
             <div class="field"><label>MRR</label><input v-model.number="form.mrr" type="number" min="0" :disabled="closed" /><small>Receita mensal. É o que conta para a meta.</small></div>

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, BriefcaseBusiness, Building2, ChevronRight, CircleDollarSign, Factory, Plus, Search, Upload } from 'lucide-vue-next'
+import { BriefcaseBusiness, Building2, ChevronRight, CircleDollarSign, Factory, Plus, Search, Upload } from 'lucide-vue-next'
+import CrumbBack from '../components/CrumbBack.vue'
 import RecordTimeline from '../components/records/RecordTimeline.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { roleIsOpen } from '../domain/partners'
@@ -200,7 +201,7 @@ function applyChange(mode: 'mesmos' | 'novo') {
 
   <template v-else>
     <nav class="crumb-bar" aria-label="Caminho">
-      <RouterLink to="/servicos" class="crumb-back" title="Voltar para Serviços"><ArrowLeft :size="16" /></RouterLink>
+      <CrumbBack fallback="/servicos" title="Voltar para Serviços" />
       <RouterLink to="/servicos" class="crumb">Serviços</RouterLink>
       <ChevronRight :size="14" class="sep" />
       <span class="crumb here">{{ isNew ? 'Novo serviço' : service ? `${service.code} · ${service.name}` : 'Serviço não encontrado' }}</span>

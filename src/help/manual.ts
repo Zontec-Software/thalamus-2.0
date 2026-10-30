@@ -921,8 +921,9 @@ export const MANUAL: ManualChapter[] = [
             kind: 'steps', title: 'Usar a tela',
             items: [
               'A lista mostra todos os parceiros. Filtre por papel ou busque por nome, documento ou cidade.',
-              'Clique em um parceiro para abrir a página dele. A seta ou o caminho **Parceiros** no topo voltam para a lista.',
+              'Clique em um parceiro para abrir a página dele. A seta no topo volta para a tela de onde você veio. O caminho **Parceiros** abre a lista.',
               'Na aba **Cadastro**, ajuste os dados gerais e os papéis Cliente, Fornecedor e Transportadora. **Inativar** pede o motivo, que fica no histórico. Transportadora inativa deixa de aparecer na expedição.',
+              'Na aba **Cliente**, a vertical do cliente é escolhida. A oportunidade lê esse valor e não o edita.',
               'Na aba **Contatos e endereços**, inclua um contato ou endereço pelos botões **+**. O primeiro contato é o principal.',
               '**Novo parceiro** abre um formulário. Se o documento já existir, a tela oferece abrir o cadastro existente.',
             ],
@@ -1038,7 +1039,22 @@ export const MANUAL: ManualChapter[] = [
         tour: '/crm',
         blocks: [
           { kind: 'flow', title: 'Etapas da oportunidade', items: ['Prospecção', 'Desenvolvimento', 'Elaboração', 'Proposta', 'Conquista'] },
-          { kind: 'p', text: 'Perdida fica fora do funil. A temperatura (Quente, Morno, Frio) é outro campo, e o status é um texto livre do vendedor. O painel soma o MRR. A ficha guarda o ticket do negócio. A meta anual é da empresa; quem pode consultar o grupo vê a soma, sem gravar a meta no grupo.' },
+          { kind: 'p', text: 'Perdida fica fora do funil. A meta anual é da empresa e usa o MRR conquistado. Quem pode consultar o grupo vê a soma, sem gravar a meta no grupo.' },
+          {
+            kind: 'table', title: 'O que cada número significa',
+            head: ['Campo', 'O que é'],
+            rows: [
+              ['Ticket', 'Valor do negócio. Estimado pelos produtos de interesse ou atualizado pela proposta.'],
+              ['MRR', 'Receita mensal recorrente. É o valor que entra todo mês se o negócio fechar, e é o que conta para a meta.'],
+              ['Ponderado', 'MRR das oportunidades em aberto multiplicado pela probabilidade da fase.'],
+              ['Temperatura', 'Quente, Morno ou Frio. Julgamento do vendedor, independente da fase.'],
+              ['Probabilidade', 'Vem da fase: 10% em Prospecção, 25% em Desenvolvimento, 40% em Elaboração, 55% em Proposta, 100% em Conquista e 0% em Perdida.'],
+              ['Fechamento', 'Data prevista para o aceite. Em vermelho quando já passou e a oportunidade segue aberta.'],
+              ['Win rate', 'Conquistadas dividido pelas oportunidades já encerradas, conquistadas e perdidas.'],
+              ['Custo total', 'Soma do custo estimado das demandas de material ligadas à oportunidade.'],
+              ['Status', 'Frase livre do vendedor sobre a situação atual. Vazio, a oportunidade aparece em Sem status.'],
+            ],
+          },
           {
             kind: 'table', title: 'Abas do CRM',
             head: ['Aba', 'Para que serve'],
@@ -1053,7 +1069,8 @@ export const MANUAL: ManualChapter[] = [
           {
             kind: 'steps', title: 'Trabalhar uma oportunidade',
             items: [
-              'Clique em **Nova oportunidade**: cliente, vendedor, origem, vertical e a próxima ação com data. A ação entra na agenda e a ficha abre.',
+              'Clique em **Nova oportunidade**: cliente e contato saem do cadastro de parceiros. Se ainda não existem, **Cadastrar cliente** ou **Cadastrar contato** abre o cadastro, e a seta de voltar traz de volta para a oportunidade.',
+              'A vertical fica no cadastro do cliente. A oportunidade só mostra.',
               'A ficha é uma página: fases, indicadores e as abas Dados, Ações, Observações, Propostas, Desenvolvimento e Histórico.',
               'Em **Dados**, edite contato, negócio, produtos de interesse e status e clique em **Salvar**.',
               'Em **Ações**, registre a próxima ação (ligação, e-mail, reunião ou tarefa) e marque como feita quando concluir.',

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ChevronRight } from 'lucide-vue-next'
+import { ChevronRight } from 'lucide-vue-next'
+import CrumbBack from '../../components/CrumbBack.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import PersonPhoto from './PersonPhoto.vue'
 import { isChecklistLate } from '../../domain/people'
@@ -59,7 +60,7 @@ function revoke() {
 
 <template>
   <nav class="crumb-bar" aria-label="Caminho">
-    <RouterLink to="/pessoas/desligamento" class="crumb-back" title="Voltar para Desligamento"><ArrowLeft :size="16" /></RouterLink>
+    <CrumbBack fallback="/pessoas/desligamento" title="Voltar para Desligamento" />
     <RouterLink to="/pessoas/desligamento" class="crumb">Desligamento</RouterLink>
     <ChevronRight :size="14" class="sep" />
     <span class="crumb here">{{ isNew ? 'Iniciar' : person?.name ?? 'Processo não encontrado' }}</span>

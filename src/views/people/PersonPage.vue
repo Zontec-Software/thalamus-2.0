@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ChevronRight } from 'lucide-vue-next'
+import { ChevronRight } from 'lucide-vue-next'
+import CrumbBack from '../../components/CrumbBack.vue'
 import RecordTimeline from '../../components/records/RecordTimeline.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import PersonFile from './PersonFile.vue'
@@ -142,7 +143,7 @@ function registerReview() {
 
 <template>
   <nav class="crumb-bar" aria-label="Caminho">
-    <RouterLink to="/pessoas" class="crumb-back" title="Voltar para Colaboradores"><ArrowLeft :size="16" /></RouterLink>
+    <CrumbBack fallback="/pessoas" title="Voltar para Colaboradores" />
     <RouterLink to="/pessoas" class="crumb">Colaboradores</RouterLink>
     <ChevronRight :size="14" class="sep" />
     <span class="crumb here">{{ isNew ? 'Nova pessoa' : person?.name ?? 'Pessoa não encontrada' }}</span>
