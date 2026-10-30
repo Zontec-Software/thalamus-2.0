@@ -4,7 +4,6 @@ import { useUiStore, type RecordKind } from '../../stores/ui'
 import AssetRecord from './AssetRecord.vue'
 import BudgetRecord from './BudgetRecord.vue'
 import DemandRecord from './DemandRecord.vue'
-import OpportunityRecord from './OpportunityRecord.vue'
 import PersonRecord from './PersonRecord.vue'
 import ProjectRecord from './ProjectRecord.vue'
 import ProposalRecord from './ProposalRecord.vue'
@@ -13,7 +12,7 @@ import TechnicalRecord from './TechnicalRecord.vue'
 
 const ui = useUiStore()
 const VIEWS: Record<RecordKind, Component> = {
-  opportunity: OpportunityRecord, proposal: ProposalRecord, demand: DemandRecord, purchase: PurchaseRecord, technical: TechnicalRecord,
+  proposal: ProposalRecord, demand: DemandRecord, purchase: PurchaseRecord, technical: TechnicalRecord,
   project: ProjectRecord, budget: BudgetRecord, person: PersonRecord, asset: AssetRecord,
 }
 const view = computed(() => ui.record ? VIEWS[ui.record.kind] : undefined)

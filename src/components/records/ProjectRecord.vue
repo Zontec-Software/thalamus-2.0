@@ -176,7 +176,7 @@ function addRisk() {
 
       <template v-if="opportunity || project.itemId">
         <h3 class="drawer-title">Origem e resultado</h3>
-        <button v-if="opportunity" class="list-row" @click="ui.openRecord('opportunity', opportunity.id)">
+        <button v-if="opportunity" class="list-row" @click="router.push(`/crm/oportunidade/${opportunity.id}`)">
           <div><strong>{{ opportunity.id }} · {{ opportunity.title }}</strong><span>{{ fmtCurrency(opportunity.value) }}</span></div><StatusBadge :value="opportunity.stage" />
         </button>
         <button v-if="project.itemId" class="list-row" @click="ui.closeRecord(); router.push(`/produtos/item/${project.itemId}`)">

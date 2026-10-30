@@ -22,7 +22,7 @@ import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NonConformity, Resource, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v51'
+const STORAGE_KEY = 'thalamus-erp-v53'
 
 function load(): ErpState {
   const seed = createSeedState()
@@ -267,6 +267,8 @@ export const useErpStore = defineStore('erp', () => {
   const undoPick = bind(enterprise.undoPick, op => `${op.id}: separação desfeita`)
   const createOpportunity = bind(enterprise.createOpportunity, opportunity => `${opportunity.id} criada`)
   const updateOpportunity = bind(enterprise.updateOpportunity, 'Oportunidade atualizada')
+  const setSalesGoal = bind(enterprise.setSalesGoal, 'Meta anual gravada')
+  const requestOpportunityChange = bind(engineering.requestChangeForOpportunity, change => `${change.id} pedido a partir da oportunidade`)
   const moveOpportunity = bind(enterprise.moveOpportunity, opportunity => `${opportunity.id}: ${opportunity.stage}`)
   const advanceOpportunity = bind(enterprise.advanceOpportunity, opportunity => `${opportunity.id}: ${opportunity.stage}`)
   const loseOpportunity = bind(enterprise.loseOpportunity, 'Oportunidade marcada como perdida')
@@ -671,10 +673,10 @@ export const useErpStore = defineStore('erp', () => {
     saveRoutingStep, removeRoutingStep, moveRoutingStep, addMedia, removeMedia, moveMedia, setMainMedia, linkProject, unlinkProject,
     addBenefit, removeBenefit, addReformEntry, removeReformEntry, addFiscalRule, removeFiscalRule, createModel, generateVariants,
     setMediaUsage, saveClassAttribute, removeClassAttribute, setItemAttributes, saveTooling, saveRevisionStep, removeRevisionStep, moveRevisionStep, copyRoutingFrom,
-    savePackaging, createChange, updateChange, openChangeRevision, moveChange, resolveFiscalConflict, pushFiscal, simulateOmieFiscal,
+    savePackaging, createChange, requestOpportunityChange, updateChange, openChangeRevision, moveChange, resolveFiscalConflict, pushFiscal, simulateOmieFiscal,
     createDemand, attendDemand, attendDemandFromStock, contractService, completeDemand, cancelDemand,
     createPurchaseOrder, selectQuote, cancelPurchaseOrder, advancePurchaseOrder,
-    createOpportunity, updateOpportunity, moveOpportunity, advanceOpportunity, loseOpportunity, addActivity, toggleActivity,
+    createOpportunity, updateOpportunity, setSalesGoal, moveOpportunity, advanceOpportunity, loseOpportunity, addActivity, toggleActivity,
     createProposal, updateProposal, addProposalLine, updateProposalLine, removeProposalLine, advanceProposal, rejectProposal,
     createTechnicalOrder, scheduleTechnicalOrder, updateTechnicalOrder, addTechnicalPart, advanceTechnicalOrder, cancelTechnicalOrder,
     createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk,

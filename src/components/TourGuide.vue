@@ -36,10 +36,6 @@ function focusStep() {
 function recordId(panel: Exclude<TourPanel, 'close'>): string | null {
   const state = store.state
   const pick = <T extends { id: string }>(list: T[], preferred?: T) => preferred?.id ?? list[0]?.id ?? null
-  if (panel === 'opportunity') {
-    const open = state.opportunities.filter(entry => entry.stage !== 'Ganha' && entry.stage !== 'Perdida')
-    return pick(state.opportunities, open.find(entry => state.proposals.some(proposal => proposal.opportunityId === entry.id)) ?? open[0])
-  }
   if (panel === 'proposal') return pick(state.proposals, state.proposals.find(entry => entry.status === 'Enviada') ?? state.proposals.find(entry => entry.status === 'Rascunho'))
   if (panel === 'demand') return pick(state.demands, state.demands.find(entry => entry.status === 'Aberta' && entry.kind === 'Material') ?? state.demands.find(entry => entry.status === 'Aberta') ?? state.demands.find(entry => entry.status === 'Em atendimento'))
   if (panel === 'purchase') return pick(state.purchaseOrders, state.purchaseOrders.find(entry => entry.status === 'Aguardando aprovação') ?? state.purchaseOrders.find(entry => entry.status === 'Aprovado' || entry.status === 'Recebido parcial'))

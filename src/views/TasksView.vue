@@ -59,8 +59,8 @@ const tasks = computed<Task[]>(() => {
   for (const maintenance of s.maintenanceOrders.filter(entry => entry.status !== 'Concluída')) {
     list.push({ id: maintenance.id, owner: 'Manutenção', title: `${maintenance.id} · ${maintenance.description}`, detail: `${s.assets.find(asset => asset.id === maintenance.assetId)?.name} · ${maintenance.type}`, urgent: maintenance.type === 'Corretiva', action: maintenance.status === 'Aberta' ? 'Iniciar' : 'Concluir', run: () => store.advanceMaintenance(maintenance.id) })
   }
-  for (const opportunity of s.opportunities.filter(entry => !['Ganha', 'Perdida'].includes(entry.stage))) {
-    list.push({ id: opportunity.id, owner: 'Comercial', title: opportunity.nextAction, detail: `${store.partnerName(opportunity.partnerId)} · ${opportunity.title}`, action: 'Abrir oportunidade', run: () => ui.openRecord('opportunity', opportunity.id) })
+  for (const opportunity of s.opportunities.filter(entry => entry.stage !== 'Conquista' && entry.stage !== 'Perdida')) {
+    list.push({ id: opportunity.id, owner: 'Comercial', title: opportunity.nextAction, detail: `${store.partnerName(opportunity.partnerId)} · ${opportunity.title}`, action: 'Abrir oportunidade', run: () => router.push(`/crm/oportunidade/${opportunity.id}`) })
   }
   for (const demand of s.demands.filter(entry => entry.status === 'Aberta')) {
     list.push({ id: demand.id, owner: demand.assigneeRole, title: `Atender ${demand.id}`, detail: `${demand.description} · origem ${demand.origin}`, urgent: demand.priority === 'Urgente', action: 'Ver demanda', run: () => ui.openRecord('demand', demand.id) })

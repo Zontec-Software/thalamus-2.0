@@ -55,6 +55,7 @@ export const FUNCTIONALITIES: Functionality[] = [
   functionality('orcamentos.liberar_saldo', 'Orçamentos', 'liberar_saldo', 'Liberar saldo excedido', 'Decide previsão retida por saldo anual.'),
   functionality('orcamentos.alerta.reconhecer', 'Orçamentos', 'reconhecer_alerta', 'Reconhecer alerta orçamentário', 'Registra ciência de alerta de limiar.'),
   functionality('orcamentos.consultar_consolidado', 'Orçamentos', 'consultar_consolidado', 'Consultar consolidado de grupo', 'Consulta orçamento das empresas autorizadas do grupo econômico.'),
+  functionality('crm.consultar_consolidado', 'CRM', 'consultar_consolidado', 'Consultar CRM do grupo', 'Vê oportunidades das empresas autorizadas do grupo. O lançamento continua na empresa.'),
 
   ...MODULES.filter(module => !['Produtos', 'Orçamentos', 'Organização', 'Pessoas'].includes(module))
     .map(module => functionality(`modulo.${module.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_')}.gerir`, module, 'gerir', `Gerir ${module}`, `Mantém registros e decisões do módulo ${module}.`)),
@@ -88,6 +89,7 @@ const roleDetailedGrants: Partial<Record<Role, FunctionalityId[]>> = {
     productFeature('homologar.tecnica'), productFeature('excecao_campo_chave.decidir'), productFeature('revisao.liberar'),
     budgetFeature('planejamento.gerir'), budgetFeature('categorias.gerir'), budgetFeature('excecao.tratar'), budgetFeature('excecao.vincular'),
     budgetFeature('liberar_saldo'), budgetFeature('alerta.reconhecer'), budgetFeature('consultar_consolidado'), 'organizacao.consultar_consolidado',
+    'crm.consultar_consolidado',
   ],
   Engenharia: [
     productFeature('nucleo.gerir'), productFeature('manufatura.gerir'), productFeature('ferramental.gerir'), productFeature('midia.gerir'),

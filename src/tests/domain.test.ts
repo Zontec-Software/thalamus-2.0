@@ -15,8 +15,9 @@ import {
 import {
   addTechnicalPart, advanceProposal, advancePurchaseOrder, advanceTechnicalOrder, attendDemandFromStock, cancelPurchaseOrder, completeDemand,
   contractService, createDemand, createOpportunity, createProject, createProposal, createPurchaseOrder, createTechnicalOrder, deliveryLead, loseOpportunity,
-  moveOpportunity, releaseRevision, tasksForRole, toggleMilestone, undoPick, updateProposal,
+  moveOpportunity, releaseRevision, tasksForRole, toggleMilestone, undoPick, updateProposal, setSalesGoal,
 } from '../domain/enterprise'
+import { requestChangeForOpportunity } from '../domain/engineering'
 import { absorbOmieCategories, acknowledgeAlert, applyBudgetApproach, applyBudgetSimulation, budgetPlanBriefing, applyOmiePayment, applyPriorSeasonality, applyRemoteCategories, budgetSummary, categoryOf, createBudgetCategory, createBudgetGroup, decideBudgetException, financeSnapshot, linkBudgetInvoice, notifiedUsers, rangeSummary, saveBudgetSimulation, seesBudgetException, setBudget, setCategoryAssignment, setGroupBudget, setSectorAllocations, updateBudgetCategory, upsertForecast, viewerCategoryScope } from '../domain/budget'
 import { assetDepreciation, dreReading, dreStatement, periodLabel, superaEstimate } from '../domain/dre'
 import { createSeedState } from '../mocks/seed'
@@ -663,15 +664,15 @@ describe('CRM e propostas', () => {
     const partner = state.partners.find(entry => entry.roles.includes('Cliente') && !state.customers.some(customer => customer.id === entry.id))
       ?? state.partners.find(entry => entry.roles.includes('Cliente'))!
     const opportunity = createOpportunity(state, { partnerId: partner.id, title: 'Teste', ownerId: 'u12', value: 0, expectedClose: '2026-11-30', source: 'Site', nextAction: 'Ligar', itemIds: ['pa-a11-ext'], quantity: 30 }, 'Comercial')
-    expect(() => moveOpportunity(state, opportunity.id, 'Ganha', 'Comercial')).toThrow()
+    expect(() => moveOpportunity(state, opportunity.id, 'Conquista', 'Comercial')).toThrow()
     const proposal = createProposal(state, opportunity.id, 'Comercial')
     expect(opportunity.stage).toBe('Proposta')
     expect(proposal.lines[0]).toMatchObject({ itemId: 'pa-a11-ext', quantity: 30 })
     expect(() => updateProposal(state, proposal.id, { discount: 20 }, 'Comercial')).toThrow('15%')
     advanceProposal(state, proposal.id, 'Comercial')
-    expect(opportunity.stage).toBe('Negociação')
+    expect(opportunity.stage).toBe('Proposta')
     advanceProposal(state, proposal.id, 'Comercial')
-    expect(opportunity.stage).toBe('Ganha')
+    expect(opportunity.stage).toBe('Conquista')
     expect(proposal.salesOrderId).toBe(state.salesOrders[0].id)
     expect(state.customers.some(customer => customer.id === partner.id)).toBe(true)
   })
@@ -681,6 +682,15 @@ describe('CRM e propostas', () => {
     loseOpportunity(state, 'OPP-26042', 'Preço', 'Comercial')
     expect(state.opportunities.find(entry => entry.id === 'OPP-26042')!.stage).toBe('Perdida')
     expect(state.proposals.find(entry => entry.id === 'PROP-26018')!.status).toBe('Recusada')
+  })
+
+  it('o PAP da oportunidade vira mudança de engenharia ligada a ela', () => {
+    const state = createSeedState()
+    const change = requestChangeForOpportunity(state, 'OPP-26044', 'Camila')
+    expect(change.opportunityId).toBe('OPP-26044')
+    expect(change.stage).toBe('Solicitada')
+    setSalesGoal(state, 'tenant-roboflex', 2026, 1000, 'Camila')
+    expect(state.salesGoals.find(entry => entry.tenantId === 'tenant-roboflex')!.amount).toBe(1000)
   })
 })
 

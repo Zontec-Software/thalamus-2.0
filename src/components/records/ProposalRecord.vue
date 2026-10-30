@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { CheckCircle2, Plus, Send, Trash2, XCircle } from 'lucide-vue-next'
 import RecordHeader from './RecordHeader.vue'
 import RecordTimeline from './RecordTimeline.vue'
@@ -13,6 +14,7 @@ import { fmtCurrency, fmtDate } from '../../utils/format'
 const props = defineProps<{ id: string; context: Record<string, string> }>()
 const store = useErpStore()
 const ui = useUiStore()
+const router = useRouter()
 
 const proposal = computed(() => store.state.proposals.find(entry => entry.id === props.id))
 const draft = computed(() => proposal.value?.status === 'Rascunho')
@@ -92,7 +94,7 @@ function openOrder(id: string) {
           <button class="button secondary" @click="rejecting = !rejecting"><XCircle :size="15" /> Cliente recusou</button>
         </template>
         <button v-if="order" class="button" @click="openOrder(order.id)">Abrir pedido {{ order.id }}</button>
-        <button v-if="opportunity" class="button secondary" @click="ui.openRecord('opportunity', opportunity.id)">Ver oportunidade</button>
+        <button v-if="opportunity" class="button secondary" @click="router.push(`/crm/oportunidade/${opportunity.id}`)">Ver oportunidade</button>
       </div>
       <div v-if="rejecting" class="inline-form row">
         <input v-model="rejection" class="filter grow" placeholder="Motivo informado pelo cliente" />

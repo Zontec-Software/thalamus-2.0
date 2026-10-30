@@ -68,7 +68,8 @@ export function createDemand(state: ErpState, input: DemandInput, actor: string)
     ?? (input.serviceId ? (state.services.find(entry => entry.id === input.serviceId)?.cost ?? 0) * input.quantity : undefined)
   const categoryId = input.budgetCategoryId
     ?? (input.origin === 'Projeto' ? (input.kind === 'Material' ? 'BC-MAT-PD' : 'BC-PD')
-      : input.origin === 'Manutenção' ? 'BC-OPER'
+      : input.origin === 'Oportunidade' ? (input.kind === 'Material' ? 'BC-CMV' : 'BC-PD')
+        : input.origin === 'Manutenção' ? 'BC-OPER'
         : input.origin === 'Assistência' ? 'BC-GARANTIA'
           : input.kind === 'Material' ? 'BC-CMV' : 'BC-OPER')
   const period = input.budgetPeriod ?? input.neededBy.slice(0, 7)
@@ -292,18 +293,21 @@ export function undoPick(state: ErpState, opId: string, actor: string) {
 
 /* ---------- CRM ---------- */
 
-export const CRM_STAGES: Opportunity['stage'][] = ['Lead', 'Qualificação', 'Proposta', 'Negociação', 'Ganha']
-const STAGE_PROBABILITY: Record<Opportunity['stage'], number> = { Lead: 10, Qualificação: 30, Proposta: 55, Negociação: 75, Ganha: 100, Perdida: 0 }
+export const CRM_STAGES: Opportunity['stage'][] = ['Prospecção', 'Desenvolvimento', 'Elaboração', 'Proposta', 'Conquista']
+export const CRM_TEMPERATURES: NonNullable<Opportunity['temperature']>[] = ['Quente', 'Morno', 'Frio']
+const STAGE_PROBABILITY: Record<Opportunity['stage'], number> = { Prospecção: 10, Desenvolvimento: 25, Elaboração: 40, Proposta: 55, Conquista: 100, Perdida: 0 }
+
+export const opportunityIsOpen = (entry: Pick<Opportunity, 'stage'>) => entry.stage !== 'Conquista' && entry.stage !== 'Perdida'
 
 type OpportunityInput = Pick<Opportunity, 'partnerId' | 'title' | 'ownerId' | 'value' | 'expectedClose' | 'source' | 'nextAction'>
-  & Partial<Pick<Opportunity, 'contact' | 'segment' | 'itemIds' | 'quantity' | 'notes'>>
+  & Partial<Pick<Opportunity, 'contact' | 'segment' | 'itemIds' | 'quantity' | 'notes' | 'tenantId' | 'mrr' | 'temperature' | 'statusNote' | 'phone' | 'email' | 'dealType'>>
 
 export function createOpportunity(state: ErpState, input: OpportunityInput, actor: string) {
   if (!input.title.trim()) throw new DomainError('Dê um título à oportunidade')
   if (!input.partnerId) throw new DomainError('Escolha o cliente')
   assertClientOpen(state, input.partnerId)
   const opportunity: Opportunity = {
-    id: `OPP-${String(state.counters.OPP = (state.counters.OPP ?? 26043) + 1)}`, stage: 'Lead', probability: 10, activities: [], createdAt: now(), ...input,
+    id: `OPP-${String(state.counters.OPP = (state.counters.OPP ?? 26043) + 1)}`, stage: 'Prospecção', probability: 10, temperature: 'Morno', mrr: 0, dealType: 'Venda', activities: [], createdAt: now(), ...input,
   }
   state.opportunities.unshift(opportunity)
   log(state, 'CRM', actor, `Oportunidade criada: ${opportunity.title} (${money(opportunity.value)})`, undefined, opportunity.id)
@@ -312,7 +316,7 @@ export function createOpportunity(state: ErpState, input: OpportunityInput, acto
 
 export function updateOpportunity(state: ErpState, id: string, patch: Partial<OpportunityInput>, actor: string) {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
-  if (opportunity.stage === 'Ganha' || opportunity.stage === 'Perdida') throw new DomainError('Oportunidade encerrada não pode ser editada')
+  if (!opportunityIsOpen(opportunity)) throw new DomainError('Oportunidade encerrada não pode ser editada')
   Object.assign(opportunity, patch)
   log(state, 'CRM', actor, 'Dados da oportunidade atualizados', undefined, id)
   return opportunity
@@ -320,12 +324,9 @@ export function updateOpportunity(state: ErpState, id: string, patch: Partial<Op
 
 export function moveOpportunity(state: ErpState, id: string, stage: Opportunity['stage'], actor: string) {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
-  if (opportunity.stage === 'Ganha' || opportunity.stage === 'Perdida') throw new DomainError('Oportunidade já encerrada')
-  if (stage === 'Ganha') throw new DomainError('A oportunidade é ganha ao aceitar uma proposta')
+  if (!opportunityIsOpen(opportunity)) throw new DomainError('Oportunidade já encerrada')
+  if (stage === 'Conquista') throw new DomainError('A oportunidade é conquistada ao aceitar uma proposta')
   if (stage === 'Perdida') throw new DomainError('Use "Marcar como perdida" e informe o motivo')
-  if ((stage === 'Negociação') && !state.proposals.some(entry => entry.opportunityId === id && entry.status !== 'Recusada')) {
-    throw new DomainError('Crie a proposta antes de entrar em negociação')
-  }
   opportunity.stage = stage
   opportunity.probability = STAGE_PROBABILITY[stage]
   log(state, 'CRM', actor, `Etapa alterada para ${stage}`, undefined, id)
@@ -335,14 +336,14 @@ export function moveOpportunity(state: ErpState, id: string, stage: Opportunity[
 export function advanceOpportunity(state: ErpState, id: string, actor: string) {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
   const next = CRM_STAGES[CRM_STAGES.indexOf(opportunity.stage) + 1]
-  if (!next || next === 'Ganha') throw new DomainError('Para ganhar, aceite a proposta do cliente')
+  if (!next || next === 'Conquista') throw new DomainError('Para conquistar, aceite a proposta do cliente')
   return moveOpportunity(state, id, next, actor)
 }
 
 export function loseOpportunity(state: ErpState, id: string, reason: string, actor: string) {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
   if (!reason.trim()) throw new DomainError('Informe o motivo da perda')
-  if (opportunity.stage === 'Ganha') throw new DomainError('Oportunidade ganha não pode ser perdida')
+  if (opportunity.stage === 'Conquista') throw new DomainError('Oportunidade conquistada não pode ser perdida')
   opportunity.stage = 'Perdida'
   opportunity.probability = 0
   opportunity.lossReason = reason
@@ -352,6 +353,16 @@ export function loseOpportunity(state: ErpState, id: string, reason: string, act
   }
   log(state, 'CRM', actor, `Oportunidade perdida: ${reason}`, undefined, id)
   return opportunity
+}
+
+/** Meta anual da empresa. A consulta de grupo soma as metas; não grava um número no grupo. */
+export function setSalesGoal(state: ErpState, tenantId: string, year: number, amount: number, actor: string) {
+  if (!(amount > 0)) throw new DomainError('Informe a meta anual')
+  const current = state.salesGoals.find(entry => entry.tenantId === tenantId && entry.year === year)
+  if (current) current.amount = amount
+  else state.salesGoals.push({ tenantId, year, amount })
+  log(state, 'CRM', actor, `Meta ${year} de ${tenantId}: ${money(amount)}`)
+  return state.salesGoals.find(entry => entry.tenantId === tenantId && entry.year === year)!
 }
 
 export function addActivity(state: ErpState, id: string, input: Pick<CrmActivity, 'type' | 'text' | 'at'>, actor: string) {
@@ -394,7 +405,7 @@ export function deliveryLead(state: ErpState, item: Item): number {
 
 export function createProposal(state: ErpState, opportunityId: string, actor: string) {
   const opportunity = find(state.opportunities, opportunityId, 'Oportunidade')
-  if (opportunity.stage === 'Ganha' || opportunity.stage === 'Perdida') throw new DomainError('Oportunidade encerrada')
+  if (!opportunityIsOpen(opportunity)) throw new DomainError('Oportunidade encerrada')
   const quantity = opportunity.quantity ?? 1
   const lines: ProposalLine[] = (opportunity.itemIds ?? []).map(itemId => {
     const item = getItem(state, itemId)
@@ -470,7 +481,7 @@ export function removeProposalLine(state: ErpState, id: string, index: number, a
 
 function syncOpportunityValue(state: ErpState, proposal: Proposal) {
   const opportunity = state.opportunities.find(entry => entry.id === proposal.opportunityId)
-  if (opportunity && opportunity.stage !== 'Ganha' && opportunity.stage !== 'Perdida') opportunity.value = Math.round(proposalTotal(proposal))
+  if (opportunity && opportunity.stage !== 'Conquista' && opportunity.stage !== 'Perdida') opportunity.value = Math.round(proposalTotal(proposal))
 }
 
 export function advanceProposal(state: ErpState, id: string, actor: string) {
@@ -479,9 +490,9 @@ export function advanceProposal(state: ErpState, id: string, actor: string) {
     if (!proposal.lines.length) throw new DomainError('Adicione ao menos uma linha antes de enviar')
     proposal.status = 'Enviada'
     const opportunity = state.opportunities.find(entry => entry.id === proposal.opportunityId)
-    if (opportunity && CRM_STAGES.indexOf(opportunity.stage) < CRM_STAGES.indexOf('Negociação')) {
-      opportunity.stage = 'Negociação'
-      opportunity.probability = STAGE_PROBABILITY.Negociação
+    if (opportunity && CRM_STAGES.indexOf(opportunity.stage) < CRM_STAGES.indexOf('Proposta')) {
+      opportunity.stage = 'Proposta'
+      opportunity.probability = STAGE_PROBABILITY.Proposta
     }
     log(state, 'Comercial', actor, `${proposal.id} enviada ao cliente (${money(proposalTotal(proposal))})`, undefined, proposal.opportunityId)
   } else if (proposal.status === 'Enviada') acceptProposal(state, proposal, actor)
@@ -496,11 +507,6 @@ export function rejectProposal(state: ErpState, id: string, reason: string, acto
   if (!reason.trim()) throw new DomainError('Informe o motivo da recusa')
   proposal.status = 'Recusada'
   proposal.rejectionReason = reason
-  const opportunity = state.opportunities.find(entry => entry.id === proposal.opportunityId)
-  if (opportunity && opportunity.stage === 'Negociação') {
-    opportunity.stage = 'Proposta'
-    opportunity.probability = STAGE_PROBABILITY.Proposta
-  }
   log(state, 'Comercial', actor, `${proposal.id} recusada: ${reason}`, undefined, proposal.opportunityId)
   log(state, 'Comercial', actor, `Recusada pelo cliente: ${reason}`, undefined, proposal.id)
   return proposal
@@ -527,9 +533,10 @@ function acceptProposal(state: ErpState, proposal: Proposal, actor: string) {
   const opportunity = state.opportunities.find(entry => entry.id === proposal.opportunityId)
   const total = proposalTotal(proposal)
   if (opportunity) {
-    opportunity.stage = 'Ganha'
+    opportunity.stage = 'Conquista'
     opportunity.probability = 100
     opportunity.value = Math.round(total)
+    opportunity.wonAt = today()
   }
   const first = orderLines.find(line => ['03', '04', '06'].includes(getItem(state, line.itemId).type)) ?? orderLines[0]
   const orderId = `PV-2026-${String(state.counters.PV = (state.counters.PV ?? 1056) + 1)}`
@@ -542,7 +549,7 @@ function acceptProposal(state: ErpState, proposal: Proposal, actor: string) {
   proposal.salesOrderId = orderId
   addSyncLog(state, { entity: 'Pedido de venda', reference: orderId, direction: 'Thalamus → Omie', status: 'sincronizado', message: `${proposal.id} convertida em pedido ${omieId}` })
   log(state, 'Comercial', actor, `${proposal.id} aceita; pedido ${orderId} aprovado no Omie`, orderId)
-  if (opportunity) log(state, 'CRM', actor, `Ganha: pedido ${orderId} gerado (${money(total)})`, undefined, opportunity.id)
+  if (opportunity) log(state, 'CRM', actor, `Conquistada: pedido ${orderId} gerado (${money(total)})`, undefined, opportunity.id)
 }
 
 /* ---------- Assistência técnica ---------- */
@@ -830,11 +837,11 @@ export function tasksForRole(state: ErpState, role: Role, userId = '') {
   const tasks: DerivedTask[] = []
   const is = (...roles: Role[]) => hasFullAccess(role) || roles.includes(role)
   if (is('Comercial')) {
-    for (const entry of state.opportunities.filter(item => item.stage !== 'Ganha' && item.stage !== 'Perdida')) {
-      tasks.push({ id: entry.id, title: entry.nextAction, detail: `${entry.title} · ${entry.stage}`, to: '/crm', record: { kind: 'opportunity', id: entry.id } })
+    for (const entry of state.opportunities.filter(item => opportunityIsOpen(item))) {
+      tasks.push({ id: entry.id, title: entry.nextAction, detail: `${entry.title} · ${entry.stage}`, to: `/crm/oportunidade/${entry.id}` })
     }
     for (const entry of state.proposals.filter(item => item.status === 'Enviada' && item.validUntil <= addDays(today(), 3))) {
-      tasks.push({ id: entry.id, title: `${entry.id} vence em breve`, detail: 'Cobrar retorno do cliente', to: '/crm', record: { kind: 'proposal', id: entry.id } })
+      tasks.push({ id: entry.id, title: `${entry.id} vence em breve`, detail: 'Cobrar retorno do cliente', to: '/crm/propostas', record: { kind: 'proposal', id: entry.id } })
     }
   }
   if (is('Compras')) {

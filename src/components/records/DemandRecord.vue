@@ -83,6 +83,7 @@ function openOrigin() {
   const entry = demand.value
   if (!entry?.originId) return
   if (entry.origin === 'Projeto') ui.openRecord('project', entry.originId)
+  else if (entry.origin === 'Oportunidade') router.push(`/crm/oportunidade/${entry.originId}?aba=desenvolvimento`)
   else if (entry.origin === 'Assistência') ui.openRecord('technical', entry.originId)
   else if (entry.origin === 'OP') { ui.closeRecord(); ui.opDrawer = entry.originId }
   else if (entry.origin === 'Manutenção') { ui.closeRecord(); router.push('/manutencao') }

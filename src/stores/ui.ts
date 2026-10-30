@@ -10,11 +10,11 @@ export interface Toast {
   text?: string
 }
 
-export type RecordKind = 'opportunity' | 'proposal' | 'demand' | 'purchase' | 'technical' | 'project' | 'budget' | 'person' | 'asset'
+export type RecordKind = 'proposal' | 'demand' | 'purchase' | 'technical' | 'project' | 'budget' | 'person' | 'asset'
 export interface RecordRef { kind: RecordKind; id: string; context?: Record<string, string> }
 
 const TOUR_KEY = 'thalamus-tours-v3'
-const TOUR_REFRESH = ['/pessoas', '/servicos', '/ativos', '/demandas', '/crm', '/assistencia', '/projetos', '/orcamentos', '/compras', '/dre', '/contas-pagar', '/contas-receber']
+const TOUR_REFRESH = ['/pessoas', '/servicos', '/ativos', '/demandas', '/crm', '/crm/oportunidades', '/crm/funil', '/crm/propostas', '/crm/oportunidade', '/assistencia', '/projetos', '/orcamentos', '/compras', '/dre', '/contas-pagar', '/contas-receber']
 
 function loadSeenTours() {
   const current = localStorage.getItem(TOUR_KEY)

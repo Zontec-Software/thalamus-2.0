@@ -27,13 +27,13 @@ export const FLAG_TONE: Record<string, string> = {
 export const PAGE_SIZES = [25, 50, 100]
 
 /** Paginação local; volta à primeira página quando o conjunto filtrado muda. */
-export function usePager<T>(rows: Ref<T[]>, initial = 25) {
+export function usePager<T>(rows: Ref<T[]>, initial = 25, noun = 'produtos') {
   const page = ref(1)
   const size = ref(initial)
   const pages = computed(() => Math.max(1, Math.ceil(rows.value.length / size.value)))
   const slice = computed(() => rows.value.slice((page.value - 1) * size.value, page.value * size.value))
   const range = computed(() => {
-    if (!rows.value.length) return '0 produtos'
+    if (!rows.value.length) return `0 ${noun}`
     const start = (page.value - 1) * size.value + 1
     return `${start}–${Math.min(rows.value.length, page.value * size.value)} de ${rows.value.length}`
   })

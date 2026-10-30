@@ -1,6 +1,6 @@
 import type {
   AccessProfile, AccessRevocation, Asset, Assignment, Budget, BudgetAlert, BudgetCategory, BudgetEntry, BudgetException, BudgetGroupDef, BudgetSimulation, BusinessPartner, Candidate, CandidateBriefing, Customer, Demand, Downtime, EconomicGroup, Employment, EngineeringChange, FiscalRule, FlowEvent, FlowStage, Functionality, IdentityLink, Interview, Item, ItemClass, ItemModel, JobCatalog, JobOpening, JobPosition, Offboarding, OmieConnection, PeopleChecklist, PerformanceReview, Person, Application, ProjectParticipation, SelectionReview,
-  MachineState, MaintenanceOrder, NonConformity, Opportunity, OpMaterial, Operation, PriceTable, ProductRevision, ProductionOrder, Project,
+  MachineState, MaintenanceOrder, NonConformity, Opportunity, OpMaterial, Operation, PriceTable, ProductRevision, ProductionOrder, Project, SalesGoal,
   OmieCategory, OmiePayment, Proposal, PurchaseOrder, Requisition, RequisitionStatus, Resource, SalesOrder, Sector, ServiceCatalogItem,
   ShopAlert, StockMovement, SupplierHomologation, SyncLog, TechnicalServiceOrder, Tenant, User, UserProfileAssignment,
   DirectoryAccount, WorkspaceConnection,
@@ -52,6 +52,7 @@ export interface ErpState {
   demands: Demand[]
   purchaseOrders: PurchaseOrder[]
   opportunities: Opportunity[]
+  salesGoals: SalesGoal[]
   proposals: Proposal[]
   technicalServiceOrders: TechnicalServiceOrder[]
   projects: Project[]

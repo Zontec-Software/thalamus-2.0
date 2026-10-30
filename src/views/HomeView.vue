@@ -32,7 +32,7 @@ const heroImage = `url('${HERO_IMAGES[dayNumber % HERO_IMAGES.length]}')`
 
 const badge = (id: string) => {
   const s = store.state
-  if (id === 'comercial') return { value: s.opportunities.filter(entry => !['Ganha', 'Perdida'].includes(entry.stage)).length, label: 'oportunidades' }
+  if (id === 'comercial') return { value: s.opportunities.filter(entry => entry.stage !== 'Conquista' && entry.stage !== 'Perdida').length, label: 'oportunidades' }
   if (id === 'cadastros') return { value: s.productRevisions.filter(entry => entry.status === 'Rascunho').length, label: 'revisões abertas' }
   if (id === 'suprimentos') return { value: s.requisitions.filter(req => req.status !== 'Recebida').length, label: 'compras abertas' }
   if (id === 'operacoes') return { value: s.productionOrders.filter(op => op.status === 'Em produção').length, label: 'OPs rodando' }

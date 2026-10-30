@@ -1,5 +1,5 @@
 /** Painel que o passo precisa aberto. `close` volta para a tela. */
-export type TourPanel = 'opportunity' | 'proposal' | 'demand' | 'purchase' | 'technical' | 'project' | 'budget' | 'person' | 'asset' | 'close'
+export type TourPanel = 'proposal' | 'demand' | 'purchase' | 'technical' | 'project' | 'budget' | 'person' | 'asset' | 'close'
 
 export interface TourStep {
   target?: string
@@ -32,6 +32,7 @@ export const ORDER_DRAWER_TOUR: TourStep[] = [
 /** Chave do guia para a rota: telas com id na URL compartilham um guia. */
 export function tourKey(path: string): string {
   if (path.startsWith('/produtos/item/')) return '/produtos/item'
+  if (path.startsWith('/crm/oportunidade/')) return '/crm/oportunidade'
   if (path.startsWith('/postos')) return '/postos'
   if (path.startsWith('/servicos')) return '/servicos'
   if (path.startsWith('/parceiros')) return '/parceiros'
@@ -137,13 +138,29 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('demand-links', 'Origem, categoria e período', 'A origem abre a OP, o chamado ou o projeto. O pedido e o orçamento mostram a categoria, o mês e o saldo que esta demanda consome.', 'demand'),
   ],
   '/crm': [
-    t('crm-funnel', 'Funil comercial', 'Cada cartão é uma oportunidade. Clique para abrir a ficha à direita: é nela que a proposta e o projeto nascem.', 'close'),
-    t('new-record', 'Nova oportunidade', 'Cliente, produtos de interesse e quantidade. Esses produtos viram as linhas da proposta, já com preço sugerido.', 'close'),
-    t('opp-actions', 'Proposta ou projeto, daqui', 'Criar proposta monta o rascunho com os produtos desta oportunidade. Projeto de desenvolvimento abre um projeto já ligado a ela e ao cliente. Marcar como perdida encerra a oportunidade e recusa as propostas que ainda estão abertas.', 'opportunity'),
-    t('opp-stages', 'A etapa anda com o trabalho', 'Clique numa etapa para avançar ou voltar. Ganha não é um clique: a oportunidade só é ganha quando o cliente aceita a proposta.', 'opportunity'),
-    t('opp-activities', 'Próxima ação', 'Toda oportunidade aberta precisa de um próximo passo. Agende a ligação, a reunião ou a tarefa e marque quando estiver feita. Isso fica na linha do tempo.', 'opportunity'),
-    t('opp-proposals', 'Propostas desta oportunidade', 'Cada proposta abre a própria ficha, com preço, validade e, depois do aceite, o pedido gerado. O guia abre uma agora.', 'opportunity'),
-    t('prop-actions', 'Enviar, aceitar ou recusar', 'Enviar leva a oportunidade para Negociação. Cliente aceitou aprova o pedido no Omie, com todas as linhas de produto, e a oportunidade vira Ganha. Recusar devolve a oportunidade para a etapa de proposta.', 'proposal'),
+    t('crm-areas', 'O CRM em cinco abas', 'Painel, Oportunidades, Funil, Propostas e Agenda. O número em cada aba é o que pede ação. Vendedor e grupo, à direita, filtram todas as abas.'),
+    t('crm-goal', 'Meta do mês ou do ano', 'O MRR conquistado contra a meta anual da empresa. O mês usa um doze avos. Definir meta fica com quem gerencia o comercial.'),
+    t('crm-attention', 'Precisa de atenção', 'Oportunidades sem status, sem próxima ação ou com fechamento vencido. Clique para abrir a ficha e resolver.'),
+  ],
+  '/crm/oportunidades': [
+    t('record-list', 'Todas as oportunidades', 'Guias por situação, atalhos de temperatura e de alerta, e filtro em cada coluna. Clique na linha para abrir a ficha.'),
+    t('new-record', 'Nova oportunidade', 'Cliente, vendedor, origem e a próxima ação com data. A ação já entra na agenda e a ficha abre em seguida.'),
+  ],
+  '/crm/funil': [
+    t('crm-funnel', 'Funil comercial', 'Cada coluna é uma fase e soma o MRR. Avançar move uma fase; Conquista só vem pelo aceite da proposta. Clique no cartão para abrir a ficha.'),
+  ],
+  '/crm/agenda': [
+    t('crm-agenda', 'Agenda comercial', 'As próximas ações de todas as oportunidades, das atrasadas às dos próximos dias. Concluir marca a atividade como feita; a linha abre a ficha nas observações.'),
+  ],
+  '/crm/oportunidade': [
+    t('opp-header', 'Ficha da oportunidade', 'Cliente, vendedor e empresa no topo, com os alertas abertos. Criar proposta monta o rascunho com os produtos de interesse. Marcar como perdida pede o motivo e recusa as propostas abertas.'),
+    t('opp-stages', 'A fase anda com o trabalho', 'Clique numa fase para avançar ou voltar. Conquista não é um clique: a oportunidade só é conquistada quando o cliente aceita a proposta.'),
+    t('opp-kpis', 'Números que importam', 'Ticket, MRR, temperatura, fechamento, próxima ação e custo das demandas. Cada indicador abre a aba onde ele se resolve.'),
+    t('opp-tabs', 'Abas da ficha', 'Dados se editam e se salvam aqui. Observações é a agenda desta oportunidade. Desenvolvimento abre o PAP, as demandas e o projeto.'),
+  ],
+  '/crm/propostas': [
+    t('crm-proposals', 'Propostas', 'Em andamento, aceitas e recusadas. A validade vencida aparece em vermelho para cobrar retorno. Clique para abrir a proposta.', 'close'),
+    t('prop-actions', 'Enviar, aceitar ou recusar', 'Enviar mantém a oportunidade em Proposta. Cliente aceitou aprova o pedido no Omie, com todas as linhas de produto, e a oportunidade vira Conquista. Recusar registra o motivo.', 'proposal'),
     t('prop-items', 'Itens, desconto e condições', 'Produtos e serviços na mesma proposta. Em rascunho, quantidade e preço são editáveis e o desconto vai até 15%. Pagamento, validade e entrega sugerida ficam nas condições.', 'proposal'),
   ],
   '/assistencia': [

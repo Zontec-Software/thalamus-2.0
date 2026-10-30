@@ -12,7 +12,18 @@ export const router = createRouter({
     { path: '/fluxo', component: () => import('../views/FlowView.vue'), meta: { title: 'Fluxo do pedido', eyebrow: 'Do Omie à nota fiscal' } },
     { path: '/tarefas', component: () => import('../views/TasksView.vue'), meta: { title: 'Minhas tarefas', eyebrow: 'Fila de trabalho' } },
     { path: '/pedidos', component: () => import('../views/OrdersView.vue'), meta: { title: 'Vendas', eyebrow: 'Comercial' } },
-    { path: '/crm', component: () => import('../views/CrmView.vue'), meta: { title: 'CRM e propostas', eyebrow: 'Comercial' } },
+    {
+      path: '/crm',
+      component: () => import('../views/crm/CrmLayout.vue'),
+      children: [
+        { path: '', component: () => import('../views/crm/CrmDashboardView.vue'), meta: { title: 'CRM', eyebrow: 'Comercial' } },
+        { path: 'oportunidades', component: () => import('../views/crm/OpportunityListView.vue'), meta: { title: 'Oportunidades', eyebrow: 'Comercial' } },
+        { path: 'funil', component: () => import('../views/crm/CrmPipelineView.vue'), meta: { title: 'Funil', eyebrow: 'Comercial' } },
+        { path: 'propostas', component: () => import('../views/crm/ProposalListView.vue'), meta: { title: 'Propostas', eyebrow: 'Comercial' } },
+        { path: 'agenda', component: () => import('../views/crm/CrmAgendaView.vue'), meta: { title: 'Agenda comercial', eyebrow: 'Comercial' } },
+        { path: 'oportunidade/:id', component: () => import('../views/crm/OpportunityPage.vue'), meta: { title: 'Oportunidade', eyebrow: 'Comercial' } },
+      ],
+    },
     {
       path: '/produtos',
       component: () => import('../views/products/ProductsLayout.vue'),
@@ -85,7 +96,8 @@ export const router = createRouter({
 
 function applyDocumentTitle(path: string, metaTitle: unknown) {
   const itemId = path.match(/^\/produtos\/item\/([^/]+)/)?.[1]
-  const code = itemId ? useErpStore().state.items.find(entry => entry.id === decodeURIComponent(itemId))?.code : undefined
+  const opportunityId = path.match(/^\/crm\/oportunidade\/([^/]+)/)?.[1]
+  const code = itemId ? useErpStore().state.items.find(entry => entry.id === decodeURIComponent(itemId))?.code : opportunityId ? decodeURIComponent(opportunityId) : undefined
   const label = code ?? screenLabel(path, typeof metaTitle === 'string' ? metaTitle : undefined)
   document.title = label ? `Thalamus | ${label}` : 'Thalamus'
 }

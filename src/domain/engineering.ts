@@ -364,6 +364,30 @@ export function createChange(state: ErpState, input: ChangeInput, actor: string,
   return change
 }
 
+/** PAP: a oportunidade pede uma mudança de engenharia e a engenharia segue nela em Produtos. */
+export function requestChangeForOpportunity(state: ErpState, opportunityId: string, actor: string) {
+  const opportunity = state.opportunities.find(entry => entry.id === opportunityId)
+  if (!opportunity) throw new DomainError('Oportunidade não encontrada')
+  if (opportunity.stage === 'Conquista' || opportunity.stage === 'Perdida') throw new DomainError('Oportunidade encerrada não pede mudança')
+  const itemIds = (opportunity.itemIds ?? []).filter(id => {
+    const item = state.items.find(entry => entry.id === id)
+    return !!item && (hasRouting(item) || isKitVirtual(item) || isTooling(item))
+  })
+  const reason = (opportunity.notes?.trim() || `${opportunity.title}: desenvolvimento pedido pelo comercial.`).slice(0, 500)
+  const change = createChange(state, {
+    title: opportunity.title.trim().length >= 5 ? opportunity.title.trim() : `PAP ${opportunity.id}`,
+    reason: reason.length >= 10 ? reason : `${opportunity.title}: desenvolvimento pedido pelo comercial.`,
+    priority: 'Normal',
+    itemIds,
+    disposition: 'Sem estoque',
+    effectiveDate: opportunity.expectedClose >= today() ? opportunity.expectedClose : today(),
+  }, actor)
+  change.opportunityId = opportunityId
+  change.history.unshift({ at: now(), actor, text: `PAP pedido por ${opportunity.id}` })
+  log(state, 'CRM', actor, `${change.id} pedido a partir da oportunidade`, undefined, opportunityId)
+  return change
+}
+
 export function updateChange(state: ErpState, changeId: string, input: ChangeInput, actor: string, role: Role = 'Gestor') {
   const change = findChange(state, changeId)
   if (change.stage === 'Implementada' || change.stage === 'Recusada') throw new DomainError('Mudança encerrada não é alterada')

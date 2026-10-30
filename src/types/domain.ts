@@ -1101,6 +1101,8 @@ export interface EngineeringChange {
   approvedAt?: string
   implementedAt?: string
   history: { at: string; actor: string; text: string }[]
+  /** Oportunidade comercial que pediu a mudança (PAP). */
+  opportunityId?: string
 }
 
 export type ServicePlace = 'Roboflex' | 'Cliente' | 'Outro'
@@ -1152,7 +1154,7 @@ export interface Demand {
   serviceId?: string
   description: string
   quantity: number
-  origin: 'OP' | 'Estoque mínimo' | 'Manutenção' | 'Assistência' | 'Projeto' | 'Manual'
+  origin: 'OP' | 'Estoque mínimo' | 'Manutenção' | 'Assistência' | 'Projeto' | 'Oportunidade' | 'Manual'
   originId?: string
   neededBy: string
   priority: Priority
@@ -1203,13 +1205,34 @@ export interface CrmActivity {
   done: boolean
 }
 
+export type OpportunityStage = 'Prospecção' | 'Desenvolvimento' | 'Elaboração' | 'Proposta' | 'Conquista' | 'Perdida'
+export type OpportunityTemperature = 'Quente' | 'Morno' | 'Frio'
+
+/** Meta comercial de uma empresa. O grupo só soma as metas; cada empresa grava a sua. */
+export interface SalesGoal {
+  tenantId: string
+  year: number
+  amount: number
+}
+
 export interface Opportunity {
   id: string
   partnerId: string
   title: string
   ownerId: string
-  stage: 'Lead' | 'Qualificação' | 'Proposta' | 'Negociação' | 'Ganha' | 'Perdida'
+  /** Empresa dona do lançamento. Ausente só em dado antigo. */
+  tenantId?: string
+  stage: OpportunityStage
+  /** Valor do negócio (ticket). A proposta atualiza este número. */
   value: number
+  /** Receita recorrente mensal usada no painel. */
+  mrr?: number
+  temperature?: OpportunityTemperature
+  /** Texto livre do vendedor. Não substitui a fase. */
+  statusNote?: string
+  phone?: string
+  email?: string
+  dealType?: 'Venda'
   probability: number
   nextAction: string
   expectedClose: string
@@ -1222,6 +1245,7 @@ export interface Opportunity {
   notes?: string
   lossReason?: string
   createdAt?: string
+  wonAt?: string
 }
 
 export interface ProposalLine {

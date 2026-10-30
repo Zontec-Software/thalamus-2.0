@@ -38,6 +38,7 @@ const STAGE_TONE: Record<ChangeStage, string> = { Solicitada: 'neutral', 'Em an�
         <span class="eyebrow">{{ change.id }} · {{ change.priority }}</span>
         <h3 style="margin:2px 0 4px">{{ change.title }}</h3>
         <p>{{ change.reason }}</p>
+        <p v-if="change.opportunityId" class="cell-sub">Ligada à oportunidade {{ change.opportunityId }}.</p>
       </div>
       <StatusBadge :value="change.stage" :tone="STAGE_TONE[change.stage]" />
     </div>
