@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, CalendarPlus, ChevronRight, FilePlus2, FolderPlus, ThumbsDown } from 'lucide-vue-next'
 import BaseModal from '../../components/BaseModal.vue'
+import RichText from '../../components/RichText.vue'
 import RecordTimeline from '../../components/records/RecordTimeline.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import { addDays, today } from '../../domain/engine'
@@ -14,7 +15,7 @@ import type { CrmActivity, Opportunity } from '../../types/domain'
 import { fmtCurrency, fmtDate, fmtDateTime } from '../../utils/format'
 import { CRM_SOURCES, CRM_VERTICALS, LOSS_REASONS, attentionOf, useCrmScope } from './shared'
 
-type Tab = 'dados' | 'observacoes' | 'propostas' | 'desenvolvimento' | 'historico'
+type Tab = 'dados' | 'acoes' | 'observacoes' | 'propostas' | 'desenvolvimento' | 'historico'
 
 const store = useErpStore()
 const ui = useUiStore()
@@ -43,7 +44,8 @@ const initials = computed(() => store.partnerName(opportunity.value?.partnerId ?
 
 const tabs = computed(() => [
   { id: 'dados' as const, label: 'Dados' },
-  { id: 'observacoes' as const, label: 'Observações', count: activities.value.filter(entry => !entry.done).length },
+  { id: 'acoes' as const, label: 'Ações', count: activities.value.filter(entry => !entry.done).length },
+  { id: 'observacoes' as const, label: 'Observações' },
   { id: 'propostas' as const, label: 'Propostas', count: proposals.value.length },
   { id: 'desenvolvimento' as const, label: 'Desenvolvimento', count: changes.value.length + demands.value.length },
   { id: 'historico' as const, label: 'Histórico' },
@@ -61,8 +63,14 @@ const editable = () => {
   }
 }
 const form = reactive(editable())
+const observation = ref('')
+const resetObservation = () => { observation.value = opportunity.value?.observation ?? '' }
+const observationDirty = computed(() => observation.value !== (opportunity.value?.observation ?? ''))
+function saveObservation() {
+  if (opportunity.value && store.updateOpportunity(opportunity.value.id, { observation: observation.value })) resetObservation()
+}
 const reset = () => Object.assign(form, editable())
-watch(() => opportunity.value?.id, reset, { immediate: true })
+watch(() => opportunity.value?.id, () => { reset(); resetObservation() }, { immediate: true })
 const dirty = computed(() => JSON.stringify(form) !== JSON.stringify(editable()))
 const estimate = computed(() => form.itemIds.reduce((sum, itemId) => sum + Math.round(store.item(itemId).cost * 2.4) * form.quantity, 0))
 function save() {
@@ -149,7 +157,7 @@ function askDemand() {
         <button type="button" class="kpi link" @click="openTab('dados')"><span>MRR</span><strong>{{ fmtCurrency(opportunity.mrr ?? 0) }}</strong><small>entra na meta</small></button>
         <div class="kpi"><span>Temperatura · prob.</span><strong>{{ opportunity.temperature ?? 'Morno' }} · {{ opportunity.probability }}%</strong><small>a probabilidade vem da fase</small></div>
         <button type="button" class="kpi link" :class="{ danger: !closed && opportunity.expectedClose < today() }" @click="openTab('dados')"><span>Fechamento</span><strong>{{ fmtDate(opportunity.expectedClose) }}</strong><small>{{ opportunity.wonAt ? `conquistada em ${fmtDate(opportunity.wonAt)}` : 'previsão' }}</small></button>
-        <button type="button" class="kpi link" :class="{ warning: !closed && !nextActivity }" @click="openTab('observacoes')"><span>Próxima ação</span><strong>{{ nextActivity ? fmtDate(nextActivity.at) : '—' }}</strong><small>{{ nextActivity?.text ?? 'Nenhuma agendada' }}</small></button>
+        <button type="button" class="kpi link" :class="{ warning: !closed && !nextActivity }" @click="openTab('acoes')"><span>Próxima ação</span><strong>{{ nextActivity ? fmtDate(nextActivity.at) : '—' }}</strong><small>{{ nextActivity?.text ?? 'Nenhuma agendada' }}</small></button>
         <button type="button" class="kpi link" @click="openTab('desenvolvimento')"><span>Custo total</span><strong>{{ fmtCurrency(demandCost) }}</strong><small>{{ demands.length }} demanda(s) · {{ changes.length }} PAP</small></button>
       </div>
     </article>
@@ -222,7 +230,7 @@ function askDemand() {
         </section>
       </div>
 
-      <div v-else-if="tab === 'observacoes'" data-tour="opp-activities">
+      <div v-else-if="tab === 'acoes'" data-tour="opp-activities">
         <div v-if="!closed" class="inline-form row">
           <select v-model="activity.type" class="filter"><option>Ligação</option><option>E-mail</option><option>Reunião</option><option>Tarefa</option></select>
           <input v-model="activity.text" class="filter grow" placeholder="O que precisa ser feito?" @keyup.enter="schedule" />
@@ -235,6 +243,14 @@ function askDemand() {
           <StatusBadge :value="entry.done ? 'Concluída' : entry.at.slice(0, 10) < today() ? 'Vencido' : 'Agendada'" />
         </label>
         <p v-if="!activities.length" class="empty-note">Nenhuma atividade. Toda oportunidade aberta precisa de uma próxima ação.</p>
+      </div>
+
+      <div v-else-if="tab === 'observacoes'">
+        <RichText v-model="observation" :disabled="closed" />
+        <div v-if="!closed" class="save-bar">
+          <button class="button secondary" :disabled="!observationDirty" @click="resetObservation">Descartar</button>
+          <button class="button" :disabled="!observationDirty" @click="saveObservation">Salvar</button>
+        </div>
       </div>
 
       <div v-else-if="tab === 'propostas'" data-tour="opp-proposals">

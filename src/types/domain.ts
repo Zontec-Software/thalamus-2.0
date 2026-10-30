@@ -1242,7 +1242,10 @@ export interface Opportunity {
   segment?: string
   itemIds?: string[]
   quantity?: number
+  /** Texto curto da motivação, na aba Dados. */
   notes?: string
+  /** Texto livre formatado, na aba Observações. */
+  observation?: string
   lossReason?: string
   createdAt?: string
   wonAt?: string

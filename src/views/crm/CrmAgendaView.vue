@@ -34,7 +34,7 @@ const rows = computed(() => pending.value.filter(entry => TABS.find(item => item
     <table class="dense">
       <thead><tr><th>Quando</th><th>Atividade</th><th>Oportunidade</th><th>Vendedor</th><th></th></tr></thead>
       <tbody>
-        <tr v-for="{ opportunity, activity, day } in rows" :key="activity.id" class="clickable" @click="router.push({ path: `/crm/oportunidade/${opportunity.id}`, query: { aba: 'observacoes' } })">
+        <tr v-for="{ opportunity, activity, day } in rows" :key="activity.id" class="clickable" @click="router.push({ path: `/crm/oportunidade/${opportunity.id}`, query: { aba: 'acoes' } })">
           <td :class="{ 'risk-text': day < today() }">{{ fmtDateTime(activity.at) }}</td>
           <td><span class="cell-main">{{ activity.text }}</span><span class="cell-sub">{{ activity.type }}</span></td>
           <td>{{ opportunity.title }}<span class="cell-sub">{{ store.partnerName(opportunity.partnerId) }}</span></td>

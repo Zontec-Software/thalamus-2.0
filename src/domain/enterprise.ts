@@ -300,7 +300,7 @@ const STAGE_PROBABILITY: Record<Opportunity['stage'], number> = { Prospecção: 
 export const opportunityIsOpen = (entry: Pick<Opportunity, 'stage'>) => entry.stage !== 'Conquista' && entry.stage !== 'Perdida'
 
 type OpportunityInput = Pick<Opportunity, 'partnerId' | 'title' | 'ownerId' | 'value' | 'expectedClose' | 'source' | 'nextAction'>
-  & Partial<Pick<Opportunity, 'contact' | 'segment' | 'itemIds' | 'quantity' | 'notes' | 'tenantId' | 'mrr' | 'temperature' | 'statusNote' | 'phone' | 'email' | 'dealType'>>
+  & Partial<Pick<Opportunity, 'contact' | 'segment' | 'itemIds' | 'quantity' | 'notes' | 'observation' | 'tenantId' | 'mrr' | 'temperature' | 'statusNote' | 'phone' | 'email' | 'dealType'>>
 
 export function createOpportunity(state: ErpState, input: OpportunityInput, actor: string) {
   if (!input.title.trim()) throw new DomainError('Dê um título à oportunidade')

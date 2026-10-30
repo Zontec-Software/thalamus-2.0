@@ -150,13 +150,13 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('crm-funnel', 'Funil comercial', 'Cada coluna é uma fase e soma o MRR. Avançar move uma fase; Conquista só vem pelo aceite da proposta. Clique no cartão para abrir a ficha.'),
   ],
   '/crm/agenda': [
-    t('crm-agenda', 'Agenda comercial', 'As próximas ações de todas as oportunidades, das atrasadas às dos próximos dias. Concluir marca a atividade como feita; a linha abre a ficha nas observações.'),
+    t('crm-agenda', 'Agenda comercial', 'As próximas ações de todas as oportunidades, das atrasadas às dos próximos dias. Concluir marca a atividade como feita; a linha abre a ficha em Ações.'),
   ],
   '/crm/oportunidade': [
     t('opp-header', 'Ficha da oportunidade', 'Cliente, vendedor e empresa no topo, com os alertas abertos. Criar proposta monta o rascunho com os produtos de interesse. Marcar como perdida pede o motivo e recusa as propostas abertas.'),
     t('opp-stages', 'A fase anda com o trabalho', 'Clique numa fase para avançar ou voltar. Conquista não é um clique: a oportunidade só é conquistada quando o cliente aceita a proposta.'),
     t('opp-kpis', 'Números que importam', 'Ticket, MRR, temperatura, fechamento, próxima ação e custo das demandas. Cada indicador abre a aba onde ele se resolve.'),
-    t('opp-tabs', 'Abas da ficha', 'Dados se editam e se salvam aqui. Observações é a agenda desta oportunidade. Desenvolvimento abre o PAP, as demandas e o projeto.'),
+    t('opp-tabs', 'Abas da ficha', 'Dados se editam e se salvam aqui. Ações é a agenda desta oportunidade. Observações guarda o texto livre. Desenvolvimento abre o PAP, as demandas e o projeto.'),
   ],
   '/crm/propostas': [
     t('crm-proposals', 'Propostas', 'Em andamento, aceitas e recusadas. A validade vencida aparece em vermelho para cobrar retorno. Clique para abrir a proposta.', 'close'),

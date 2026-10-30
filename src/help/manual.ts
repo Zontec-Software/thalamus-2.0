@@ -1054,9 +1054,10 @@ export const MANUAL: ManualChapter[] = [
             kind: 'steps', title: 'Trabalhar uma oportunidade',
             items: [
               'Clique em **Nova oportunidade**: cliente, vendedor, origem, vertical e a próxima ação com data. A ação entra na agenda e a ficha abre.',
-              'A ficha é uma página: fases, indicadores e as abas Dados, Observações, Propostas, Desenvolvimento e Histórico.',
+              'A ficha é uma página: fases, indicadores e as abas Dados, Ações, Observações, Propostas, Desenvolvimento e Histórico.',
               'Em **Dados**, edite contato, negócio, produtos de interesse e status e clique em **Salvar**.',
-              'Em **Observações**, registre a próxima ação (ligação, e-mail, reunião ou tarefa) e marque como feita quando concluir.',
+              'Em **Ações**, registre a próxima ação (ligação, e-mail, reunião ou tarefa) e marque como feita quando concluir.',
+              'Em **Observações**, escreva o texto livre da negociação. Negrito, itálico e listas ficam salvos com o botão **Salvar**.',
               'Clique numa fase para avançar ou voltar.',
               'Quando o cliente pedir preço, use **Criar proposta**. Se for desenvolvimento, a aba **Desenvolvimento** abre o PAP, as demandas e o projeto.',
             ],
