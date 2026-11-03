@@ -63,7 +63,7 @@ function openOp(id: string) {
 
 <template>
   <template v-if="isNew">
-    <RecordHeader eyebrow="Cadastros · novo ativo" title="Novo ativo" subtitle="Máquinas, moldes e equipamentos com responsável, criticidade e plano preventivo." />
+    <RecordHeader eyebrow="Patrimônio · novo ativo" title="Novo ativo" subtitle="Máquinas, moldes e equipamentos com responsável, criticidade e plano preventivo." />
     <div class="drawer-body">
       <div class="form-grid">
         <div class="field"><label>Nome</label><input v-model="form.name" placeholder="Ex.: Injetora 04 · Haitian 250 t" /></div>
@@ -71,7 +71,7 @@ function openOp(id: string) {
         <div class="field"><label>Fabricante</label><input v-model="form.manufacturer" /></div>
         <div class="field"><label>Número de série</label><input v-model="form.serial" /></div>
         <div class="field"><label>Localização</label><input v-model="form.location" /></div>
-        <div class="field"><label>Recurso produtivo</label><select v-model="form.resourceId"><option value="">Nenhum</option><option v-for="resource in postos" :key="resource.id" :value="resource.id">{{ resource.name }}</option></select><small>Posto de Cadastros. Liga o ativo à programação. O posto inativo não entra em vínculo novo.</small></div>
+        <div class="field"><label>Recurso produtivo</label><select v-model="form.resourceId"><option value="">Nenhum</option><option v-for="resource in postos" :key="resource.id" :value="resource.id">{{ resource.name }}</option></select><small>Posto de Administração do sistema. Liga o ativo à programação. O posto inativo não entra em vínculo novo.</small></div>
         <div class="field"><label>Responsável</label><select v-model="form.responsibleId"><option v-for="user in technicians" :key="user.id" :value="user.id">{{ user.name }}</option></select></div>
         <div class="field"><label>Criticidade</label><select v-model="form.criticality"><option value="A">A · para a produção</option><option value="B">B · impacto parcial</option><option value="C">C · baixo impacto</option></select></div>
         <div v-if="form.kind === 'Molde'" class="field"><label>Limite de ciclos p/ preventiva</label><input v-model.number="form.preventiveLimit" type="number" min="0" step="10000" /></div>

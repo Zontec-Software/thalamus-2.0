@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Bell, BookOpen, ChevronDown, CircleHelp, Compass, House, RotateCcw, Search } from 'lucide-vue-next'
+import { BookOpen, ChevronDown, Compass, House, RotateCcw } from 'lucide-vue-next'
+import { IconAjuda, IconBusca, IconNotificacoes, IconTarefas } from './icons/ds'
 import BrandMark from './components/BrandMark.vue'
 import OpDrawer from './components/OpDrawer.vue'
 import OrderDrawer from './components/OrderDrawer.vue'
@@ -9,7 +10,7 @@ import RecordDrawer from './components/records/RecordDrawer.vue'
 import ToastHost from './components/ToastHost.vue'
 import TourGuide from './components/TourGuide.vue'
 import { allocationOf } from './domain/budget'
-import { AREAS, areaDestination, areaOf, moduleFeature, moduleOf, owns } from './navigation'
+import { AREAS, areaDestination, areaOf, moduleFeature, moduleOf, navTarget, owns, type NavItem } from './navigation'
 import { useErpStore } from './stores/erp'
 import { useUiStore } from './stores/ui'
 import { PAGE_TOURS, WELCOME_KEY, WELCOME_TOUR, tourKey } from './tour/steps'
@@ -23,7 +24,7 @@ const ui = useUiStore()
 
 const isTablet = computed(() => route.meta.layout === 'tablet')
 const isHome = computed(() => route.path === '/')
-const currentArea = computed(() => areaOf(route.path))
+const currentArea = computed(() => areaOf(route.path, typeof route.query.origem === 'string' ? route.query.origem : undefined))
 const query = ref('')
 const searchOpen = ref(false)
 const helpOpen = ref(false)
@@ -38,7 +39,7 @@ const areas = computed(() => AREAS.flatMap(area => {
 }))
 const areaHome = computed(() => currentArea.value ? areaDestination(currentArea.value, allowed) : undefined)
 const navigation = computed(() => (currentArea.value?.groups ?? [])
-  .map(group => ({ ...group, items: group.items.filter(item => allowed(item.module)) }))
+  .map(group => ({ ...group, items: group.items.filter((item): item is NavItem & { to: string } => item.bar !== false && !!item.to && !item.pending && allowed(item.module)) }))
   .filter(group => group.items.length))
 
 const openAlerts = computed(() => store.state.alerts.filter(alert => !alert.resolved))
@@ -76,6 +77,7 @@ function openBudgetNotice(alert: BudgetAlert) {
   router.push('/orcamentos')
   if (allocation) ui.openRecord('budget', allocation.id, { window: alert.period })
 }
+const taskCount = computed(() => store.tasks().length)
 const syncErrors = computed(() => store.state.syncLogs.filter(entry => entry.status === 'erro').length)
 const lastSync = computed(() => store.state.syncLogs[0]?.at)
 
@@ -192,15 +194,21 @@ watch(() => ui.tourSteps.length, length => { if (length === 0) maybeStartTour() 
         </div>
         <div class="topbar-actions">
           <div class="search-wrap" data-tour="search">
-            <label class="global-search"><Search :size="16" /><input v-model="query" placeholder="Buscar pedido, cliente, demanda, projeto…" @focus="searchOpen = true" @blur="closeSearchSoon" /></label>
+            <label class="global-search"><IconBusca :size="16" /><input v-model="query" placeholder="Buscar pedido, cliente, demanda, projeto…" @focus="searchOpen = true" @blur="closeSearchSoon" /></label>
             <div v-if="searchOpen && results.length" class="dropdown search-results">
               <button v-for="result in results" :key="result.type + result.key" @mousedown.prevent="pick(result)">
                 <span class="status neutral">{{ result.type }}</span>
                 <div><strong>{{ result.title }}</strong><small>{{ result.text }}</small></div>
               </button>
             </div>
-            <div v-else-if="searchOpen && query.length >= 2" class="dropdown search-results"><p class="empty-note">Nada encontrado para “{{ query }}”</p></div>
+            <div v-else-if="searchOpen && query.length >= 2" class="dropdown search-results"><p class="empty-note">Nada encontrado para “{{ query }}”</p>            </div>
           </div>
+
+          <RouterLink to="/tarefas" class="task-link" data-tour="nav-tarefas">
+            <IconTarefas :size="16" />
+            <span>Minhas tarefas</span>
+            <b v-if="taskCount">{{ taskCount }}</b>
+          </RouterLink>
 
           <label v-if="canPreview" class="role-switch" data-tour="role">
             <span>Visualizar como</span>
@@ -212,7 +220,7 @@ watch(() => ui.tourSteps.length, length => { if (length === 0) maybeStartTour() 
 
           <div class="menu-wrap">
             <button class="icon-button" title="Notificações" @click="bellOpen = !bellOpen; helpOpen = false; areaOpen = false">
-              <Bell :size="18" /><b v-if="noticeCount" class="badge-count">{{ noticeCount }}</b>
+              <IconNotificacoes :size="18" /><b v-if="noticeCount" class="badge-count">{{ noticeCount }}</b>
             </button>
             <div v-if="bellOpen" class="dropdown menu-dropdown wide" @click.stop>
               <template v-if="budgetDecisions.length">
@@ -247,11 +255,11 @@ watch(() => ui.tourSteps.length, length => { if (length === 0) maybeStartTour() 
           </div>
 
           <div class="menu-wrap" data-tour="help">
-            <button class="icon-button" title="Guia e ajuda" @click="helpOpen = !helpOpen; bellOpen = false; areaOpen = false"><CircleHelp :size="18" /></button>
+            <button class="icon-button" title="Guia e ajuda" @click="helpOpen = !helpOpen; bellOpen = false; areaOpen = false"><IconAjuda :size="18" /></button>
             <div v-if="helpOpen" class="dropdown menu-dropdown">
               <button @click="pageTour"><Compass :size="15" /> Guia desta tela</button>
               <button @click="welcomeTour"><BookOpen :size="15" /> Tour geral do sistema</button>
-              <button @click="helpOpen = false; router.push('/ajuda')"><CircleHelp :size="15" /> Central de ajuda</button>
+              <button @click="helpOpen = false; router.push('/ajuda')"><IconAjuda :size="15" /> Central de ajuda</button>
               <button @click="restartGuides"><RotateCcw :size="15" /> Reexibir guias de todas as telas</button>
             </div>
           </div>
@@ -264,7 +272,7 @@ watch(() => ui.tourSteps.length, length => { if (length === 0) maybeStartTour() 
         <div class="module-tabs">
           <template v-for="(group, index) in navigation" :key="group.label">
             <span v-if="index" class="module-sep" :title="group.label"></span>
-            <RouterLink v-for="item in group.items" :key="item.to" :to="item.to" class="module-tab" :class="{ 'router-link-active': owns(item.to, route.path) }" :data-tour="item.tour">
+            <RouterLink v-for="item in group.items" :key="item.label" :to="navTarget(item)" class="module-tab" :class="{ 'router-link-active': owns(item.to, route.path) }" :data-tour="item.tour">
               <component :is="item.icon" :size="15" />
               <span>{{ item.label }}</span>
             </RouterLink>

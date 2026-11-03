@@ -81,7 +81,8 @@ const tenure = computed(() => {
 })
 const access = computed(() => person.value ? AREAS.map(area => ({
   area: area.label,
-  modules: area.groups.flatMap(group => group.items).filter(item => {
+  modules: area.groups.flatMap(group => group.items)  .filter(item => {
+    if (!item.to || item.pending) return false
     if (!item.module) return true
     const profiles = profilesHere.value.map(assignment => store.state.accessProfiles.find(profile => profile.id === assignment.profileId))
     return profiles.some(profile => profile?.system || profile?.functionalityIds.includes(moduleFeature(item.module!)))

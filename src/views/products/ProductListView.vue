@@ -14,7 +14,7 @@ import { fmtCurrency, fmtNumber } from '../../utils/format'
 import HeaderFilter from './HeaderFilter.vue'
 import ReasonModal from './ReasonModal.vue'
 import TablePager from './TablePager.vue'
-import { FLAG_TONE, LIFE_TONE, LIST_COLUMNS, headerFilterMatches, listState, usePager, type HeaderFilterColumn, type HeaderFilterOp, type ListColumn } from './shared'
+import { FLAG_TONE, LIFE_TONE, LIST_COLUMNS, dateFilterMatches, headerFilterMatches, listState, numberFilterMatches, usePager, type HeaderFilterColumn, type HeaderFilterOp, type ListColumn } from './shared'
 
 const store = useErpStore()
 const router = useRouter()
@@ -52,9 +52,18 @@ function cellText(item: Item, column: HeaderFilterColumn) {
 }
 function columnMatches(item: Item, column: HeaderFilterColumn, value: string, op: HeaderFilterOp) {
   const needle = value.trim().toLowerCase()
+  if (column === 'price') return numberFilterMatches(priceOf(item) ?? null, value, op)
+  if (column === 'stock') return numberFilterMatches(catalogOf(item).nature === 'Bem' ? item.stock : null, value, op)
+  if (column === 'updated') return dateFilterMatches(catalogOf(item).updatedAt, value, op)
   if (column === 'flags' && needle === 'qualquer pendência') {
     const hasFlag = flagsOf(item).length > 0
     return op === 'not-contains' || op === 'not-equals' ? !hasFlag : hasFlag
+  }
+  const status = value.trim()
+  if (column === 'lifecycle' && ((LIFECYCLE as readonly string[]).includes(status) || status === 'Excluído')) {
+    const life = catalogOf(item).deletedAt ? 'Excluído' : catalogOf(item).lifecycle
+    const same = life.toLowerCase() === needle
+    return op === 'not-contains' || op === 'not-equals' ? !same : same
   }
   if (column === 'class') {
     const hit = store.state.itemClasses.find(entry => entry.name.toLowerCase() === needle || classLabel(store.state, entry.id).toLowerCase() === needle)
@@ -65,11 +74,10 @@ function columnMatches(item: Item, column: HeaderFilterColumn, value: string, op
   }
   return headerFilterMatches(cellText(item, column), value, op)
 }
-function matches(item: Item, ignoreType = false, ignoreLife = false) {
+function matches(item: Item, ignoreLife = false) {
   const catalog = catalogOf(item)
   if (!!catalog.deletedAt !== listState.showDeleted) return false
   if (!ignoreLife && !productLifeTabs(store.state, item).includes(listState.life)) return false
-  if (!ignoreType && listState.type && item.type !== listState.type) return false
   return (Object.entries(listState.headerFilters) as [HeaderFilterColumn, { value: string; op: HeaderFilterOp }][])
     .every(([column, filter]) => !filter.value.trim() || columnMatches(item, column, filter.value, filter.op))
 }
@@ -87,20 +95,10 @@ function versionNote(item: Item) {
   return ''
 }
 const filtered = computed(() => store.state.items.filter(item => matches(item)))
-const typeCounts = computed(() => {
-  const counts = new Map<ItemType, number>()
-  let all = 0
-  for (const item of store.state.items) {
-    if (!matches(item, true)) continue
-    all += 1
-    counts.set(item.type, (counts.get(item.type) ?? 0) + 1)
-  }
-  return { all, counts }
-})
 const lifeCounts = computed(() => {
   const counts = { draft: 0, active: 0, review: 0, inactive: 0 }
   for (const item of store.state.items) {
-    if (!matches(item, false, true)) continue
+    if (!matches(item, true)) continue
     for (const tab of productLifeTabs(store.state, item)) counts[tab] += 1
   }
   return counts
@@ -159,6 +157,10 @@ function classIdFromFilter() {
   return store.state.itemClasses.find(entry => entry.name.toLowerCase() === value || classLabel(store.state, entry.id).toLowerCase() === value)?.id ?? ''
 }
 const units = computed(() => [...new Set(store.state.items.map(item => item.unit))].sort())
+const typeOptions = Object.values(ITEM_TYPE_LABEL)
+const classFilterOptions = computed(() => classes.value.map(entry => entry.label))
+const brandOptions = computed(() => [...brands.value, ...categories.value.filter(category => !brands.value.includes(category))])
+const lifeOptions = [...LIFECYCLE, 'Excluído']
 function closeMenu() { menu.value = '' }
 onMounted(() => document.addEventListener('click', closeMenu))
 onUnmounted(() => document.removeEventListener('click', closeMenu))
@@ -195,7 +197,9 @@ const draft = reactive({ name: '', type: '04' as ItemType, unit: 'un', classId: 
 const similar = computed(() => similarItems(store.state, draft.name))
 watch(() => draft.name, () => { confirmSimilar.value = false })
 function openCreate() {
-  Object.assign(draft, { name: '', type: listState.type || '04', unit: 'un', classId: classIdFromFilter() })
+  const typed = listState.headerFilters.type.value.trim().toLowerCase()
+  const fromFilter = (Object.entries(ITEM_TYPE_LABEL) as [ItemType, string][]).find(([id, label]) => typed === id || typed === label.toLowerCase())
+  Object.assign(draft, { name: '', type: fromFilter?.[0] ?? '04', unit: 'un', classId: classIdFromFilter() })
   creating.value = true
 }
 function create() {
@@ -226,11 +230,6 @@ function create() {
       <button class="button" data-tour="new-record" :disabled="!store.can('produtos.nucleo.gerir')" :title="store.can('produtos.nucleo.gerir') ? '' : 'Seu perfil não permite cadastrar produtos.'" @click="openCreate"><Plus :size="14" /> Novo produto</button>
     </div>
 
-    <div class="type-bar">
-      <button type="button" class="chip" :class="{ active: !listState.type }" @click="listState.type = ''">Todos <b>{{ typeCounts.all }}</b></button>
-      <button v-for="(label, id) in ITEM_TYPE_LABEL" :key="id" type="button" class="chip" :class="{ active: listState.type === id }" @click="listState.type = id">{{ id }} · {{ label }} <b>{{ typeCounts.counts.get(id) ?? 0 }}</b></button>
-    </div>
-
     <div v-if="picked.length" class="bulk-bar">
       <b>{{ picked.length }} selecionado(s)</b>
       <button class="button secondary small" @click="bulk('submit')">Enviar para homologação</button>
@@ -253,20 +252,20 @@ function create() {
           <th class="check"><input type="checkbox" :checked="allOnPage" title="Selecionar a página" @change="togglePage" /></th>
           <th :class="{ filtering: filled('code') }"><HeaderFilter label="Código" sortable :arrow="arrow('code')" v-bind="filterBindings('code')" @sort="sortBy('code')" /></th>
           <th :class="{ filtering: filled('name') }"><HeaderFilter label="Descrição" sortable :arrow="arrow('name')" v-bind="filterBindings('name')" @sort="sortBy('name')" /></th>
-          <th v-if="shown('type')" :class="{ filtering: filled('type') }"><HeaderFilter label="Tipo" list-id="product-type-options" v-bind="filterBindings('type')" /></th>
-          <th v-if="shown('class')" :class="{ filtering: filled('class') }"><HeaderFilter label="Classificação" list-id="product-class-options" v-bind="filterBindings('class')" /></th>
-          <th v-if="shown('brand')" :class="{ filtering: filled('brand') }"><HeaderFilter label="Marca" list-id="product-brand-options" v-bind="filterBindings('brand')" /></th>
-          <th v-if="shown('abc')" :class="{ filtering: filled('abc') }"><HeaderFilter label="ABC" list-id="product-abc-options" v-bind="filterBindings('abc')" /></th>
-          <th v-if="shown('price')" :class="{ filtering: filled('price') }"><HeaderFilter label="Preço" v-bind="filterBindings('price')" /></th>
+          <th v-if="shown('type')" :class="{ filtering: filled('type') }"><HeaderFilter label="Tipo" :options="typeOptions" v-bind="filterBindings('type')" /></th>
+          <th v-if="shown('class')" :class="{ filtering: filled('class') }"><HeaderFilter label="Classificação" :options="classFilterOptions" v-bind="filterBindings('class')" /></th>
+          <th v-if="shown('brand')" :class="{ filtering: filled('brand') }"><HeaderFilter label="Marca" :options="brandOptions" v-bind="filterBindings('brand')" /></th>
+          <th v-if="shown('abc')" :class="{ filtering: filled('abc') }"><HeaderFilter label="ABC" :options="['A', 'B', 'C']" v-bind="filterBindings('abc')" /></th>
+          <th v-if="shown('price')" :class="{ filtering: filled('price') }"><HeaderFilter label="Preço" kind="number" v-bind="filterBindings('price')" /></th>
           <th v-if="shown('model')" :class="{ filtering: filled('model') }"><HeaderFilter label="Grade" v-bind="filterBindings('model')" /></th>
-          <th v-if="shown('unit')" :class="{ filtering: filled('unit') }"><HeaderFilter label="Un." list-id="product-unit-options" v-bind="filterBindings('unit')" /></th>
-          <th v-if="shown('stock')" :class="{ filtering: filled('stock') }"><HeaderFilter label="Saldo" sortable :arrow="arrow('stock')" v-bind="filterBindings('stock')" @sort="sortBy('stock')" /></th>
+          <th v-if="shown('unit')" :class="{ filtering: filled('unit') }"><HeaderFilter label="Un." :options="units" v-bind="filterBindings('unit')" /></th>
+          <th v-if="shown('stock')" :class="{ filtering: filled('stock') }"><HeaderFilter label="Saldo" kind="number" sortable :arrow="arrow('stock')" v-bind="filterBindings('stock')" @sort="sortBy('stock')" /></th>
           <th v-if="shown('ncm')" :class="{ filtering: filled('ncm') }"><HeaderFilter label="NCM" v-bind="filterBindings('ncm')" /></th>
           <th v-if="shown('gtin')" :class="{ filtering: filled('gtin') }"><HeaderFilter label="EAN" v-bind="filterBindings('gtin')" /></th>
           <th v-if="shown('version')" :class="{ filtering: filled('version') }"><HeaderFilter label="Versão" v-bind="filterBindings('version')" /></th>
-          <th v-if="shown('updated')" :class="{ filtering: filled('updated') }"><HeaderFilter label="Alterado" sortable :arrow="arrow('updated')" v-bind="filterBindings('updated')" @sort="sortBy('updated')" /></th>
-          <th :class="{ filtering: filled('lifecycle') }"><HeaderFilter label="Situação" sortable list-id="product-life-options" :arrow="arrow('lifecycle')" v-bind="filterBindings('lifecycle')" @sort="sortBy('lifecycle')" /></th>
-          <th v-if="shown('flags')" :class="{ filtering: filled('flags') }"><HeaderFilter label="Pendências" list-id="product-flag-options" v-bind="filterBindings('flags')" /></th>
+          <th v-if="shown('updated')" :class="{ filtering: filled('updated') }"><HeaderFilter label="Alterado" kind="date" sortable :arrow="arrow('updated')" v-bind="filterBindings('updated')" @sort="sortBy('updated')" /></th>
+          <th :class="{ filtering: filled('lifecycle') }"><HeaderFilter label="Situação" sortable :options="lifeOptions" :arrow="arrow('lifecycle')" v-bind="filterBindings('lifecycle')" @sort="sortBy('lifecycle')" /></th>
+          <th v-if="shown('flags')" :class="{ filtering: filled('flags') }"><HeaderFilter label="Pendências" :options="FLAGS" v-bind="filterBindings('flags')" /></th>
         </tr>
       </thead>
       <tbody>
@@ -291,13 +290,6 @@ function create() {
         </tr>
       </tbody>
     </table>
-    <datalist id="product-type-options"><option v-for="(label, id) in ITEM_TYPE_LABEL" :key="id" :value="label" /></datalist>
-    <datalist id="product-class-options"><option v-for="entry in classes" :key="entry.id" :value="entry.label" /></datalist>
-    <datalist id="product-brand-options"><option v-for="brand in brands" :key="brand" :value="brand" /><option v-for="category in categories" :key="category" :value="category" /></datalist>
-    <datalist id="product-abc-options"><option value="A" /><option value="B" /><option value="C" /></datalist>
-    <datalist id="product-unit-options"><option v-for="unit in units" :key="unit" :value="unit" /></datalist>
-    <datalist id="product-life-options"><option v-for="step in LIFECYCLE" :key="step" :value="step" /></datalist>
-    <datalist id="product-flag-options"><option v-for="flag in FLAGS" :key="flag" :value="flag" /></datalist>
     <p v-if="!filtered.length" class="empty-note">Nenhum produto com esses filtros.</p>
     <TablePager v-model:page="page" v-model:size="size" :pages="pages" :range="range" />
   </article>
@@ -306,7 +298,7 @@ function create() {
     subtitle="Cada produto passa pelas mesmas regras da tela individual. Os que não puderem mudar voltam com o motivo." :tone="askReason === 'block' ? 'danger' : 'warning'"
     :confirm="askReason === 'block' ? 'Bloquear' : 'Obsoletar'" @close="askReason = ''" @confirm="reason => askReason && bulk(askReason, reason)" />
 
-  <BaseModal :open="creating" title="Novo produto" subtitle="Nasce em rascunho. Rascunho não entra em pedido, compra nem produção." @close="creating = false">
+  <BaseModal :open="creating" title="Novo produto" subtitle="Nasce em criação. Em criação não entra em pedido, compra nem produção." @close="creating = false">
     <form id="new-item" @submit.prevent="create">
       <div class="field"><label>Descrição</label><input v-model="draft.name" required minlength="3" placeholder="Ex.: ABS cinza UV" /></div>
       <div class="form-grid">
@@ -325,7 +317,7 @@ function create() {
     </form>
     <template #footer>
       <button class="button secondary" type="button" @click="creating = false">Cancelar</button>
-      <button class="button" type="submit" form="new-item">{{ confirmSimilar ? 'É outro produto, criar' : 'Criar rascunho' }}</button>
+      <button class="button" type="submit" form="new-item">{{ confirmSimilar ? 'É outro produto, criar' : 'Criar' }}</button>
     </template>
   </BaseModal>
 </template>

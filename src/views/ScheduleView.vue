@@ -60,7 +60,7 @@ const loadClass = (percent: number) => percent > 100 ? 'over' : percent > 80 ? '
 <template>
   <div class="toolbar">
     <p>Sequência por recurso e dia. Clique em uma OP para reprogramar; o tablet do posto recebe a mudança na hora.</p>
-    <div class="legend"><span><i class="dot" style="background:#143266"></i> Injeção</span><span><i class="dot" style="background:#00CCFF"></i> Montagem</span><span><i class="dot" style="background:#c4472c"></i> Aguardando material</span></div>
+    <div class="legend"><span><i class="dot" style="background:var(--navy)"></i> Injeção</span><span><i class="dot" style="background:var(--blue-logo-light)"></i> Montagem</span><span><i class="dot" style="background:var(--alert)"></i> Aguardando material</span></div>
   </div>
 
   <section class="grid-3" data-tour="capacity" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr))">

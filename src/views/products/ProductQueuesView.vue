@@ -39,8 +39,8 @@ const QUEUES = computed<{ id: Queue; label: string; hint: string; rows: Row[] }[
     rows: live.value.filter(item => catalogOf(item).lifecycle === 'Inativação pendente').map(item => ({ item, info: 'Aguardando aprovação' })),
   },
   {
-    id: 'drafts', label: 'Rascunhos', hint: 'Cadastros iniciados que ainda não foram para análise.',
-    rows: live.value.filter(item => catalogOf(item).lifecycle === 'Rascunho').map(item => ({ item, info: `Criado por ${catalogOf(item).createdBy} em ${catalogOf(item).createdAt.slice(0, 10)}` })),
+    id: 'drafts', label: 'Em criação', hint: 'Cadastros iniciados que ainda não foram para análise.',
+    rows: live.value.filter(item => catalogOf(item).lifecycle === 'Em criação').map(item => ({ item, info: `Criado por ${catalogOf(item).createdBy} em ${catalogOf(item).createdAt.slice(0, 10)}` })),
   },
   {
     id: 'exceptions', label: 'Exceções de campo-chave', hint: 'Mudança de unidade base ou NCM em produto ativo. Decide a gestão do cadastro; quem pediu não aprova.',

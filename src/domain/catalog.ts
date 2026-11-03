@@ -6,7 +6,7 @@ import type {
   ProductRevision, Role, UnitContext, UnitConversion,
 } from '../types/domain'
 
-export const LIFECYCLE: ItemLifecycle[] = ['Rascunho', 'Em homologação', 'Ativo', 'Alteração pendente', 'Inativação pendente', 'Bloqueado', 'Obsoleto', 'Inativo']
+export const LIFECYCLE: ItemLifecycle[] = ['Em criação', 'Em homologação', 'Ativo', 'Alteração pendente', 'Inativação pendente', 'Bloqueado', 'Obsoleto', 'Inativo']
 
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   '00': 'Mercadoria para Revenda',
@@ -122,7 +122,7 @@ export function isInjected(item: Item) {
 
 export function isLocked(item: Item) {
   const life = catalogOf(item).lifecycle
-  return life !== 'Rascunho' && life !== 'Em homologação'
+  return life !== 'Em criação' && life !== 'Em homologação'
 }
 
 export function stockable(item: Item) {
@@ -136,7 +136,7 @@ export function inUse(life: string) {
 
 /** Guias da lista. O mesmo produto pode ocupar mais de uma. */
 export const PRODUCT_LIFE_TABS = [
-  { id: 'draft', label: 'Rascunho' },
+  { id: 'draft', label: 'Em criação' },
   { id: 'active', label: 'Ativos' },
   { id: 'review', label: 'Em Revisão' },
   { id: 'inactive', label: 'Inativo' },
@@ -147,7 +147,7 @@ export type ProductLifeTab = (typeof PRODUCT_LIFE_TABS)[number]['id']
 const VIGENTE: ItemLifecycle[] = ['Ativo', 'Alteração pendente', 'Inativação pendente', 'Bloqueado', 'Obsoleto']
 
 /**
- * Rascunho: cadastro ainda não liberado, inclusive em homologação.
+ * Em criação: cadastro ainda não liberado, inclusive em homologação.
  * Ativos: a versão vigente continua valendo.
  * Em Revisão: há outra versão em desenvolvimento, sem tirar a vigente de Ativos.
  * Inativo: só depois da inativação, e não aparece nas outras guias.
@@ -156,7 +156,7 @@ export function productLifeTabs(state: ErpState, item: Item): ProductLifeTab[] {
   const life = catalogOf(item).lifecycle
   if (life === 'Inativo') return ['inactive']
   const tabs: ProductLifeTab[] = []
-  if (life === 'Rascunho' || life === 'Em homologação') tabs.push('draft')
+  if (life === 'Em criação' || life === 'Em homologação') tabs.push('draft')
   if (VIGENTE.includes(life)) tabs.push('active')
   if (tabs.includes('active') && state.productRevisions.some(entry => entry.itemId === item.id && entry.status === 'Rascunho')) tabs.push('review')
   return tabs
@@ -525,13 +525,13 @@ export function createItem(state: ErpState, input: NewItemInput, actor: string, 
     stock: 0, minimum: 0, location: nature === 'Bem' ? 'A definir' : '—', cost: 0,
     catalog: {
       ...blankCatalog(nature),
-      classId: input.classId, lifecycle: 'Rascunho',
+      classId: input.classId, lifecycle: 'Em criação',
       createdAt: at, createdBy: actor, updatedAt: at, updatedBy: actor, version: 1,
-      audit: [{ at, actor, version: 1, text: 'Item criado como rascunho. Não entra em pedido, compra ou produção até ser ativado.' }],
+      audit: [{ at, actor, version: 1, text: 'Item criado em criação. Não entra em pedido, compra ou produção até ser ativado.' }],
     },
   }
   state.items.unshift(item)
-  log(state, 'Produtos', actor, `${code} criado como rascunho`, undefined, item.id)
+  log(state, 'Produtos', actor, `${code} criado em criação`, undefined, item.id)
   return item
 }
 
@@ -620,7 +620,7 @@ export function updateFiscal(state: ErpState, itemId: string, patch: { ncm: stri
   catalog.gtinTax = gtinTax
   if (catalog.lifecycle === 'Em homologação') delete catalog.approvals.fiscal
   const fiscalTouched = changes.some(change => change.field !== 'GTIN tributável')
-  if (fiscalTouched && catalog.lifecycle !== 'Rascunho') {
+  if (fiscalTouched && catalog.lifecycle !== 'Em criação') {
     catalog.fiscalSync = { ...catalog.fiscalSync, status: catalog.fiscalSync?.status === 'Conflito' ? 'Conflito' : 'Enviar ao Omie', at: now(), by: actor }
   }
   commit(catalog, actor, changes)
@@ -793,7 +793,7 @@ export function decideKeyChange(state: ErpState, itemId: string, requestId: stri
 export function submitItem(state: ErpState, itemId: string, actor: string, role: Role = 'Gestor') {
   const item = findItem(state, itemId)
   const catalog = editable(item, role, 'ciclo')
-  if (catalog.lifecycle !== 'Rascunho') throw new DomainError('Só um rascunho segue para homologação')
+  if (catalog.lifecycle !== 'Em criação') throw new DomainError('Só um produto em criação segue para homologação')
   const missing = missingAttributes(state, item)
   if (missing.length) throw new DomainError(`Preencha os atributos obrigatórios da classe: ${missing.map(def => def.label).join(', ')}`)
   catalog.approvals = {}
@@ -833,7 +833,7 @@ export function returnItem(state: ErpState, itemId: string, reason: string, acto
   if (!(APPROVER[role] ?? []).some(approval => requiredApprovals(item).includes(approval)) && !canEdit(role, 'ciclo')) throw new DomainError('Só um aprovador do item pode devolver')
   if (!reason.trim()) throw new DomainError('Informe o motivo da devolução')
   catalog.approvals = {}
-  transition(state, item, 'Rascunho', actor, `Devolvido: ${reason.trim()}`)
+  transition(state, item, 'Em criação', actor, `Devolvido: ${reason.trim()}`)
 }
 
 export function blockItem(state: ErpState, itemId: string, reason: string, actor: string, role: Role = 'Gestor') {
@@ -967,7 +967,7 @@ export function references(state: ErpState, itemId: string): string[] {
 export function deleteItem(state: ErpState, itemId: string, reason: string, actor: string, role: Role = 'Gestor') {
   const item = findItem(state, itemId)
   const catalog = editable(item, role, 'ciclo')
-  if (catalog.lifecycle !== 'Rascunho' && catalog.lifecycle !== 'Inativo') throw new DomainError('Só rascunho ou item inativo pode ser excluído')
+  if (catalog.lifecycle !== 'Em criação' && catalog.lifecycle !== 'Inativo') throw new DomainError('Só produto em criação ou item inativo pode ser excluído')
   if (!reason.trim()) throw new DomainError('Informe o motivo da exclusão')
   if (item.stock > 0) throw new DomainError('Item com saldo não pode ser excluído')
   const refs = references(state, itemId)
@@ -1146,8 +1146,8 @@ const PRESET: Record<string, Partial<ItemCatalog>> = {
   'pa-s9-min': { commercialName: 'Case Mining para Galaxy Tab S9 FE', ncm: '', cest: '', gtin: '' },
   'pa-lite-ipad': { commercialName: 'Mesa Lite para iPad 10ª geração', gtin: withCheckDigit('789123450004'), weightKg: 1.4 },
   'mp-abs-cinza': {
-    lifecycle: 'Rascunho', ncm: '', approvals: {}, conversions: [],
-    audit: [{ at: '2026-10-16T11:00:00.000Z', actor: 'Eduardo Freitas', version: 1, text: 'Rascunho aberto para a resina cinza. Ainda não entra em compra nem em produção.' }],
+    lifecycle: 'Em criação', ncm: '', approvals: {}, conversions: [],
+    audit: [{ at: '2026-10-16T11:00:00.000Z', actor: 'Eduardo Freitas', version: 1, text: 'Cadastro em criação para a resina cinza. Ainda não entra em compra nem em produção.' }],
   },
   'cp-pelic-11': {
     lifecycle: 'Em homologação', ncm: '70071900', approvals: { fiscal: 'Patrícia Melo' },

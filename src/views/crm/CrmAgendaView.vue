@@ -36,7 +36,7 @@ const rows = computed(() => pending.value.filter(entry => TABS.find(item => item
       <tbody>
         <tr v-for="{ opportunity, activity, day } in rows" :key="activity.id" class="clickable" @click="router.push({ path: `/crm/oportunidade/${opportunity.id}`, query: { aba: 'acoes' } })">
           <td :class="{ 'risk-text': day < today() }">{{ fmtDateTime(activity.at) }}</td>
-          <td><span class="cell-main">{{ activity.text }}</span><span class="cell-sub">{{ activity.type }}</span></td>
+          <td><span class="cell-main">{{ activity.text }}</span><span class="cell-sub">{{ activity.type }}<template v-if="activity.calendar"> · agenda de {{ activity.calendar.ownerName }}</template></span></td>
           <td>{{ opportunity.title }}<span class="cell-sub">{{ store.partnerName(opportunity.partnerId) }}</span></td>
           <td>{{ store.userName(opportunity.ownerId) }}</td>
           <td style="text-align:right" @click.stop><button class="button secondary small" @click="store.toggleActivity(opportunity.id, activity.id)">Concluir</button></td>

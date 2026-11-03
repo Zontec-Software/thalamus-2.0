@@ -14,7 +14,7 @@ import {
 } from '../domain/catalogExtensions'
 import {
   addTechnicalPart, advanceProposal, advancePurchaseOrder, advanceTechnicalOrder, attendDemandFromStock, cancelPurchaseOrder, completeDemand,
-  contractService, createDemand, createOpportunity, createProject, createProposal, createPurchaseOrder, createTechnicalOrder, deliveryLead, loseOpportunity,
+  addActivity, contractService, createDemand, createOpportunity, createProject, createProposal, createPurchaseOrder, createTechnicalOrder, deliveryLead, loseOpportunity, toggleActivity,
   moveOpportunity, releaseRevision, tasksForRole, toggleMilestone, undoPick, updateProposal, setSalesGoal,
 } from '../domain/enterprise'
 import { requestChangeForOpportunity } from '../domain/engineering'
@@ -684,13 +684,51 @@ describe('CRM e propostas', () => {
     expect(state.proposals.find(entry => entry.id === 'PROP-26018')!.status).toBe('Recusada')
   })
 
+  it('reunião entra na agenda de quem criou, convida o contato e o vendedor se for outra pessoa', () => {
+    const state = createSeedState()
+    const byOther = addActivity(state, 'OPP-26042', { type: 'Reunião', text: 'Fechar o lote', at: '2026-11-06T15:00:00.000Z', details: 'Pauta da parada' }, 'Lucas Lima', 'u16')
+    expect(byOther.calendar).toMatchObject({ ownerUserId: 'u16', ownerName: 'Lucas Lima' })
+    expect(byOther.calendar?.guests.map(guest => guest.role)).toEqual(['contato', 'vendedor'])
+    expect(byOther.calendar?.guests.map(guest => guest.name)).toEqual(['Marcelo Dias', 'Camila Nunes'])
+    expect(byOther.details).toBe('Pauta da parada')
+
+    const bySeller = addActivity(state, 'OPP-26042', { type: 'Reunião', text: 'Retorno da operação', at: '2026-11-07T15:00:00.000Z' }, 'Camila Nunes', 'u12')
+    expect(bySeller.calendar?.guests.map(guest => guest.role)).toEqual(['contato'])
+
+    const task = addActivity(state, 'OPP-26042', { type: 'Tarefa', text: 'Enviar a ata', at: '2026-11-08T09:00:00.000Z', details: '  Mandar a ata em PDF  ' }, 'Lucas Lima', 'u16')
+    expect(task.calendar).toBeUndefined()
+    expect(task.details).toBe('Mandar a ata em PDF')
+    const call = addActivity(state, 'OPP-26042', { type: 'Ligação', text: 'Retornar o Marcelo', at: '2026-11-09T09:00:00.000Z', details: '   ' }, 'Lucas Lima', 'u16')
+    expect(call.details).toBeUndefined()
+
+    state.opportunities.find(entry => entry.id === 'OPP-26044')!.contact = ''
+    expect(() => addActivity(state, 'OPP-26044', { type: 'Reunião', text: 'Sem contato', at: '2026-11-08T09:00:00.000Z' }, 'Lucas Lima', 'u16')).toThrow(/contato/)
+  })
+
+  it('concluir a reunião anexa a transcrição e a gravação uma vez', () => {
+    const state = createSeedState()
+    const meeting = addActivity(state, 'OPP-26042', { type: 'Reunião', text: 'Fechar o lote', at: '2026-11-06T15:00:00.000Z', attachments: [{ name: 'pauta.pdf', size: 12, mime: 'application/pdf' }] }, 'Lucas Lima', 'u16')
+    toggleActivity(state, 'OPP-26042', meeting.id, 'Lucas Lima')
+    const done = state.opportunities.find(entry => entry.id === 'OPP-26042')!.activities.find(entry => entry.id === meeting.id)!
+    expect(done.attachments?.map(file => file.kind)).toEqual(['arquivo', 'transcrição', 'gravação'])
+    expect(done.attachments?.filter(file => file.source === 'google')).toHaveLength(2)
+    toggleActivity(state, 'OPP-26042', meeting.id, 'Lucas Lima')
+    toggleActivity(state, 'OPP-26042', meeting.id, 'Lucas Lima')
+    expect(done.attachments?.filter(file => file.source === 'google')).toHaveLength(2)
+  })
+
   it('o PAP da oportunidade vira mudança de engenharia ligada a ela', () => {
     const state = createSeedState()
     const change = requestChangeForOpportunity(state, 'OPP-26044', 'Camila')
     expect(change.opportunityId).toBe('OPP-26044')
     expect(change.stage).toBe('Solicitada')
-    setSalesGoal(state, 'tenant-roboflex', 2026, 1000, 'Camila')
-    expect(state.salesGoals.find(entry => entry.tenantId === 'tenant-roboflex')!.amount).toBe(1000)
+    setSalesGoal(state, 'tenant-roboflex', 2026, 1000, undefined, 'Camila')
+    const goal = state.salesGoals.find(entry => entry.tenantId === 'tenant-roboflex')!
+    expect(goal.amount).toBe(1000)
+    expect(goal.monthlyAmounts).toHaveLength(12)
+    expect(goal.monthlyAmounts!.reduce((sum, value) => sum + value, 0)).toBe(1000)
+    setSalesGoal(state, 'tenant-roboflex', 2026, 0, [100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50], 'Camila')
+    expect(state.salesGoals.find(entry => entry.tenantId === 'tenant-roboflex')!.amount).toBe(150)
   })
 })
 
@@ -723,12 +761,12 @@ describe('cadastro de itens', () => {
   const novo = (state: ErpState, extra: Partial<{ name: string; type: '01' | '04'; unit: string }> = {}) =>
     createItem(state, { name: 'Resina experimental azul', type: '01', unit: 'kg', classId: classOf(state), ...extra }, 'Eduardo', 'Engenharia')
 
-  it('cria rascunho com código sequencial, exige classificação e respeita o papel', () => {
+  it('cria em criação com código sequencial, exige classificação e respeita o papel', () => {
     const state = createSeedState()
     const item = novo(state)
     expect(item.code).toMatch(/^RF-\d{5}$/)
     expect(Number(item.code.slice(3))).toBeGreaterThan(10006)
-    expect(item.catalog?.lifecycle).toBe('Rascunho')
+    expect(item.catalog?.lifecycle).toBe('Em criação')
     expect(() => createItem(state, { name: 'Sem nó', type: '01', unit: 'kg', classId: '' }, 'Eduardo', 'Engenharia')).toThrow(/Classifique/)
     expect(() => createItem(state, { name: 'Pelo comercial', type: '01', unit: 'kg', classId: classOf(state) }, 'Camila', 'Comercial')).toThrow(/Engenharia/)
     expect(similarItems(state, 'ABS cinza especial', item.id).some(entry => entry.id === 'mp-abs-cinza')).toBe(true)
@@ -818,7 +856,7 @@ describe('cadastro de itens', () => {
     const previous = item.currentRevisionId!
     const revision = openBomVersion(state, item.id, 'Trocar parafusos', 'Eduardo', 'Engenharia')
     expect(() => setBomLine(state, revision.id, item.id, 1, 'Eduardo', 'Engenharia')).toThrow(/si mesmo/)
-    expect(() => setBomLine(state, revision.id, 'mp-abs-cinza', 1, 'Eduardo', 'Engenharia')).toThrow(/rascunho/)
+    expect(() => setBomLine(state, revision.id, 'mp-abs-cinza', 1, 'Eduardo', 'Engenharia')).toThrow(/criação/)
     expect(() => setBomLine(state, revision.id, 'cp-paraf', 0, 'Eduardo', 'Engenharia')).toThrow(/maior/)
     setBomLine(state, revision.id, 'cp-paraf', 12, 'Eduardo', 'Engenharia')
     revision.checklist.forEach(entry => { entry.done = true })
@@ -852,7 +890,7 @@ describe('cadastro de itens', () => {
     expect(() => requestKeyChange(state, item.id, 'name', 'Outro', 'Depois', 'Eduardo', 'Engenharia', { module: 'OS', id: 'OS-5' })).toThrow(/inativo/)
   })
 
-  it('apaga de verdade o rascunho nunca usado e exclui logicamente o que já foi usado', () => {
+  it('apaga de verdade o cadastro em criação nunca usado e exclui logicamente o que já foi usado', () => {
     const state = createSeedState()
     const fresh = novo(state)
     expect(deleteItem(state, fresh.id, 'Criado por engano', 'Eduardo', 'Engenharia')).toBe('física')
@@ -977,13 +1015,13 @@ describe('cadastro completo: camadas estendidas', () => {
     expect(ext.catalog!.cClassTrib).toBe('000002')
   })
 
-  it('grade gera itens reais em rascunho, herdando o fiscal e sem repetir combinação', () => {
+  it('grade gera itens reais em criação, herdando o fiscal e sem repetir combinação', () => {
     const state = createSeedState()
     const created = generateVariants(state, 'GR-1', [{ Cor: 'Laranja segurança' }], 'Eduardo', 'Engenharia')
     expect(created).toHaveLength(1)
     const variant = created[0]
     expect(variant.code).toMatch(/^RF-\d{5}$/)
-    expect(variant.catalog).toMatchObject({ lifecycle: 'Rascunho', ncm: '39269090', modelId: 'GR-1', attributes: { Cor: 'Laranja segurança' }, barcodes: [] })
+    expect(variant.catalog).toMatchObject({ lifecycle: 'Em criação', ncm: '39269090', modelId: 'GR-1', attributes: { Cor: 'Laranja segurança' }, barcodes: [] })
     expect(() => generateVariants(state, 'GR-1', [{ Cor: 'Laranja segurança' }], 'Eduardo', 'Engenharia')).toThrow(/combinação/)
     expect(() => createModel(state, { templateId: 'pa-a11-imp', name: 'Outra', axes: [{ name: 'Cor', values: ['Preto'] }], templateAttributes: { Cor: 'Preto' } }, 'Eduardo', 'Engenharia')).toThrow(/grade/)
     expect(() => generateVariants(state, 'GR-1', [{ Cor: 'Azul petróleo' }], 'Camila', 'Comercial')).toThrow(/Engenharia/)
@@ -1066,7 +1104,8 @@ describe('parceiros', () => {
     inactivateRole(state, 'p-norte', 'Cliente', 'Sem compra nova', 'Marina')
     expect(state.partners.find(entry => entry.id === 'p-norte')?.roleStatus.Fornecedor).toBe('Ativo')
     expect(() => createOpportunity(state, { partnerId: 'p-norte', title: 'Nova', ownerId: 'u12', value: 0, expectedClose: '2026-12-01', source: 'Site', nextAction: 'Ligar' }, 'Camila')).toThrow(/inativo/)
-    expect(() => createOpportunity(state, { partnerId: 'c1', title: 'Segue', ownerId: 'u12', value: 0, expectedClose: '2026-12-01', source: 'Site', nextAction: 'Ligar' }, 'Camila')).not.toThrow()
+    const cold = createOpportunity(state, { partnerId: 'c1', title: 'Segue', ownerId: 'u12', value: 0, expectedClose: '2026-12-01', source: 'Site', nextAction: 'Ligar' }, 'Camila')
+    expect(cold.temperature).toBe('Frio')
     const open = state.purchaseOrders.find(entry => entry.supplierId === 'f2' && entry.status !== 'Recebido' && entry.status !== 'Cancelado')
     inactivateRole(state, 'f2', 'Fornecedor', 'Troca de fonte', 'Marina')
     expect(open?.status).not.toBe('Cancelado')

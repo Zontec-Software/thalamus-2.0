@@ -4,7 +4,7 @@ export type SyncStatus = 'sincronizado' | 'pendente' | 'erro'
 /** Tipo do item no padrão da escrituração: 00 revenda, 01 matéria-prima, 02 embalagem, 03 em processo, 04 acabado, 06 intermediário, 07 uso e consumo, 08 imobilizado. */
 export type ItemType = '00' | '01' | '02' | '03' | '04' | '06' | '07' | '08'
 
-export type ItemLifecycle = 'Rascunho' | 'Em homologação' | 'Ativo' | 'Alteração pendente' | 'Inativação pendente' | 'Bloqueado' | 'Obsoleto' | 'Inativo'
+export type ItemLifecycle = 'Em criação' | 'Em homologação' | 'Ativo' | 'Alteração pendente' | 'Inativação pendente' | 'Bloqueado' | 'Obsoleto' | 'Inativo'
 export type ItemNature = 'Bem' | 'Serviço' | 'Kit virtual' | 'Imobilizado'
 export type UnitContext = 'Compra' | 'Produção' | 'Estoque' | 'Venda'
 export type ApprovalRole = 'fiscal' | 'pcp' | 'comercial' | 'tecnica'
@@ -188,7 +188,7 @@ export interface AttributeDef {
   kind: AttributeKind
   options?: string[]
   unit?: string
-  /** Sem valor, o item não sai do rascunho para a homologação. */
+  /** Sem valor, o item não sai de Em criação para a homologação. */
   required: boolean
   /** Pode virar eixo da grade de variantes. */
   variantAxis?: boolean
@@ -1199,22 +1199,74 @@ export interface PurchaseOrder {
   createdAt: string
 }
 
+export interface ActivityAttachment {
+  id: string
+  name: string
+  kind: 'arquivo' | 'transcrição' | 'gravação'
+  source: 'usuário' | 'google'
+  mime?: string
+  size: number
+  at: string
+  /** Conteúdo só nesta demonstração, e só abaixo do limite. */
+  dataUrl?: string
+}
+
+export interface ActivityGuest {
+  name: string
+  email?: string
+  role: 'contato' | 'vendedor'
+}
+
+/** Evento na agenda Google de quem criou a ação. Neste mockup o Google não é chamado. */
+export interface ActivityCalendar {
+  ownerUserId: string
+  ownerName: string
+  externalId: string
+  guests: ActivityGuest[]
+}
+
 export interface CrmActivity {
   id: string
   at: string
   type: 'Ligação' | 'E-mail' | 'Reunião' | 'Tarefa'
   text: string
   done: boolean
+  /** Pauta da reunião. */
+  details?: string
+  /** Setor que recebe a tarefa. */
+  sector?: string
+  attachments?: ActivityAttachment[]
+  calendar?: ActivityCalendar
+  createdBy?: string
+}
+
+export interface NewActivityFile {
+  name: string
+  mime?: string
+  size: number
+  dataUrl?: string
+}
+
+export interface NewActivityInput {
+  type: CrmActivity['type']
+  text: string
+  at: string
+  details?: string
+  sector?: string
+  attachments?: NewActivityFile[]
 }
 
 export type OpportunityStage = 'Prospecção' | 'Desenvolvimento' | 'Elaboração' | 'Proposta' | 'Conquista' | 'Perdida'
 export type OpportunityTemperature = 'Quente' | 'Morno' | 'Frio'
+export type OpportunityDeal = 'Venda' | 'Locação'
 
 /** Meta comercial de uma empresa. O grupo só soma as metas; cada empresa grava a sua. */
 export interface SalesGoal {
   tenantId: string
   year: number
   amount: number
+  /** Janeiro a dezembro. Sem isto, cada mês vale um doze avos. */
+  monthlyAmounts?: number[]
 }
 
 export interface Opportunity {
@@ -1234,7 +1286,7 @@ export interface Opportunity {
   statusNote?: string
   phone?: string
   email?: string
-  dealType?: 'Venda'
+  dealType?: OpportunityDeal
   probability: number
   nextAction: string
   expectedClose: string

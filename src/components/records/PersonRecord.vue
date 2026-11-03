@@ -38,7 +38,8 @@ function create() {
 
 const access = computed(() => person.value ? AREAS.map(area => ({
   area: area.label,
-  modules: area.groups.flatMap(group => group.items).filter(item => {
+  modules: area.groups.flatMap(group => group.items)  .filter(item => {
+    if (!item.to || item.pending) return false
     if (!item.module) return true
     const profiles = store.state.userProfileAssignments.filter(assignment => assignment.userId === person.value!.id).map(assignment => store.state.accessProfiles.find(profile => profile.id === assignment.profileId))
     return profiles.some(profile => profile?.system || profile?.functionalityIds.includes(moduleFeature(item.module!)))
@@ -79,7 +80,7 @@ function registerReview() {
 
 <template>
   <template v-if="isNew">
-    <RecordHeader eyebrow="Cadastros · nova pessoa" title="Nova pessoa" subtitle="O papel define os módulos e tarefas; o cargo descreve a responsabilidade. Um PIN é gerado para o tablet." />
+    <RecordHeader eyebrow="Pessoas · nova pessoa" title="Nova pessoa" subtitle="O papel define os módulos e tarefas; o cargo descreve a responsabilidade. Um PIN é gerado para o tablet." />
     <div class="drawer-body">
       <div class="form-grid">
         <div class="field"><label>Nome</label><input v-model="form.name" /></div>
@@ -157,7 +158,7 @@ function registerReview() {
       <h3 class="drawer-title">Acessos pelo papel {{ person.role }}</h3>
       <div v-for="entry in access" :key="entry.area" class="access-row"><b>{{ entry.area }}</b><span v-for="module in entry.modules" :key="module" class="chip">{{ module }}</span></div>
       <p v-if="!access.length" class="empty-note">Sem módulos. Operadores usam apenas o tablet.</p>
-      <p class="hint">As permissões por papel são ajustadas em Cadastros → Gestão de acesso.</p>
+      <p class="hint">As permissões por papel são ajustadas em Administração do sistema → Usuários e permissões.</p>
       </div>
 
       <div data-tour="person-team">

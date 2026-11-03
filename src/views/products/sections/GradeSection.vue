@@ -60,7 +60,7 @@ function generate() {
     </table>
     <div v-if="missing.length" class="filter-row" style="margin-top:8px">
       <button class="button small" :disabled="!allowed" :title="allowed ? '' : `Quem gera variantes: ${editorsLabel('nucleo')}`" @click="generate">
-        {{ picked.length ? `Gerar ${picked.length} selecionada(s)` : `Gerar todas as ${missing.length} faltantes` }} em rascunho
+        {{ picked.length ? `Gerar ${picked.length} selecionada(s)` : `Gerar todas as ${missing.length} faltantes` }} em criação
       </button>
       <span class="cell-sub">Herdam fiscal, marca, categorias, dimensões e unidades do produto-modelo. EAN, preço, estrutura e foto ficam por variante.</span>
     </div>

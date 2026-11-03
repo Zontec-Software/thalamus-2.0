@@ -102,7 +102,7 @@ function copy() {
             <select v-model="form.serviceId"><option value="">Nenhum</option><option v-for="service in routingServices" :key="service.id" :value="service.id">{{ service.code }} · {{ service.name }}{{ service.status === 'Inativo' ? ' · inativo' : '' }}</option></select>
             <small>Só entra serviço marcado para roteiro. A operação guarda a versão da instrução deste momento.</small>
           </div>
-          <div class="field"><label>Posto de trabalho</label><select v-model="form.resourceId" required @change="form.toolId = ''"><option v-for="resource in postos" :key="resource.id" :value="resource.id">{{ resource.name }}{{ resource.status === 'Inativo' ? ' · inativo' : '' }}</option></select><small>A lista vem de Cadastros → Postos. Posto inativo não entra em operação nova.</small></div>
+          <div class="field"><label>Posto de trabalho</label><select v-model="form.resourceId" required @change="form.toolId = ''"><option v-for="resource in postos" :key="resource.id" :value="resource.id">{{ resource.name }}{{ resource.status === 'Inativo' ? ' · inativo' : '' }}</option></select><small>A lista vem de Administração do sistema → Postos e centros de custo. Posto inativo não entra em operação nova.</small></div>
           <div class="field"><label>Ferramental</label>
             <select v-model="form.toolId"><option value="">Nenhum</option><option v-for="tool in compatibleTools" :key="tool.id" :value="tool.id">{{ tool.code }} · {{ tool.name }}</option></select>
             <small>Só aparece o que é compatível com o posto.</small>

@@ -171,7 +171,7 @@ function addMovement(state: ErpState, itemId: string, type: StockMovement['type'
 
 export type ItemUse = 'venda' | 'compra' | 'produção' | 'consumo'
 
-/** Rascunho e homologação não entram em transação; bloqueado também não; obsoleto só consome o saldo que sobrou. */
+/** Em criação e homologação não entram em transação; bloqueado também não; obsoleto só consome o saldo que sobrou. */
 export function assertUsable(item: Item, use: ItemUse) {
   const catalog = item.catalog
   if (!catalog) return
@@ -184,7 +184,7 @@ export function assertUsable(item: Item, use: ItemUse) {
   }
   if (life === 'Obsoleto' && use === 'consumo') return
   const reason: Record<string, string> = {
-    Rascunho: 'ainda é rascunho', 'Em homologação': 'ainda está em análise', Bloqueado: 'está bloqueado',
+    'Em criação': 'ainda está em criação', 'Em homologação': 'ainda está em análise', Bloqueado: 'está bloqueado',
     Obsoleto: 'está obsoleto: só o saldo restante pode ser consumido', Inativo: 'está inativo',
   }
   throw new DomainError(`${item.code} ${reason[life]} e não entra em ${use}`)

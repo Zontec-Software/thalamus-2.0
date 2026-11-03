@@ -138,8 +138,10 @@ function roleHint(entry: BusinessPartner, role: Role) {
 }
 const item = (id: string) => store.state.items.find(entry => entry.id === id)
 
+const originQuery = () => typeof route.query.origem === 'string' ? { origem: route.query.origem } : {}
+
 function open(id: string) {
-  router.push(`/parceiros/${id}`)
+  router.push({ path: `/parceiros/${id}`, query: originQuery() })
 }
 function startNew(role?: Role) {
   duplicateAck.value = false
@@ -148,7 +150,7 @@ function startNew(role?: Role) {
 }
 function closeCreate() {
   creating.value = false
-  if (route.query.novo) router.replace({ path: '/parceiros' })
+  if (route.query.novo) router.replace({ path: '/parceiros', query: originQuery() })
 }
 function toggleRole(role: Role) {
   form.roles = form.roles.includes(role) ? form.roles.filter(entry => entry !== role) : [...form.roles, role]
@@ -163,7 +165,7 @@ function saveNew() {
   })
   if (created && created !== true) {
     creating.value = false
-    const next = `/parceiros/${created.id}`
+    const next = { path: `/parceiros/${created.id}`, query: originQuery() }
     if (route.query.novo) router.replace(next)
     else router.push(next)
   }
@@ -177,12 +179,12 @@ function openContact() {
 }
 function closeContact() {
   addingContact.value = false
-  if (route.query.novo === 'contato') router.replace({ path: route.path, query: { aba: 'contatos' } })
+  if (route.query.novo === 'contato') router.replace({ path: route.path, query: { aba: 'contatos', ...originQuery() } })
 }
 function saveContact() {
   if (!partner.value || store.addPartnerContact(partner.value.id, { ...contact }) === undefined) return
   addingContact.value = false
-  if (route.query.novo) router.replace({ path: route.path, query: { aba: 'contatos' } })
+  if (route.query.novo) router.replace({ path: route.path, query: { aba: 'contatos', ...originQuery() } })
 }
 function saveVertical(value: string) {
   if (partner.value) store.setPartnerVertical(partner.value.id, value)
@@ -241,7 +243,7 @@ function inactivate(reason: string) {
   <template v-else>
     <nav class="crumb-bar" aria-label="Caminho">
       <CrumbBack fallback="/parceiros" title="Voltar para Parceiros" />
-      <RouterLink to="/parceiros" class="crumb">Parceiros</RouterLink>
+      <RouterLink :to="{ path: '/parceiros', query: originQuery() }" class="crumb">Parceiros</RouterLink>
       <ChevronRight :size="14" class="sep" />
       <span class="crumb here">{{ partner?.name ?? 'Parceiro não encontrado' }}</span>
     </nav>
@@ -425,7 +427,7 @@ function inactivate(reason: string) {
       </div>
       <p v-if="duplicate" class="notice warning">
         Já existe <b>{{ duplicate.name }}</b> com este documento.
-        <RouterLink :to="`/parceiros/${duplicate.id}`" @click="creating = false">Abrir esse cadastro</RouterLink>
+        <RouterLink :to="{ path: `/parceiros/${duplicate.id}`, query: originQuery() }" @click="creating = false">Abrir esse cadastro</RouterLink>
         <label class="check-line" style="border:0;padding:6px 0 0"><input v-model="duplicateAck" type="checkbox" /> Cadastrar outro registro mesmo assim</label>
       </p>
       <div class="field">

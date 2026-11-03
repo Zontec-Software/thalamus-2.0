@@ -8,7 +8,7 @@ import { assertClientOpen, assertPurchaseAllowed, assertSupplierOpen } from './p
 import { fieldVisitService } from './services'
 import { assertResourceChoice } from './resources'
 import type {
-  Asset, Budget, CrmActivity, Demand, Item, Opportunity, Project, Proposal, ProposalLine,
+  ActivityAttachment, ActivityGuest, Asset, Budget, CrmActivity, Demand, Item, NewActivityFile, NewActivityInput, Opportunity, Project, Proposal, ProposalLine,
   PurchaseOrder, Role, TechnicalServiceOrder, User,
 } from '../types/domain'
 
@@ -307,7 +307,7 @@ export function createOpportunity(state: ErpState, input: OpportunityInput, acto
   if (!input.partnerId) throw new DomainError('Escolha o cliente')
   assertClientOpen(state, input.partnerId)
   const opportunity: Opportunity = {
-    id: `OPP-${String(state.counters.OPP = (state.counters.OPP ?? 26043) + 1)}`, stage: 'Prospecção', probability: 10, temperature: 'Morno', mrr: 0, dealType: 'Venda', activities: [], createdAt: now(), ...input,
+    id: `OPP-${String(state.counters.OPP = (state.counters.OPP ?? 26043) + 1)}`, stage: 'Prospecção', probability: 10, temperature: 'Frio', mrr: 0, dealType: 'Venda', activities: [], createdAt: now(), ...input,
   }
   state.opportunities.unshift(opportunity)
   log(state, 'CRM', actor, `Oportunidade criada: ${opportunity.title} (${money(opportunity.value)})`, undefined, opportunity.id)
@@ -355,23 +355,96 @@ export function loseOpportunity(state: ErpState, id: string, reason: string, act
   return opportunity
 }
 
-/** Meta anual da empresa. A consulta de grupo soma as metas; não grava um número no grupo. */
-export function setSalesGoal(state: ErpState, tenantId: string, year: number, amount: number, actor: string) {
-  if (!(amount > 0)) throw new DomainError('Informe a meta anual')
+/** Doze fatias. O último mês absorve o resto da divisão. */
+export function splitSalesGoal(amount: number) {
+  const total = Math.round(amount)
+  const base = Math.floor(total / 12)
+  const months = Array.from({ length: 12 }, () => base)
+  months[11] = total - base * 11
+  return months
+}
+
+/** Meta da empresa, com os doze meses. Sem meses informados, o ano é rateado por igual. O grupo só soma. */
+export function setSalesGoal(state: ErpState, tenantId: string, year: number, amount: number, monthly: number[] | undefined, actor: string) {
+  const months = monthly ?? splitSalesGoal(amount)
+  if (months.length !== 12 || months.some(value => !(value >= 0) || !Number.isFinite(value))) throw new DomainError('Informe a meta dos doze meses')
+  const total = months.reduce((sum, value) => sum + value, 0)
+  if (!(total > 0)) throw new DomainError('Informe a meta anual')
   const current = state.salesGoals.find(entry => entry.tenantId === tenantId && entry.year === year)
-  if (current) current.amount = amount
-  else state.salesGoals.push({ tenantId, year, amount })
-  log(state, 'CRM', actor, `Meta ${year} de ${tenantId}: ${money(amount)}`)
+  if (current) Object.assign(current, { amount: total, monthlyAmounts: [...months] })
+  else state.salesGoals.push({ tenantId, year, amount: total, monthlyAmounts: [...months] })
+  log(state, 'CRM', actor, `Meta ${year} de ${tenantId}: ${money(total)}`)
   return state.salesGoals.find(entry => entry.tenantId === tenantId && entry.year === year)!
 }
 
-export function addActivity(state: ErpState, id: string, input: Pick<CrmActivity, 'type' | 'text' | 'at'>, actor: string) {
+const ACTIVITY_FILE_LIMIT = 450_000
+
+function storedFile(state: ErpState, file: NewActivityFile, at: string): ActivityAttachment {
+  const name = file.name.trim()
+  if (!name) throw new DomainError('O anexo precisa de um nome')
+  if (file.size > ACTIVITY_FILE_LIMIT) throw new DomainError(`Arquivo de ${Math.round(file.size / 1024)} KB: na demonstração o limite é ${Math.round(ACTIVITY_FILE_LIMIT / 1024)} KB por arquivo`)
+  return { id: nextId(state, 'ANX'), name, kind: 'arquivo', source: 'usuário', mime: file.mime, size: file.size, at, dataUrl: file.dataUrl }
+}
+
+/** Transcrição e gravação que o Google Meet devolveria ao encerrar a reunião. Sem chamada externa. */
+function googleMeetArtifacts(state: ErpState, at: string): ActivityAttachment[] {
+  const transcript = 'Transcrição simulada do Google Meet.\n\nNesta demonstração o Thalamus não acessa o Google. No sistema real, a transcrição gerada na reunião entra neste anexo.'
+  return [
+    {
+      id: nextId(state, 'ANX'), name: 'Transcrição do Google Meet.txt', kind: 'transcrição', source: 'google',
+      mime: 'text/plain', size: transcript.length, at, dataUrl: `data:text/plain;charset=utf-8,${encodeURIComponent(transcript)}`,
+    },
+    {
+      id: nextId(state, 'ANX'), name: 'Gravação do Google Meet.mp4', kind: 'gravação', source: 'google',
+      mime: 'video/mp4', size: 0, at,
+    },
+  ]
+}
+
+function meetingCalendar(state: ErpState, opportunity: Opportunity, actorUserId: string) {
+  const creator = state.users.find(user => user.id === actorUserId)
+  if (!creator) throw new DomainError('Usuário da agenda não encontrado')
+  const contactName = opportunity.contact?.trim()
+  if (!contactName) throw new DomainError('A reunião precisa do contato da oportunidade')
+  const partner = state.partners.find(entry => entry.id === opportunity.partnerId)
+  const contact = partner?.contacts.find(entry => entry.name === contactName)
+  const guests: ActivityGuest[] = [{
+    name: contactName,
+    email: contact?.email || opportunity.email || partner?.email || undefined,
+    role: 'contato',
+  }]
+  const seller = state.users.find(user => user.id === opportunity.ownerId)
+  if (seller && seller.id !== creator.id) guests.push({ name: seller.name, email: seller.email, role: 'vendedor' })
+  return { creator, guests }
+}
+
+export function addActivity(state: ErpState, id: string, input: NewActivityInput, actor: string, actorUserId = '') {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
-  if (!input.text.trim()) throw new DomainError('Descreva a atividade')
-  const activity: CrmActivity = { id: nextId(state, 'ACT'), done: false, ...input }
+  if (!input.text.trim()) throw new DomainError(input.type === 'Reunião' ? 'Informe o título da reunião' : 'Descreva a atividade')
+  const at = input.at
+  const activity: CrmActivity = {
+    id: nextId(state, 'ACT'), at, type: input.type, text: input.text.trim(), done: false, createdBy: actor,
+    details: input.details?.trim() || undefined,
+    sector: input.sector?.trim() || undefined,
+    attachments: (input.attachments ?? []).map(file => storedFile(state, file, at)),
+  }
+  if (input.type === 'Reunião') {
+    const { creator, guests } = meetingCalendar(state, opportunity, actorUserId)
+    activity.calendar = { ownerUserId: creator.id, ownerName: creator.name, externalId: `gcal-sim-${activity.id}`, guests }
+  }
   opportunity.activities.unshift(activity)
   if (activity.at >= now()) opportunity.nextAction = activity.text
-  log(state, 'CRM', actor, `${activity.type} agendada: ${activity.text}`, undefined, id)
+  const invited = activity.calendar ? ` na agenda de ${activity.calendar.ownerName}` : ''
+  log(state, 'CRM', actor, `${activity.type} agendada${invited}: ${activity.text}`, undefined, id)
+  return activity
+}
+
+export function addActivityAttachment(state: ErpState, id: string, activityId: string, file: NewActivityFile, actor: string) {
+  const opportunity = find(state.opportunities, id, 'Oportunidade')
+  const activity = find(opportunity.activities, activityId, 'Atividade')
+  const attachment = storedFile(state, file, now())
+  activity.attachments = [...(activity.attachments ?? []), attachment]
+  log(state, 'CRM', actor, `Anexo em ${activity.text}: ${attachment.name}`, undefined, id)
   return activity
 }
 
@@ -379,6 +452,10 @@ export function toggleActivity(state: ErpState, id: string, activityId: string, 
   const opportunity = find(state.opportunities, id, 'Oportunidade')
   const activity = find(opportunity.activities, activityId, 'Atividade')
   activity.done = !activity.done
+  if (activity.done && activity.type === 'Reunião') {
+    const hasGoogle = activity.attachments?.some(file => file.source === 'google')
+    if (!hasGoogle) activity.attachments = [...(activity.attachments ?? []), ...googleMeetArtifacts(state, now())]
+  }
   const pending = opportunity.activities.filter(entry => !entry.done).sort((a, b) => a.at.localeCompare(b.at))[0]
   opportunity.nextAction = pending?.text ?? 'Definir próxima ação'
   log(state, 'CRM', actor, `${activity.type} ${activity.done ? 'concluída' : 'reaberta'}: ${activity.text}`, undefined, id)

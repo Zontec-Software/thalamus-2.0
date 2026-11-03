@@ -308,8 +308,8 @@ const openAlerts = computed(() => store.state.alerts.filter(alert => !alert.reso
       </div>
       <div class="side-card">
         <h3>PINs da demonstração</h3>
-        <div v-for="entry in users" :key="entry.id" class="guide-steps" style="display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0; color:#D6E4F5">
-          <span>{{ entry.name }} <small style="color:#A9BDD4">· {{ entry.role }}</small></span><b style="color:#00CCFF">{{ entry.pin }}</b>
+        <div v-for="entry in users" :key="entry.id" class="guide-steps" style="display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0; color:var(--ink-on-dark-muted)">
+          <span>{{ entry.name }} <small style="color:var(--eyebrow-on-dark)">· {{ entry.role }}</small></span><b style="color:var(--blue-logo-light)">{{ entry.pin }}</b>
         </div>
       </div>
     </aside>
@@ -608,7 +608,7 @@ const openAlerts = computed(() => store.state.alerts.filter(alert => !alert.reso
       </div>
       <div v-if="openAlerts.length" class="side-card">
         <h3>Chamados abertos ({{ openAlerts.length }})</h3>
-        <div v-for="alert in openAlerts" :key="alert.id" class="live-item"><i style="background:#f28a45"></i><div><strong>{{ alert.message }}</strong><span>{{ store.resourceName(alert.resourceId) }} · {{ alert.operator }}</span></div></div>
+        <div v-for="alert in openAlerts" :key="alert.id" class="live-item"><i style="background:var(--alert)"></i><div><strong>{{ alert.message }}</strong><span>{{ store.resourceName(alert.resourceId) }} · {{ alert.operator }}</span></div></div>
       </div>
       <div class="side-card">
         <h3>Últimos registros</h3>

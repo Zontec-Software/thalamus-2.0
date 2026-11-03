@@ -26,7 +26,7 @@ type Ask = 'return' | 'block' | 'reactivate' | 'obsolete' | 'inactivate' | 'reje
 const ask = ref<Ask | ''>('')
 const refusing = ref('')
 const ASK: Record<Ask, { title: string; confirm: string; tone: 'danger' | 'warning' | '' }> = {
-  return: { title: 'Devolver a rascunho', confirm: 'Devolver', tone: 'warning' },
+  return: { title: 'Devolver para Em criação', confirm: 'Devolver', tone: 'warning' },
   block: { title: 'Bloquear item', confirm: 'Bloquear', tone: 'danger' },
   reactivate: { title: 'Reativar item', confirm: 'Reativar', tone: '' },
   obsolete: { title: 'Obsoletar item', confirm: 'Obsoletar', tone: 'warning' },
@@ -58,7 +58,7 @@ const canReturn = computed(() => requiredApprovals(props.item).some(role => canA
     <span v-for="step in LIFECYCLE" :key="step" :class="{ current: life === step, past: past(step) }">{{ step }}</span>
   </div>
 
-  <template v-if="life === 'Rascunho' || life === 'Em homologação'">
+  <template v-if="life === 'Em criação' || life === 'Em homologação'">
     <h3 class="drawer-title">Homologação por papel</h3>
     <div class="approval-grid">
       <div v-for="role in requiredApprovals(item)" :key="role" class="approval-card" :class="{ done: !!catalog.approvals[role] }">
@@ -74,10 +74,10 @@ const canReturn = computed(() => requiredApprovals(props.item).some(role => canA
   </template>
 
   <div class="drawer-actions">
-    <button v-if="life === 'Rascunho'" class="button" :disabled="!canCycle" @click="store.submitItem(item.id)">Enviar para homologação</button>
+    <button v-if="life === 'Em criação'" class="button" :disabled="!canCycle" @click="store.submitItem(item.id)">Enviar para homologação</button>
     <template v-if="life === 'Em homologação'">
       <button class="button" :disabled="!canCycle || issues.length > 0" @click="store.finishActivation(item.id)">Ativar</button>
-      <button class="button secondary" :disabled="!canReturn" @click="ask = 'return'">Devolver a rascunho</button>
+      <button class="button secondary" :disabled="!canReturn" @click="ask = 'return'">Devolver para Em criação</button>
     </template>
     <button v-if="life === 'Ativo'" class="button secondary" :disabled="!canCycle" @click="ask = 'block'">Bloquear</button>
     <button v-if="life === 'Bloqueado'" class="button" :disabled="!canCycle" @click="ask = 'reactivate'">Reativar</button>

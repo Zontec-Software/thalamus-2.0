@@ -48,7 +48,7 @@ function downloadSped() {
   </div>
   <FiscalMatrixPanel v-if="view === 'matriz'" />
   <article v-else-if="view === 'sped'" class="card flush">
-    <div class="section-head"><div><h2>SPED · Bloco 0</h2><p>Registros 0190 (unidades), 0200 (produtos) e 0220 (fatores de conversão) da EFD ICMS/IPI, gerados do cadastro ativo. Rascunho, homologação e kit virtual ficam de fora.</p></div>
+    <div class="section-head"><div><h2>SPED · Bloco 0</h2><p>Registros 0190 (unidades), 0200 (produtos) e 0220 (fatores de conversão) da EFD ICMS/IPI, gerados do cadastro ativo. Em criação, homologação e kit virtual ficam de fora.</p></div>
       <button class="button" @click="downloadSped">Baixar .txt ({{ sped.count }} produtos)</button>
     </div>
     <p v-if="sped.issues.length" class="notice warning" style="margin:0 16px 10px">{{ sped.issues.join(' · ') }}</p>

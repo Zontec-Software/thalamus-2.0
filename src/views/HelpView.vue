@@ -2,7 +2,7 @@
 import { useRouter } from 'vue-router'
 import { BookMarked, BookOpen, CircleHelp, FileText, PlayCircle, Tablet, Unplug, Wrench } from 'lucide-vue-next'
 import { MANUAL, MANUAL_SECTIONS } from '../help/manual'
-import { NAVIGATION } from '../navigation'
+import { NAVIGATION, type NavItem } from '../navigation'
 import { PAGE_TOURS, WELCOME_KEY, WELCOME_TOUR } from '../tour/steps'
 import { useUiStore } from '../stores/ui'
 
@@ -30,7 +30,7 @@ const LEGACY = [
   { before: 'Programação de máquinas que se perdia ao recarregar', after: 'Programação persistida e validada por tipo de recurso' },
 ]
 
-const modules = NAVIGATION.flatMap(group => group.items).filter(item => PAGE_TOURS[item.to])
+const modules = NAVIGATION.flatMap(group => group.items).filter((item): item is NavItem & { to: string } => !!item.to && !!PAGE_TOURS[item.to])
 
 function openGuide(to: string) {
   router.push(to).then(() => setTimeout(() => ui.startTour(to, PAGE_TOURS[to]), 600))

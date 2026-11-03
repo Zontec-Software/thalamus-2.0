@@ -1,6 +1,7 @@
 import type { Component } from 'vue'
+import { IconComercial, IconEngenharia, IconFinancas, IconGestao, IconOperacoes, IconServicos, IconSuprimentos } from '../icons/ds'
 import {
-  BookMarked, Boxes, CircleDollarSign, Compass, Factory, HandCoins, LineChart, Warehouse, Wrench,
+  BookMarked, Compass,
 } from 'lucide-vue-next'
 
 /** Trechos entre **asteriscos** são renderizados em negrito. */
@@ -68,19 +69,19 @@ export const MANUAL: ManualChapter[] = [
         screens: [{ label: 'Tela inicial', to: '/' }],
         tour: '/',
         blocks: [
-          { kind: 'p', text: 'O sistema é dividido em **sete áreas**: Cadastros, Suprimentos, Comercial, Operações, Serviços, Gestão e Finanças. A tela inicial mostra um bloco por área, todos na mesma linha. Cada bloco tem atalhos para as telas mais usadas. O clique no bloco abre o mapa da área, com um cartão por módulo liberado para o perfil. Cada cartão diz, em uma linha, o que aquele módulo faz. Quem só tem um módulo entra direto nele.' },
+          { kind: 'p', text: 'O sistema tem **dez módulos**, em duas faixas. A **cadeia de valor** segue o pedido: Comercial, Engenharia, Suprimentos, Operações e Serviços e Contratos. O **apoio** sustenta todas as etapas: Pessoas, Patrimônio, Finanças, Gestão e Administração do sistema. A tela inicial mostra um bloco por módulo. Cada bloco tem atalhos para as telas mais usadas. O nome apagado é um processo previsto, ainda sem tela. O clique no bloco, fora dos atalhos, destaca esse módulo na própria tela e mostra uma linha sobre cada atalho. O atalho abre a tela.' },
           {
             kind: 'list', title: 'Elementos fixos da tela',
             items: [
-              '**Barra superior**: marca, nome da área (volta ao mapa da área), seta para trocar de área, busca geral, perfil, sino de notificações e o botão de ajuda.',
-              '**Barra de módulos**: faixa escura logo abaixo do topo, com os módulos da área em que você está. O módulo aberto fica sublinhado em ciano. À direita fica o indicador do Omie, que mostra se há falhas de integração.',
+              '**Barra superior**: marca, nome da área (volta ao mapa da área), seta para trocar de área, busca geral, Minhas tarefas, perfil, sino de notificações e o botão de ajuda.',
+              '**Barra de módulos**: faixa escura logo abaixo do topo, com as telas do módulo em que você está. A tela aberta fica sublinhada. À direita fica o indicador do Omie, que mostra se há falhas de integração.',
               '**Abas do módulo**: Portfólio e Orçamentos têm as telas internas numa faixa no topo, com a tela aberta sublinhada. Na ficha do produto, as abas do módulo somem e as seções do produto aparecem na mesma faixa horizontal.',
             ],
           },
           {
             kind: 'steps', title: 'Para chegar a uma tela',
             items: [
-              'Na tela inicial, clique no bloco da área. Se o perfil tiver mais de um módulo, abre o mapa; se tiver só um, abre esse módulo. Os atalhos do bloco abrem a tela direto.',
+              'Na tela inicial, clique no bloco da área para ver o detalhe de cada atalho. O atalho abre a tela direto.',
               'No mapa, escolha o módulo. Módulo sem permissão não aparece.',
               'Na barra de módulos, dá para trocar de módulo sem voltar ao mapa.',
               'Se o módulo tiver abas no topo, escolha a tela interna.',
@@ -163,7 +164,7 @@ export const MANUAL: ManualChapter[] = [
   },
 
   {
-    id: 'cadastros', title: 'Cadastros', icon: Boxes,
+    id: 'cadastros', title: 'Cadastros', icon: IconEngenharia,
     intro: 'A base compartilhada: produtos, estruturas, serviços, pessoas, postos, ativos e gestão de acesso.',
     sections: [
       {
@@ -191,7 +192,7 @@ export const MANUAL: ManualChapter[] = [
           {
             kind: 'list', title: 'As telas do módulo Produtos',
             items: [
-              '**Portfólio**: a lista, com quatro guias da vida do cadastro. **Rascunho** é o que ainda não foi liberado. **Ativos** é a versão vigente. **Em Revisão** é uma versão em desenvolvimento, e o produto continua em Ativos enquanto a vigente vale. **Inativo** só aparece depois da inativação. Dentro da guia, os tipos e o filtro de cada coluna continuam valendo.',
+              '**Portfólio**: a lista, com quatro guias da vida do cadastro. **Em criação** é o que ainda não foi liberado. **Ativos** é a versão vigente. **Em Revisão** é uma versão em desenvolvimento, e o produto continua em Ativos enquanto a vigente vale. **Inativo** só aparece depois da inativação. Dentro da guia, o filtro de cada coluna continua valendo. O tipo se escolhe na coluna Tipo.',
               '**Ficha do produto**: abre ao clicar numa linha. No topo ficam a foto, a situação e os indicadores (custo, saldo, lead time, roteiro, onde é usado, mudanças); cada indicador leva à seção correspondente. Abaixo, as seções ficam numa faixa horizontal: Identificação, Engenharia, Logística, Comercial e fiscal, Documentos e Governança. O número marca o que pede ação.',
               '**Classificação**: a árvore que organiza os produtos e define os atributos que eles herdam.',
               '**Ações**: o que o perfil logado pode fazer agora. Entram homologação, cadastro incompleto, estrutura e roteiro, fiscal, mudança de engenharia e ciclo de vida. Quem não tem a funcionalidade não vê a linha. A matriz fiscal e o SPED ficam nesta aba para quem gere o fiscal. Estoque e ferramental continuam na página do produto.',
@@ -201,7 +202,7 @@ export const MANUAL: ManualChapter[] = [
             kind: 'list', title: 'Encontrar produtos numa base grande',
             items: [
               'A busca aceita código, descrição, descrição comercial, qualquer código de barras (EAN, DUN, UPC), marca, linha e NCM.',
-              'Os filtros combinam tipo, situação, nó da classificação (inclui os nós filhos), marca, categoria de e-commerce, curva ABC e pendência (sem NCM, sem CEST, sem estrutura, sem roteiro, sem EAN, sem preço, GTIN × NCM divergente, exceção pendente, versão em rascunho, obsoleto com saldo).',
+              'Os filtros combinam tipo, situação, nó da classificação (inclui os nós filhos), marca, categoria de e-commerce, curva ABC e pendência (sem NCM, sem CEST, sem estrutura, sem roteiro, sem EAN, sem preço, GTIN × NCM divergente, exceção pendente, versão em rascunho, obsoleto com saldo). Nessas colunas a lista troca a opção, e a linha em branco limpa. Preço e saldo comparam maior, menor e igual. A data de alteração compara depois, antes, a partir de e até.',
               'Clique no cabeçalho para ordenar por código, descrição, saldo, data de alteração ou situação.',
               'Em **Colunas**, escolha o que aparece: tipo, classificação, unidade, saldo, NCM, EAN, marca, curva ABC, preço vigente, grade, versão do registro, alterado por e pendências. A escolha fica salva no navegador.',
               'A lista é paginada em 25, 50 ou 100 produtos por página. Os filtros continuam valendo quando você abre um produto e volta.',
@@ -212,7 +213,7 @@ export const MANUAL: ManualChapter[] = [
       },
       {
         id: 'criar-item', title: 'Criar um produto',
-        summary: 'Do novo rascunho até a homologação.',
+        summary: 'Do cadastro em criação até a homologação.',
         roles: ['Engenharia', 'Gestor'],
         screens: [{ label: 'Portfólio', to: '/produtos' }],
         blocks: [
@@ -222,7 +223,7 @@ export const MANUAL: ManualChapter[] = [
               'Em Produtos → Portfólio, clique em **Novo produto**.',
               'Informe a descrição, o tipo, a unidade base e o nó da classificação.',
               'Se já existir produto com descrição parecida, o sistema lista os candidatos. Confira: se for o mesmo produto, cancele e use o existente. Se for outro, confirme com **É outro produto, criar**.',
-              'O produto nasce em **Rascunho**, com código sequencial (RF-10007, RF-10008…) e abre a página dele.',
+              'O produto nasce em **Em criação**, com código sequencial (RF-10007, RF-10008…) e abre a página dele.',
               'Preencha as camadas que o tipo pede. Para produto acabado e kit, abra a primeira versão da estrutura na aba Estrutura e roteiro.',
               'Na aba Ciclo e aprovações, clique em **Enviar para homologação**.',
             ],
@@ -232,7 +233,7 @@ export const MANUAL: ManualChapter[] = [
             items: [
               'O código não tem significado e nunca muda. Quem organiza é a classificação.',
               'Só Engenharia e Gestor criam produtos.',
-              'Rascunho não entra em pedido, proposta, compra, demanda nem produção.',
+              'Em criação não entra em pedido, proposta, compra, demanda nem produção.',
               'Descrição parecida gera aviso, não bloqueio: a decisão é de quem cadastra.',
             ],
           },
@@ -394,7 +395,7 @@ export const MANUAL: ManualChapter[] = [
             items: [
               'Produto acabado estocado não libera versão com roteiro vazio. Kit virtual não tem roteiro.',
               'Operação com molde só aceita injetora compatível com aquele molde.',
-              'O posto vem de Cadastros → Postos. Posto inativo não entra em operação nova; a operação que já o usa permanece.',
+              'O posto vem de Administração do sistema → Postos e centros de custo. Posto inativo não entra em operação nova; a operação que já o usa permanece.',
               'Qualquer mudança no roteiro desmarca o checklist da versão.',
               'Versão ligada a uma mudança de engenharia só é liberada pela própria mudança, na data de efetividade.',
             ],
@@ -639,7 +640,7 @@ export const MANUAL: ManualChapter[] = [
             items: [
               'Alteração feita no Omie em produto sincronizado é aplicada no Thalamus e registrada na auditoria.',
               'Alteração no Omie com envio pendente do Thalamus vira conflito; nada é sobrescrito sozinho.',
-              'Rascunho não sincroniza: o produto vai ao Omie na ativação.',
+              'Em criação não sincroniza: o produto vai ao Omie na ativação.',
               'Produto em conflito aparece na pendência "Fiscal em conflito com o Omie" e na aba Ações, para quem gere o fiscal.',
             ],
           },
@@ -665,7 +666,7 @@ export const MANUAL: ManualChapter[] = [
             kind: 'list', title: 'SPED · registro 0200',
             items: [
               'A aba **SPED** gera os registros **0190** (unidades), **0200** (produtos) e **0220** (fatores de conversão) da EFD ICMS/IPI a partir do cadastro ativo.',
-              'Rascunho, produto em homologação e kit virtual ficam fora.',
+              'Em criação, produto em homologação e kit virtual ficam fora.',
               'Produto sem NCM aparece no aviso acima do arquivo, porque o 0200 sairia incompleto.',
               '**Baixar .txt** gera o arquivo no formato do SPED, pronto para conferência. Cada produto também tem a prévia na própria aba Fiscal.',
             ],
@@ -686,7 +687,7 @@ export const MANUAL: ManualChapter[] = [
               'Dê o nome do modelo e os eixos, um por linha, no formato "Cor: Preto, Laranja, Azul" (até 3 eixos). Os atributos da classe marcados como eixo de variação já vêm preenchidos.',
               'Diga qual valor de cada eixo o produto-modelo tem e clique em **Criar grade**.',
               'A matriz mostra as combinações. Marque as que quer criar, ou deixe sem marcar para gerar todas as que faltam.',
-              'As variantes nascem em rascunho e seguem a homologação normal.',
+              'As variantes nascem em criação e seguem a homologação normal.',
             ],
           },
           { kind: 'rules', items: ['As variantes herdam fiscal, marca, linha, categorias, dimensões, lotes e unidades do produto-modelo.', 'EAN, preço, estrutura e foto são de cada variante.', 'Um produto só pertence a uma grade, e a mesma combinação não é gerada duas vezes.'] },
@@ -729,13 +730,13 @@ export const MANUAL: ManualChapter[] = [
         screens: [{ label: 'Ações', to: '/produtos/acoes' }],
         tour: '/produtos/acoes',
         blocks: [
-          { kind: 'flow', title: 'Situações do produto', items: ['Rascunho', 'Em homologação', 'Ativo', 'Alteração pendente', 'Inativação pendente', 'Bloqueado', 'Obsoleto', 'Inativo'] },
+          { kind: 'flow', title: 'Situações do produto', items: ['Em criação', 'Em homologação', 'Ativo', 'Alteração pendente', 'Inativação pendente', 'Bloqueado', 'Obsoleto', 'Inativo'] },
           { kind: 'p', text: 'A análise do cadastro novo continua nesta tela. A **homologação de fornecedor** é de outro submódulo, só para matéria-prima, e aqui aparece como retrato somente leitura: fornecedor, situação, referência, validade e testes de P&D. Alteração de descrição, classificação, unidade ou NCM de produto ativo exige documento de origem (OS, OP, PAP, oportunidade ou outro) e aprovação; o valor vigente continua até lá. A inativação também é solicitada e aprovada. Depois dela, estoque, ordens e pedidos já abertos seguem, e solicitações que ainda estavam pendentes são negadas. Os papéis de cada aprovação ainda não foram definidos pela especificação; a demonstração mantém os papéis já usados na análise do cadastro.' },
           {
             kind: 'table', title: 'O que cada situação permite',
             head: ['Situação', 'Venda', 'Compra', 'Produção', 'Consumo de saldo', 'Edição'],
             rows: [
-              ['Rascunho', 'Não', 'Não', 'Não', 'Não', 'Livre, conforme a camada'],
+              ['Em criação', 'Não', 'Não', 'Não', 'Não', 'Livre, conforme a camada'],
               ['Em homologação', 'Não', 'Não', 'Não', 'Não', 'Livre; alterar uma camada apaga a aprovação dela'],
               ['Ativo', 'Sim', 'Sim', 'Sim', 'Sim', 'Tipo, unidade base e NCM congelados'],
               ['Bloqueado', 'Não', 'Não', 'Não', 'Não', 'Igual ao ativo'],
@@ -760,7 +761,7 @@ export const MANUAL: ManualChapter[] = [
               'Cada aprovador vê o produto em Homologação → **Aguardando meu papel** e em Minhas tarefas.',
               'Na aba Ciclo e aprovações, cada cartão mostra o que falta para aquele papel. O botão **Aprovar** só fica ativo quando não falta nada.',
               'Quando a última aprovação é registrada e não há pendência, o produto é **ativado automaticamente**. Se faltar algo, use **Ativar** depois de resolver.',
-              'Se o cadastro estiver errado, um aprovador usa **Devolver a rascunho** com o motivo. As aprovações já dadas são apagadas.',
+              'Se o cadastro estiver errado, um aprovador usa **Devolver para Em criação** com o motivo. As aprovações já dadas são apagadas.',
             ],
           },
           {
@@ -837,8 +838,8 @@ export const MANUAL: ManualChapter[] = [
             kind: 'table', title: 'Excluir um produto',
             head: ['Situação do produto', 'Resultado'],
             rows: [
-              ['Rascunho ou inativo, nunca usado', 'Exclusão **física**: o produto sai do cadastro'],
-              ['Rascunho ou inativo, já usado em algum documento', 'Exclusão **lógica**: some das listas e não entra em transação, mas o histórico fica'],
+              ['Em criação ou inativo, nunca usado', 'Exclusão **física**: o produto sai do cadastro'],
+              ['Em criação ou inativo, já usado em algum documento', 'Exclusão **lógica**: some das listas e não entra em transação, mas o histórico fica'],
               ['Qualquer outra situação, ou com saldo', 'Exclusão recusada'],
             ],
           },
@@ -866,7 +867,7 @@ export const MANUAL: ManualChapter[] = [
             rows: [
               ['Aguardando meu papel', 'Produtos em homologação com aprovação que o seu perfil pode dar, com aprovação direta na linha'],
               ['Em homologação', 'Todos os produtos em aprovação e o que falta em cada um'],
-              ['Rascunhos', 'Cadastros iniciados e ainda não enviados'],
+              ['Em criação', 'Cadastros iniciados e ainda não enviados'],
               ['Exceções de campo-chave', 'Pedidos de mudança de unidade ou NCM aguardando a gestão'],
               ['Ativos com pendência', 'Produtos ativos com cadastro incompleto (NCM, CEST, EAN, estrutura, roteiro)'],
               ['Bloqueados', 'Produtos fora de transação, com o motivo do bloqueio'],
@@ -916,7 +917,7 @@ export const MANUAL: ManualChapter[] = [
         screens: [{ label: 'Parceiros', to: '/parceiros' }],
         tour: '/parceiros',
         blocks: [
-          { kind: 'p', text: 'O nome Parceiros é temporário. No Omie, cliente e fornecedor são o mesmo registro de pessoa. O Thalamus segue essa lógica: os dados gerais existem uma vez, e cada papel tem situação, perfil e indicadores próprios. Cliente, fornecedor e transportadora se atribuem no mesmo cadastro. Inativar um papel não inativa os outros.' },
+          { kind: 'p', text: 'A mesma tela abre por dois atalhos: **Clientes**, no Comercial, e **Fornecedores**, em Suprimentos. No Omie, cliente e fornecedor são o mesmo registro de pessoa. O Thalamus segue essa lógica: os dados gerais existem uma vez, e cada papel tem situação, perfil e indicadores próprios. Cliente, fornecedor e transportadora se atribuem no mesmo cadastro. Inativar um papel não inativa os outros.' },
           {
             kind: 'steps', title: 'Usar a tela',
             items: [
@@ -1009,7 +1010,7 @@ export const MANUAL: ManualChapter[] = [
         screens: [{ label: 'Ativos', to: '/ativos' }],
         tour: '/ativos',
         blocks: [
-          { kind: 'p', text: 'Cada ativo tem criticidade, contador de ciclos e plano preventivo. Os moldes somam ciclos a cada OP de injeção concluída (peças boas divididas pelas cavidades). O campo Recurso produtivo liga o ativo a um posto de Cadastros. Sem esse vínculo, a máquina não entra na programação.' },
+          { kind: 'p', text: 'Cada ativo tem criticidade, contador de ciclos e plano preventivo. Os moldes somam ciclos a cada OP de injeção concluída (peças boas divididas pelas cavidades). O campo Recurso produtivo liga o ativo a um posto de Administração do sistema. Sem esse vínculo, a máquina não entra na programação.' },
           { kind: 'p', text: 'O molde como dado de engenharia fica em Produtos, no produto de ferramental. Esta tela é o bem que a manutenção acompanha. O vínculo entre os dois é feito na ficha do ferramental, no campo Ativo na manutenção, e só aparece aqui depois que o ativo existe. O produto pode ser gravado antes. Esta tela de Ativos ainda é a da demonstração; a revisão do módulo não foi feita.' },
           {
             kind: 'list', title: 'Ações na ficha do ativo',
@@ -1023,23 +1024,21 @@ export const MANUAL: ManualChapter[] = [
   },
 
   {
-    id: 'comercial', title: 'Comercial', icon: HandCoins,
+    id: 'comercial', title: 'Comercial', icon: IconComercial,
     intro: 'Do primeiro contato com o cliente até a carga faturada.',
     sections: [
       {
-        id: 'crm', title: 'CRM: oportunidades e funil',
+        id: 'crm', title: 'CRM: painel e oportunidades',
         summary: 'Acompanhar negociações até o aceite.',
         roles: ['Comercial', 'Gestor'],
         screens: [
           { label: 'Painel', to: '/crm' },
           { label: 'Oportunidades', to: '/crm/oportunidades' },
-          { label: 'Funil', to: '/crm/funil' },
-          { label: 'Agenda', to: '/crm/agenda' },
         ],
         tour: '/crm',
         blocks: [
           { kind: 'flow', title: 'Etapas da oportunidade', items: ['Prospecção', 'Desenvolvimento', 'Elaboração', 'Proposta', 'Conquista'] },
-          { kind: 'p', text: 'Perdida fica fora do funil. A meta anual é da empresa e usa o MRR conquistado. Quem pode consultar o grupo vê a soma, sem gravar a meta no grupo.' },
+          { kind: 'p', text: 'O CRM tem duas áreas: painel e oportunidades. A meta anual é da empresa, rateada por mês, e cada mês pode ser alterado. Quem pode consultar o grupo vê a soma, sem gravar a meta no grupo. O funil e a pizza ficam no painel. A temperatura filtra o painel sem abrir a lista.' },
           {
             kind: 'table', title: 'O que cada número significa',
             head: ['Campo', 'O que é'],
@@ -1051,32 +1050,27 @@ export const MANUAL: ManualChapter[] = [
               ['Probabilidade', 'Vem da fase: 10% em Prospecção, 25% em Desenvolvimento, 40% em Elaboração, 55% em Proposta, 100% em Conquista e 0% em Perdida.'],
               ['Fechamento', 'Data prevista para o aceite. Em vermelho quando já passou e a oportunidade segue aberta.'],
               ['Win rate', 'Conquistadas dividido pelas oportunidades já encerradas, conquistadas e perdidas.'],
-              ['Custo total', 'Soma do custo estimado das demandas de material ligadas à oportunidade.'],
-              ['Status', 'Frase livre do vendedor sobre a situação atual. Vazio, a oportunidade aparece em Sem status.'],
+              ['CAC', 'Soma do custo estimado das demandas ligadas à oportunidade.'],
+              ['Status', 'Frase livre do vendedor sobre a situação atual. Vazio, a coluna Avisos da lista marca Sem status.'],
             ],
           },
           {
             kind: 'table', title: 'Abas do CRM',
             head: ['Aba', 'Para que serve'],
             rows: [
-              ['Painel', 'Meta do mês ou do ano, funil, temperatura e o que precisa de atenção.'],
-              ['Oportunidades', 'Lista com guias Em aberto, Conquistadas e Perdidas, atalhos de temperatura e de alerta e filtro por coluna.'],
-              ['Funil', 'Quadro por fase, com o MRR de cada coluna.'],
-              ['Propostas', 'Todas as propostas, com a validade vencida em destaque.'],
-              ['Agenda', 'Próximas ações de todas as oportunidades: atrasadas, hoje e próximos dias.'],
+              ['Painel', 'Meta mensal ou anual, funil pela quantidade, pizza por fase, temperatura e o que precisa de atenção.'],
+              ['Oportunidades', 'Uma pesquisa e colunas que se ligam e desligam. A linha mostra temperatura, cliente, ticket e fase. O clique abre um cartão; a ficha completa é um passo a mais.'],
             ],
           },
           {
             kind: 'steps', title: 'Trabalhar uma oportunidade',
             items: [
-              'Clique em **Nova oportunidade**: cliente e contato saem do cadastro de parceiros. Se ainda não existem, **Cadastrar cliente** ou **Cadastrar contato** abre o cadastro, e a seta de voltar traz de volta para a oportunidade.',
-              'A vertical fica no cadastro do cliente. A oportunidade só mostra.',
-              'A ficha é uma página: fases, indicadores e as abas Dados, Ações, Observações, Propostas, Desenvolvimento e Histórico.',
-              'Em **Dados**, edite contato, negócio, produtos de interesse e status e clique em **Salvar**.',
-              'Em **Ações**, registre a próxima ação (ligação, e-mail, reunião ou tarefa) e marque como feita quando concluir.',
-              'Em **Observações**, escreva o texto livre da negociação. Negrito, itálico e listas ficam salvos com o botão **Salvar**.',
-              'Clique numa fase para avançar ou voltar.',
-              'Quando o cliente pedir preço, use **Criar proposta**. Se for desenvolvimento, a aba **Desenvolvimento** abre o PAP, as demandas e o projeto.',
+              'Clique em **Nova oportunidade**. A empresa é Roboflex, Zontec ou Locações. O vendedor começa com quem está logado. O cliente sai do cadastro de parceiros, ou é cadastrado ali mesmo. A oportunidade nasce fria.',
+              'Um relato escrito, ou o áudio simulado, preenche os campos que o texto reconhecer. Nesta demonstração não há serviço de voz nem de IA.',
+              'A ficha abre na apresentação: marca do cliente, linha do tempo, temperatura, ticket, MRR, CAC, previsão e status. Depois vêm só duas áreas, Dados e Histórico.',
+              'Em **Dados**, salve cliente, contato, vendedor, tipo, origem, vertical e motivação. A vertical grava no cadastro do cliente.',
+              'As propostas mostram número, valor e se estão aprovadas, em análise ou canceladas. O clique abre a proposta no vendas.',
+              'O mesmo campo de ação cria tarefa, reunião, demanda, e-mail, ligação, PAP ou projeto. Reunião entra na agenda Google simulada. Demanda soma no CAC. O histórico do cliente não fica mais aqui: ele mora no cadastro de parceiros.',
             ],
           },
           {
@@ -1107,7 +1101,7 @@ export const MANUAL: ManualChapter[] = [
               'Abaixo do preço de cada linha aparece o preço da tabela padrão e quanto a negociação se afastou dele, para porcentagem mais ou menos.',
               'Kit virtual entra como uma linha só e é explodido nos componentes quando o cliente aceita.',
               'O desconto vai até **15%**.',
-              'Só item **ativo** entra numa proposta. Item bloqueado, obsoleto, em rascunho ou imobilizado é recusado com o motivo.',
+              'Só item **ativo** entra numa proposta. Item bloqueado, obsoleto, em criação ou imobilizado é recusado com o motivo.',
               '**Enviar** mantém a oportunidade em Proposta.',
               '**Cliente aceitou** confere de novo os itens, aprova o pedido no Omie com todas as linhas e marca a oportunidade como Conquista.',
               'No desenvolvimento, **Criação de PAP** abre a mudança de engenharia ligada à oportunidade. **Nova demanda** abre a demanda de material que já existe, com origem nesta oportunidade.',
@@ -1156,7 +1150,7 @@ export const MANUAL: ManualChapter[] = [
   },
 
   {
-    id: 'operacoes', title: 'Planejamento e produção', icon: Factory,
+    id: 'operacoes', title: 'Planejamento e produção', icon: IconOperacoes,
     intro: 'Como um pedido vira peças, cases e lotes aprovados.',
     sections: [
       {
@@ -1356,7 +1350,7 @@ export const MANUAL: ManualChapter[] = [
   },
 
   {
-    id: 'suprimentos', title: 'Suprimentos', icon: Warehouse,
+    id: 'suprimentos', title: 'Suprimentos', icon: IconSuprimentos,
     intro: 'Da necessidade ao recebimento e ao controle de estoque.',
     sections: [
       {
@@ -1377,7 +1371,7 @@ export const MANUAL: ManualChapter[] = [
               '**Contratar e concluir** (serviço): a contratação acompanha a previsão; a conclusão encerra a execução e o realizado aguarda o pagamento do Omie.',
             ],
           },
-          { kind: 'rules', items: ['Item da demanda precisa poder ser consumido: bloqueado, rascunho, inativo e excluído são recusados.', 'Obsoleto pode ser atendido pelo saldo, mas não comprado.'] },
+          { kind: 'rules', items: ['Item da demanda precisa poder ser consumido: bloqueado, em criação, inativo e excluído são recusados.', 'Obsoleto pode ser atendido pelo saldo, mas não comprado.'] },
         ],
         related: ['compras', 'orcamentos'],
       },
@@ -1420,7 +1414,7 @@ export const MANUAL: ManualChapter[] = [
   },
 
   {
-    id: 'servicos-campo', title: 'Serviços', icon: Wrench,
+    id: 'servicos-campo', title: 'Serviços', icon: IconServicos,
     intro: 'Disponibilidade da fábrica e atendimento depois da entrega.',
     sections: [
       {
@@ -1462,7 +1456,7 @@ export const MANUAL: ManualChapter[] = [
   },
 
   {
-    id: 'gestao', title: 'Gestão', icon: LineChart,
+    id: 'gestao', title: 'Gestão', icon: IconGestao,
     intro: 'Projetos, indicadores e integração.',
     sections: [
       {
@@ -1529,7 +1523,7 @@ export const MANUAL: ManualChapter[] = [
   },
 
   {
-    id: 'financas', title: 'Finanças', icon: CircleDollarSign,
+    id: 'financas', title: 'Finanças', icon: IconFinancas,
     intro: 'DRE e orçamento por categoria e setor utilizador. Contas a pagar e a receber estão em estruturação; por enquanto o título, o banco e a contabilidade ficam no Omie.',
     sections: [
       {
@@ -1647,12 +1641,12 @@ export const MANUAL: ManualChapter[] = [
         id: 'situacoes', title: 'Situações e cores',
         summary: 'Resumo das situações de cada registro.',
         blocks: [
-          { kind: 'table', head: ['Cor', 'Significado geral'], rows: [['Azul claro', 'Concluído, aprovado, ativo ou em dia'], ['Laranja', 'Atenção: rascunho, pendente, aguardando'], ['Vermelho', 'Problema: bloqueado, atrasado, erro, falta'], ['Cinza', 'Fora de uso: obsoleto, inativo, substituído, excluído'], ['Azul', 'Informação: em andamento, programado']] },
+          { kind: 'table', head: ['Cor', 'Significado geral'], rows: [['Azul claro', 'Concluído, aprovado, ativo ou em dia'], ['Laranja', 'Atenção: em criação, rascunho, pendente, aguardando'], ['Vermelho', 'Problema: bloqueado, atrasado, erro, falta'], ['Cinza', 'Fora de uso: obsoleto, inativo, substituído, excluído'], ['Azul', 'Informação: em andamento, programado']] },
           {
             kind: 'table', title: 'Situações por registro',
             head: ['Registro', 'Situações'],
             rows: [
-              ['Produto', 'Rascunho, Em homologação, Ativo, Bloqueado, Obsoleto, Inativo (e Excluído)'],
+              ['Produto', 'Em criação, Em homologação, Ativo, Bloqueado, Obsoleto, Inativo (e Excluído)'],
               ['Versão da estrutura', 'Rascunho, Programada, Vigente, Substituída'],
               ['Pedido de venda (etapa)', 'Entrada, Materiais, Injeção, Montagem, Qualidade, Expedição, Faturado'],
               ['OP', 'Aguardando material, Planejada, Liberada, Em produção, Inspeção, Concluída'],
@@ -1681,7 +1675,7 @@ export const MANUAL: ManualChapter[] = [
             head: ['Mensagem ou situação', 'Causa', 'O que fazer'],
             rows: [
               ['"… está bloqueado e não entra em venda/compra/produção"', 'O item foi bloqueado', 'Veja o motivo na aba Ciclo e aprovações; reative se for o caso'],
-              ['"… ainda é rascunho" ou "ainda está em homologação"', 'O item não foi ativado', 'Conclua a homologação em Produtos → Homologação'],
+              ['"… ainda está em criação" ou "ainda está em homologação"', 'O item não foi ativado', 'Conclua a homologação em Produtos → Homologação'],
               ['"… não permite estoque negativo"', 'A baixa deixaria o saldo abaixo de zero', 'Confira o saldo, faça o recebimento ou o inventário antes'],
               ['"Produto sem estrutura ou roteiro oficial"', 'Falta versão liberada ou roteiro', 'Libere uma versão da estrutura e cadastre o roteiro'],
               ['"Máquina em manutenção corretiva"', 'Há OS corretiva aberta no recurso', 'Aguarde a Manutenção concluir a OS'],

@@ -35,7 +35,7 @@ O fiscal é dividido em duas responsabilidades, para não haver dois cadastros d
   - alteração no Thalamus marca o item como "Enviar ao Omie" e é publicada pelo botão da ficha (no real, pela fila);
   - alteração no Omie (webhook de produto) em item sincronizado é aplicada aqui e auditada com o ator "Omie";
   - alteração no Omie com envio pendente vira **Conflito**: a ficha mostra campo a campo (NCM, CEST, origem, Ex-TIPI, cClassTrib) e alguém com permissão fiscal escolhe "Manter o Thalamus" (reenvia) ou "Aceitar o Omie" (aplica e audita);
-  - rascunho não sincroniza.
+  - em criação não sincroniza.
 - **Apuração e emissão** são do Omie. A matriz fiscal do Thalamus (`Produtos → Fiscal → Matriz fiscal`) apenas **sugere** CFOP, CST e alíquotas por operação, UF e NCM, para quem cadastra conferir. O valor que vai na nota é o que o Omie aplicar.
 
 Quando a matriz do Thalamus e a do Omie divergirem, vale a do Omie, e a diferença precisa aparecer como erro na tela de integração.

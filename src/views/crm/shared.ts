@@ -2,8 +2,7 @@ import { computed, reactive, watch } from 'vue'
 import { opportunityIsOpen } from '../../domain/enterprise'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
-import type { Opportunity } from '../../types/domain'
-import type { HeaderFilterOp } from '../products/shared'
+import type { Opportunity, Proposal } from '../../types/domain'
 
 /** Ano e mês do relógio da demonstração (29/10/2026). */
 export const CRM_YEAR = 2026
@@ -16,59 +15,66 @@ export const LOSS_REASONS = ['Preço', 'Prazo', 'Concorrente', 'Projeto cancelad
 /** Vendedor e grupo valem para todas as abas do CRM. */
 export const crmScope = reactive({ owner: '', groupId: '' })
 
-export type OpportunityLife = 'open' | 'won' | 'lost'
-export const OPPORTUNITY_LIFE_TABS: { id: OpportunityLife; label: string }[] = [
-  { id: 'open', label: 'Em aberto' },
-  { id: 'won', label: 'Conquistadas' },
-  { id: 'lost', label: 'Perdidas' },
-]
-export const lifeOf = (entry: Opportunity): OpportunityLife => entry.stage === 'Conquista' ? 'won' : entry.stage === 'Perdida' ? 'lost' : 'open'
+export const lifeOf = (entry: Opportunity) => entry.stage === 'Conquista' ? 'won' as const : entry.stage === 'Perdida' ? 'lost' as const : 'open' as const
 
-export type OpportunityQuick = '' | 'Quente' | 'Morno' | 'Frio' | 'sem-status' | 'sem-acao' | 'vencida'
+export const CRM_COMPANIES = [
+  { id: 'tenant-roboflex', label: 'Roboflex' },
+  { id: 'tenant-roboflex-sul', label: 'Zontec' },
+  { id: 'tenant-locacoes', label: 'Locações' },
+] as const
+export const DEAL_TYPES = ['Venda', 'Locação'] as const
 
-export type OpportunityColumn = 'id' | 'client' | 'stage' | 'owner' | 'temperature' | 'source' | 'segment' | 'probability' | 'close' | 'created' | 'won' | 'next' | 'tenant' | 'value' | 'mrr'
-export type OptionalColumn = Exclude<OpportunityColumn, 'id' | 'client' | 'stage' | 'value' | 'mrr'>
-export const OPPORTUNITY_COLUMNS: { id: OptionalColumn; label: string }[] = [
+export type OpportunityColumn = 'id' | 'client' | 'stage' | 'owner' | 'temperature' | 'source' | 'segment' | 'close' | 'created' | 'tenant'
+export const OPPORTUNITY_COLUMNS: { id: OpportunityColumn; label: string }[] = [
+  { id: 'id', label: 'Código da oportunidade' },
+  { id: 'client', label: 'Cliente' },
+  { id: 'stage', label: 'Fase' },
   { id: 'owner', label: 'Vendedor' },
   { id: 'temperature', label: 'Temperatura' },
   { id: 'source', label: 'Origem' },
   { id: 'segment', label: 'Vertical' },
-  { id: 'probability', label: 'Probabilidade' },
-  { id: 'close', label: 'Previsão de fechamento' },
+  { id: 'close', label: 'Previsão' },
   { id: 'created', label: 'Criação' },
-  { id: 'won', label: 'Conversão' },
-  { id: 'next', label: 'Próxima ação' },
   { id: 'tenant', label: 'Empresa' },
 ]
 
-const COLUMNS_KEY = 'thalamus-crm-colunas'
+const COLUMNS_KEY = 'thalamus-crm-colunas-v2'
 const savedColumns = (() => {
   try {
     const raw = JSON.parse(localStorage.getItem(COLUMNS_KEY) ?? 'null')
-    return Array.isArray(raw) ? raw as OptionalColumn[] : undefined
+    return Array.isArray(raw) ? raw.filter((id): id is OpportunityColumn => OPPORTUNITY_COLUMNS.some(column => column.id === id)) : undefined
   } catch {
     return undefined
   }
 })()
 
-const FILTER_COLUMNS: OpportunityColumn[] = ['id', 'client', 'stage', 'owner', 'temperature', 'source', 'segment', 'probability', 'close', 'created', 'won', 'next', 'tenant', 'value', 'mrr']
+export const ATTENTION_SIGNALS = ['Sem status', 'Sem próxima ação', 'Fechamento vencido'] as const
 export const opportunityList = reactive({
-  life: 'open' as OpportunityLife,
-  quick: '' as OpportunityQuick,
-  sort: 'close' as 'id' | 'close' | 'created' | 'value' | 'mrr',
+  query: '',
+  sort: 'close' as 'id' | 'close' | 'created' | 'value',
   desc: false,
-  columns: savedColumns ?? ['owner', 'temperature', 'source', 'segment', 'close'] as OptionalColumn[],
-  headerFilters: Object.fromEntries(FILTER_COLUMNS.map(id => [id, { value: '', op: 'contains' as HeaderFilterOp }])) as Record<OpportunityColumn, { value: string; op: HeaderFilterOp }>,
+  columns: savedColumns ?? OPPORTUNITY_COLUMNS.map(column => column.id),
 })
 watch(() => [...opportunityList.columns], columns => localStorage.setItem(COLUMNS_KEY, JSON.stringify(columns)))
+
+export function proposalSituation(status: Proposal['status']) {
+  if (status === 'Aceita') return 'Aprovada'
+  if (status === 'Recusada' || status === 'Expirada') return 'Cancelada'
+  return 'Em análise'
+}
+
+export function monthSlice(amount: number, monthly: number[] | undefined, monthIndex: number) {
+  if (monthly && monthly.length === 12) return monthly[monthIndex] ?? 0
+  return amount / 12
+}
 
 /** Sinais de gestão à vista de uma oportunidade em aberto. */
 export function attentionOf(entry: Opportunity, today: string) {
   if (!opportunityIsOpen(entry)) return []
   const signals: string[] = []
-  if (!entry.statusNote?.trim()) signals.push('Sem status')
-  if (!entry.activities.some(activity => !activity.done)) signals.push('Sem próxima ação')
-  if (entry.expectedClose < today) signals.push('Fechamento vencido')
+  if (!entry.statusNote?.trim()) signals.push(ATTENTION_SIGNALS[0])
+  if (!entry.activities.some(activity => !activity.done)) signals.push(ATTENTION_SIGNALS[1])
+  if (entry.expectedClose < today) signals.push(ATTENTION_SIGNALS[2])
   return signals
 }
 

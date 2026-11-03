@@ -2,7 +2,7 @@ import { computed, reactive, ref, watch, type Ref } from 'vue'
 import { catalogOf, type ProductLifeTab } from '../../domain/catalog'
 import { productFeature } from '../../domain/access'
 import { useErpStore } from '../../stores/erp'
-import type { CatalogLayer, Item, ItemLifecycle, ItemType, Role } from '../../types/domain'
+import type { CatalogLayer, Item, ItemLifecycle, Role } from '../../types/domain'
 
 /** Espelha a regra do domínio para travar o formulário antes de o usuário tentar salvar. */
 export function readOnly(item: Item, role: Role, layer: CatalogLayer) {
@@ -17,7 +17,7 @@ export function readOnly(item: Item, role: Role, layer: CatalogLayer) {
 }
 
 export const LIFE_TONE: Record<ItemLifecycle, string> = {
-  Rascunho: 'warning', 'Em homologação': 'info', Ativo: 'success', 'Alteração pendente': 'warning', 'Inativação pendente': 'warning', Bloqueado: 'danger', Obsoleto: 'neutral', Inativo: 'neutral',
+  'Em criação': 'warning', 'Em homologação': 'info', Ativo: 'success', 'Alteração pendente': 'warning', 'Inativação pendente': 'warning', Bloqueado: 'danger', Obsoleto: 'neutral', Inativo: 'neutral',
 }
 
 export const FLAG_TONE: Record<string, string> = {
@@ -41,7 +41,8 @@ export function usePager<T>(rows: Ref<T[]>, initial = 25, noun = 'produtos') {
   return { page, size, pages, slice, range }
 }
 
-export type HeaderFilterOp = 'starts' | 'ends' | 'contains' | 'not-contains' | 'equals' | 'not-equals'
+export type HeaderFilterKind = 'text' | 'number' | 'date'
+export type HeaderFilterOp = 'starts' | 'ends' | 'contains' | 'not-contains' | 'equals' | 'not-equals' | 'gt' | 'gte' | 'lt' | 'lte' | 'after' | 'before' | 'from' | 'until'
 export const HEADER_FILTER_OPS: { id: HeaderFilterOp; label: string }[] = [
   { id: 'starts', label: 'Começa com' },
   { id: 'ends', label: 'Termina com' },
@@ -50,6 +51,34 @@ export const HEADER_FILTER_OPS: { id: HeaderFilterOp; label: string }[] = [
   { id: 'equals', label: 'Igual a' },
   { id: 'not-equals', label: 'Diferente de' },
 ]
+const NUMBER_FILTER_OPS: { id: HeaderFilterOp; label: string }[] = [
+  { id: 'gt', label: 'Maior que' },
+  { id: 'gte', label: 'Maior ou igual a' },
+  { id: 'lt', label: 'Menor que' },
+  { id: 'lte', label: 'Menor ou igual a' },
+  { id: 'equals', label: 'Igual a' },
+  { id: 'not-equals', label: 'Diferente de' },
+]
+const DATE_FILTER_OPS: { id: HeaderFilterOp; label: string }[] = [
+  { id: 'after', label: 'Depois de' },
+  { id: 'from', label: 'A partir de' },
+  { id: 'before', label: 'Antes de' },
+  { id: 'until', label: 'Até' },
+  { id: 'equals', label: 'Igual a' },
+  { id: 'not-equals', label: 'Diferente de' },
+]
+
+export function filterOps(kind: HeaderFilterKind = 'text') {
+  if (kind === 'number') return NUMBER_FILTER_OPS
+  if (kind === 'date') return DATE_FILTER_OPS
+  return HEADER_FILTER_OPS
+}
+
+/** Condição que vale quando a coluna ainda está na comparação de texto. */
+export function activeFilterOp(op: HeaderFilterOp, kind: HeaderFilterKind = 'text'): HeaderFilterOp {
+  const ops = filterOps(kind)
+  return ops.some(entry => entry.id === op) ? op : ops[0].id
+}
 
 export type HeaderFilterColumn = 'code' | 'name' | 'type' | 'class' | 'brand' | 'abc' | 'price' | 'model' | 'unit' | 'stock' | 'ncm' | 'gtin' | 'version' | 'updated' | 'lifecycle' | 'flags'
 
@@ -68,7 +97,38 @@ export function headerFilterMatches(text: string, value: string, op: HeaderFilte
   if (op === 'contains') return hay.includes(needle)
   if (op === 'not-contains') return !hay.includes(needle)
   if (op === 'equals') return hay === needle
-  return hay !== needle
+  if (op === 'not-equals') return hay !== needle
+  return false
+}
+
+/** Compara um número da linha com o valor digitado no filtro. */
+export function numberFilterMatches(actual: number | null | undefined, value: string, op: HeaderFilterOp) {
+  const raw = value.trim().replace(/\s/g, '').replace(',', '.')
+  if (!raw) return true
+  const needle = Number(raw)
+  if (!Number.isFinite(needle) || actual == null || !Number.isFinite(actual)) return false
+  const used = activeFilterOp(op, 'number')
+  if (used === 'gt') return actual > needle
+  if (used === 'gte') return actual >= needle
+  if (used === 'lt') return actual < needle
+  if (used === 'lte') return actual <= needle
+  if (used === 'not-equals') return actual !== needle
+  return actual === needle
+}
+
+/** Compara uma data ISO (aaaa-mm-dd) com o dia escolhido no filtro. */
+export function dateFilterMatches(actual: string | null | undefined, value: string, op: HeaderFilterOp) {
+  const needle = value.trim().slice(0, 10)
+  if (!needle) return true
+  const day = actual?.slice(0, 10) ?? ''
+  const used = activeFilterOp(op, 'date')
+  if (!day) return used === 'not-equals'
+  if (used === 'after') return day > needle
+  if (used === 'from') return day >= needle
+  if (used === 'before') return day < needle
+  if (used === 'until') return day <= needle
+  if (used === 'not-equals') return day !== needle
+  return day === needle
 }
 
 export type ListColumn = 'type' | 'class' | 'brand' | 'abc' | 'price' | 'model' | 'unit' | 'stock' | 'ncm' | 'gtin' | 'version' | 'updated' | 'flags'
@@ -102,7 +162,6 @@ const savedColumns = (() => {
 export const listState = reactive({
   query: '',
   life: 'active' as ProductLifeTab,
-  type: '' as ItemType | '',
   lifecycle: '' as ItemLifecycle | '',
   classId: '',
   flag: '',

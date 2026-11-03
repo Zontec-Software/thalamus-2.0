@@ -1,19 +1,32 @@
 import type { Component } from 'vue'
 export { moduleFeature } from './domain/access'
 import {
-  ArrowDownToLine, ArrowUpFromLine, BadgeDollarSign, BarChart3, Boxes, BriefcaseBusiness, Building2, CalendarRange, CircleDollarSign, Handshake, Landmark,
-  ClipboardCheck, Cog, Factory, FolderKanban, Gauge, HandCoins, Headset, LifeBuoy, ListChecks, PackageCheck,
-  PackageSearch, ShoppingCart, Tablet, Truck, Unplug, UserRoundCog, Users, Warehouse, Workflow, Wrench,
+  IconAdministracao, IconComercial, IconEngenharia, IconFabrica, IconFinancas, IconGestao, IconOperacoes,
+  IconPatrimonio, IconPedido, IconPessoas, IconServicos, IconSuprimentos, IconTablet,
+} from './icons/ds'
+import {
+  ArrowDownToLine, ArrowUpFromLine, Boxes, BriefcaseBusiness, CalendarRange, ClipboardCheck, Cog, FileText,
+  FolderKanban, Gauge, GraduationCap, Handshake, Headset, Landmark, ListChecks, PackageCheck, PackageSearch, Shield,
+  ShoppingCart, Truck, Unplug, Users, Warehouse, Workflow,
 } from 'lucide-vue-next'
 
 export interface NavItem {
   label: string
-  to: string
+  /** Ausente quando o atalho já está no mapa, mas a tela ainda não existe. */
+  to?: string
   icon: Component
   /** Uma linha no mapa da área: o que a pessoa encontra ao abrir. */
   hint: string
   module?: string
   tour?: string
+  /** Previsto na proposta. Aparece no cartão, sem navegação. */
+  pending?: boolean
+  /** Atalho do cartão na home. */
+  home?: boolean
+  /** Fora da barra de módulos. O atalho da home continua. */
+  bar?: boolean
+  /** Consulta que distingue duas portas da mesma tela. */
+  query?: Record<string, string>
 }
 
 export interface NavGroup {
@@ -26,114 +39,149 @@ export interface Area {
   label: string
   description: string
   icon: Component
+  /** Faixa da home. */
+  band: 'cadeia' | 'apoio'
   groups: NavGroup[]
 }
 
-/** Áreas do sistema; fonte única para menus, permissões e seletor de área. */
+const soon = (label: string, icon: NavItem['icon'], hint: string): NavItem => ({ label, icon, hint, pending: true, home: true })
+
+/** Módulos do sistema; fonte única para a home, os menus e o seletor de área. */
 export const AREAS: Area[] = [
   {
-    id: 'cadastros', label: 'Cadastros', description: 'Produtos, pessoas, postos, serviços e patrimônio em uma fonte única.', icon: Building2,
+    id: 'comercial', band: 'cadeia', label: 'Comercial', description: 'Do primeiro contato ao pedido fechado.', icon: IconComercial,
     groups: [
-      { label: 'Engenharia', items: [
-        { label: 'Produtos', to: '/produtos', icon: Boxes, module: 'Produtos', hint: 'Catálogo, estrutura, fiscal e revisões' },
-        { label: 'Serviços', to: '/servicos', icon: BriefcaseBusiness, module: 'Serviços', hint: 'O que a empresa presta e cobra' },
+      { label: 'Relacionamento', items: [
+        { label: 'Clientes', to: '/parceiros', query: { origem: 'comercial' }, icon: Handshake, module: 'Parceiros', home: true, hint: 'Quem compra da empresa. O cadastro é o mesmo dos fornecedores.' },
+        { label: 'CRM', to: '/crm', icon: Users, module: 'CRM', home: true, hint: 'Painel e oportunidades' },
+        { label: 'Propostas', to: '/crm/propostas', icon: IconPedido, module: 'CRM', home: true, bar: false, hint: 'Propostas enviadas ao cliente' },
       ] },
-      { label: 'Organização', items: [
-        { label: 'Pessoas', to: '/pessoas', icon: Users, module: 'Pessoas', hint: 'Colaboradores, cargos e desligamento' },
-        { label: 'Parceiros', to: '/parceiros', icon: Handshake, module: 'Parceiros', hint: 'Clientes e fornecedores' },
-        { label: 'Postos', to: '/postos', icon: Cog, module: 'Postos', hint: 'Máquinas, células e capacidade' },
-        { label: 'Ativos', to: '/ativos', icon: Factory, module: 'Ativos', hint: 'Patrimônio acompanhado pela manutenção' },
-        { label: 'Gestão de acesso', to: '/organizacao', icon: UserRoundCog, module: 'Organização', hint: 'Perfis e o que cada um pode fazer' },
+      { label: 'Venda', items: [
+        { label: 'Pedidos de venda', to: '/pedidos', icon: IconPedido, module: 'Vendas', home: true, hint: 'Pedidos aprovados no Omie' },
       ] },
     ],
   },
   {
-    id: 'suprimentos', label: 'Suprimentos', description: 'Da necessidade ao recebimento, reserva e separação.', icon: Warehouse,
+    id: 'engenharia', band: 'cadeia', label: 'Engenharia', description: 'O que fabricamos: produto, estrutura e evolução.', icon: IconEngenharia,
+    groups: [
+      { label: 'Produto', items: [
+        { label: 'Produtos e estruturas', to: '/produtos', icon: IconEngenharia, module: 'Produtos', home: true, hint: 'Catálogo, estrutura, fiscal e revisões' },
+        soon('Revisões', ClipboardCheck, 'A revisão segue dentro da ficha do produto.'),
+        soon('Projetos de P&D', FolderKanban, 'Projeto de desenvolvimento de produto, separado do projeto corporativo.'),
+      ] },
+      { label: 'Catálogo', items: [
+        { label: 'Serviços', to: '/servicos', icon: BriefcaseBusiness, module: 'Serviços', hint: 'O que a empresa presta e cobra' },
+      ] },
+    ],
+  },
+  {
+    id: 'suprimentos', band: 'cadeia', label: 'Suprimentos', description: 'Da necessidade de material até o estoque.', icon: IconSuprimentos,
     groups: [{ label: 'Abastecimento', items: [
-      { label: 'Compras', to: '/compras', icon: ShoppingCart, module: 'Compras', hint: 'Da cotação ao recebimento' },
-      { label: 'Almoxarifado', to: '/estoque', icon: Warehouse, module: 'Almoxarifado', hint: 'Saldo, reserva e separação' },
-      { label: 'Demandas', to: '/demandas', icon: ListChecks, module: 'Demandas', hint: 'O que falta comprar ou fabricar' },
+      { label: 'Fornecedores', to: '/parceiros', query: { origem: 'suprimentos' }, icon: Handshake, module: 'Parceiros', home: true, hint: 'Quem vende para a empresa. O cadastro é o mesmo dos clientes.' },
+      { label: 'Requisições', to: '/demandas', icon: ListChecks, module: 'Demandas', home: true, hint: 'O que falta comprar ou fabricar' },
+      { label: 'Compras', to: '/compras', icon: ShoppingCart, module: 'Compras', home: true, hint: 'Da cotação ao pedido de compra' },
+      soon('Recebimento', PackageCheck, 'A conferência do que chegou ainda acontece dentro de Compras.'),
+      { label: 'Almoxarifado', to: '/estoque', icon: Warehouse, module: 'Almoxarifado', home: true, hint: 'Saldo, reserva e separação' },
     ] }],
   },
   {
-    id: 'comercial', label: 'Comercial', description: 'Do relacionamento à proposta, venda e entrega.', icon: HandCoins,
-    groups: [
-      { label: 'Relacionamento', items: [
-        { label: 'CRM', to: '/crm', icon: Users, module: 'CRM', hint: 'Oportunidades e propostas' },
-        { label: 'Vendas', to: '/pedidos', icon: ShoppingCart, module: 'Vendas', hint: 'Pedidos aprovados no Omie' },
-      ] },
-      { label: 'Entrega', items: [{ label: 'Expedição', to: '/expedicao', icon: Truck, module: 'Expedição', hint: 'Conferência e carga' }] },
-    ],
-  },
-  {
-    id: 'operacoes', label: 'Operações', description: 'Planejar, produzir, inspecionar e apontar no tablet.', icon: Factory,
+    id: 'operacoes', band: 'cadeia', label: 'Operações', description: 'Planejar, produzir, inspecionar e despachar.', icon: IconOperacoes,
     groups: [
       { label: 'Acompanhamento', items: [
         { label: 'Painel da operação', to: '/painel', icon: Gauge, module: 'Painel', hint: 'A fábrica neste momento' },
         { label: 'Fluxo do pedido', to: '/fluxo', icon: Workflow, module: 'Fluxo do pedido', tour: 'nav-fluxo', hint: 'Do pedido à nota fiscal' },
-        { label: 'Minhas tarefas', to: '/tarefas', icon: ListChecks, tour: 'nav-tarefas', hint: 'O que depende de você' },
       ] },
       { label: 'Planejamento', items: [
-        { label: 'Planejamento', to: '/programacao', icon: CalendarRange, module: 'Planejamento', hint: 'Capacidade e programação' },
-        { label: 'Ordens de produção', to: '/ordens', icon: ClipboardCheck, module: 'Ordens de produção', hint: 'O que vai ser fabricado' },
+        { label: 'Planejamento', to: '/programacao', icon: CalendarRange, module: 'Planejamento', home: true, hint: 'Capacidade e programação' },
+        { label: 'Ordens de produção', to: '/ordens', icon: ClipboardCheck, module: 'Ordens de produção', home: true, hint: 'O que vai ser fabricado' },
         { label: 'Necessidades', to: '/necessidades', icon: PackageSearch, module: 'Demandas', hint: 'Material que a produção pede' },
       ] },
-      { label: 'Execução', items: [
-        { label: 'Injeção', to: '/injecao', icon: Factory, module: 'Injeção', hint: 'Peças nas injetoras' },
+      { label: 'Chão de fábrica', items: [
+        { label: 'Injeção', to: '/injecao', icon: IconFabrica, module: 'Injeção', hint: 'Peças nas injetoras' },
         { label: 'Montagem', to: '/montagem', icon: Boxes, module: 'Montagem', hint: 'Células de montagem' },
-        { label: 'Qualidade', to: '/qualidade', icon: PackageCheck, module: 'Qualidade', hint: 'Inspeção e liberação' },
-        { label: 'Tablet', to: '/tablet', icon: Tablet, tour: 'nav-tablet', hint: 'Apontamento no chão de fábrica' },
+        { label: 'Apontamento', to: '/tablet', icon: IconTablet, home: true, tour: 'nav-tablet', hint: 'Apontamento no chão de fábrica' },
+        { label: 'Qualidade', to: '/qualidade', icon: PackageCheck, module: 'Qualidade', home: true, hint: 'Inspeção e liberação' },
+      ] },
+      { label: 'Saída', items: [
+        { label: 'Expedição', to: '/expedicao', icon: Truck, module: 'Expedição', home: true, hint: 'Conferência e carga' },
+        { label: 'Manutenção', to: '/manutencao', icon: IconServicos, module: 'Manutenção', home: true, hint: 'Disponibilidade das máquinas' },
       ] },
     ],
   },
   {
-    id: 'servicos', label: 'Serviços', description: 'Disponibilidade da fábrica e atendimento após a entrega.', icon: Wrench,
-    groups: [{ label: 'Ordens de serviço', items: [
-      { label: 'Manutenção', to: '/manutencao', icon: Wrench, module: 'Manutenção', hint: 'Disponibilidade das máquinas' },
-      { label: 'Assistência técnica', to: '/assistencia', icon: Headset, module: 'Assistência Técnica', hint: 'Atendimento depois da entrega' },
+    id: 'servicos', band: 'cadeia', label: 'Serviços e Contratos', description: 'O cliente depois da entrega: atendimento técnico, garantia e contratos de locação.', icon: IconServicos,
+    groups: [{ label: 'Depois da entrega', items: [
+      { label: 'Assistência técnica', to: '/assistencia', icon: Headset, module: 'Assistência Técnica', home: true, hint: 'Atendimento depois da entrega' },
+      soon('Garantia', Shield, 'A garantia hoje é calculada dentro do chamado de assistência.'),
+      soon('Contratos de locação', FileText, 'Contrato de locação de equipamento ainda não tem tela.'),
     ] }],
   },
   {
-    id: 'gestao', label: 'Gestão', description: 'Indicadores, projetos, integração e governança.', icon: BarChart3,
+    id: 'pessoas', band: 'apoio', label: 'Pessoas', description: 'Quem faz a empresa funcionar.', icon: IconPessoas,
+    groups: [{ label: 'Pessoas', items: [
+      { label: 'Colaboradores', to: '/pessoas', icon: IconPessoas, module: 'Pessoas', home: true, hint: 'Quem trabalha na empresa' },
+      { label: 'Cargos e funções', to: '/pessoas/cargos', icon: IconPessoas, module: 'Pessoas', home: true, bar: false, hint: 'O catálogo do trabalho' },
+      soon('Treinamentos', GraduationCap, 'Formação e reciclagem ainda não têm tela.'),
+    ] }],
+  },
+  {
+    id: 'patrimonio', band: 'apoio', label: 'Patrimônio', description: 'Bens da empresa: da aquisição à baixa.', icon: IconPatrimonio,
+    groups: [{ label: 'Bens', items: [
+      { label: 'Bens e equipamentos', to: '/ativos', icon: IconPatrimonio, module: 'Ativos', home: true, hint: 'Patrimônio acompanhado pela manutenção' },
+      soon('Movimentações', Truck, 'Transferência e baixa do bem ainda não têm tela.'),
+      soon('Inventário', ClipboardCheck, 'Contagem patrimonial, diferente do almoxarifado.'),
+      soon('Depreciação', Landmark, 'A depreciação estimada hoje aparece no DRE.'),
+    ] }],
+  },
+  {
+    id: 'financas', band: 'apoio', label: 'Finanças', description: 'Orçamento por setor e resultado. Banco e contabilidade no Omie.', icon: IconFinancas,
     groups: [
-      { label: 'Gestão', items: [
-        { label: 'Indicadores', to: '/indicadores', icon: BarChart3, module: 'Indicadores', hint: 'Números da operação' },
-        { label: 'Projetos', to: '/projetos', icon: FolderKanban, module: 'Projetos', hint: 'Iniciativas e prazos' },
+      { label: 'Resultado', items: [
+        { label: 'Orçamento anual', to: '/orcamentos', icon: IconFinancas, module: 'Orçamentos', home: true, hint: 'Teto e o que já foi consumido' },
+        { label: 'DRE', to: '/dre', icon: Landmark, module: 'DRE', home: true, hint: 'Resultado por setor utilizador' },
       ] },
-      { label: 'Sistema', items: [
-        { label: 'Integração Omie', to: '/integracao', icon: Unplug, module: 'Integração Omie', hint: 'O que entrou e o que falhou' },
-        { label: 'Central de ajuda', to: '/ajuda', icon: LifeBuoy, hint: 'Manual e guias de cada tela' },
+      { label: 'Títulos', items: [
+        { label: 'Contas a pagar', to: '/contas-pagar', icon: ArrowUpFromLine, module: 'Orçamentos', home: true, hint: 'Compromissos a pagar' },
+        { label: 'Contas a receber', to: '/contas-receber', icon: ArrowDownToLine, module: 'Orçamentos', home: true, hint: 'Títulos a receber' },
       ] },
     ],
   },
   {
-    id: 'financas', label: 'Finanças', description: 'Resultado e orçamento por setor utilizador. Banco e contabilidade ficam no Omie.', icon: CircleDollarSign,
-    groups: [
-      { label: 'Planejamento', items: [
-        { label: 'DRE', to: '/dre', icon: Landmark, module: 'DRE', hint: 'Resultado por setor utilizador' },
-        { label: 'Orçamentos', to: '/orcamentos', icon: BadgeDollarSign, module: 'Orçamentos', hint: 'Teto e o que já foi consumido' },
-      ] },
-      { label: 'Títulos (em estruturação)', items: [
-        { label: 'Contas a pagar', to: '/contas-pagar', icon: ArrowUpFromLine, module: 'Orçamentos', hint: 'Compromissos a pagar' },
-        { label: 'Contas a receber', to: '/contas-receber', icon: ArrowDownToLine, module: 'Orçamentos', hint: 'Títulos a receber' },
-      ] },
-    ],
+    id: 'gestao', band: 'apoio', label: 'Gestão', description: 'Acompanhar e decidir.', icon: IconGestao,
+    groups: [{ label: 'Gestão', items: [
+      { label: 'Indicadores', to: '/indicadores', icon: IconGestao, module: 'Indicadores', home: true, hint: 'Números da operação' },
+      { label: 'Projetos corporativos', to: '/projetos', icon: FolderKanban, module: 'Projetos', home: true, hint: 'Iniciativas e prazos da empresa' },
+    ] }],
+  },
+  {
+    id: 'administracao', band: 'apoio', label: 'Administração do sistema', description: 'Configuração do Thalamus.', icon: IconAdministracao,
+    groups: [{ label: 'Sistema', items: [
+      { label: 'Usuários e permissões', to: '/organizacao', icon: IconAdministracao, module: 'Organização', home: true, hint: 'Perfis e o que cada um pode fazer' },
+      soon('Cadastros gerais', Cog, 'Tabelas compartilhadas que ainda não têm uma tela própria.'),
+      { label: 'Postos e centros de custo', to: '/postos', icon: Cog, module: 'Postos', home: true, hint: 'Máquinas, células e capacidade' },
+      { label: 'Integração Omie', to: '/integracao', icon: Unplug, module: 'Integração Omie', home: true, hint: 'O que entrou e o que falhou' },
+    ] }],
   },
 ]
 
 export const NAVIGATION: NavGroup[] = AREAS.flatMap(area => area.groups)
 
 export const ROUTE_MODULE: Record<string, string | undefined> = Object.fromEntries(
-  NAVIGATION.flatMap(group => group.items).map(item => [item.to, item.module]),
+  NAVIGATION.flatMap(group => group.items).flatMap(item => item.to ? [[item.to, item.module]] : []),
 )
 
-export const owns = (to: string, path: string) => path === to || path.startsWith(`${to}/`)
+export const owns = (to: string | undefined, path: string) => !!to && (path === to || path.startsWith(`${to}/`))
+
+export function navTarget(item: NavItem) {
+  if (!item.to) return '/'
+  return item.query ? { path: item.to, query: item.query } : item.to
+}
 
 export const areaHubPath = (areaId: string) => `/area/${areaId}`
 
-/** Módulos da área que o perfil pode abrir. Item sem módulo fica visível para todos. */
+/** Telas que o perfil pode abrir. Atalho sem tela fica de fora. */
 export function areaItems(area: Area, can: (module?: string) => boolean) {
-  return area.groups.flatMap(group => group.items).filter(item => can(item.module))
+  return area.groups.flatMap(group => group.items).filter(item => item.to && !item.pending && can(item.module))
 }
 
 /**
@@ -147,10 +195,11 @@ export function areaDestination(area: Area, can: (module?: string) => boolean): 
   return undefined
 }
 
-export const areaOf = (path: string) => {
+export const areaOf = (path: string, origin?: string) => {
   const hub = path.match(/^\/area\/([^/]+)/)?.[1]
   if (hub) return AREAS.find(area => area.id === hub)
-  return AREAS.find(area => area.groups.some(group => group.items.some(item => owns(item.to, path))))
+  const owners = AREAS.filter(area => area.groups.some(group => group.items.some(item => owns(item.to, path))))
+  return owners.find(area => area.id === origin) ?? owners[0]
 }
 
 export const moduleOf = (path: string) => NAVIGATION.flatMap(group => group.items).find(item => owns(item.to, path))?.module
@@ -158,9 +207,12 @@ export const moduleOf = (path: string) => NAVIGATION.flatMap(group => group.item
 /** Rótulo curto da tela ativa, para a guia do navegador. Na raiz do módulo usa o nome da barra. */
 export function screenLabel(path: string, metaTitle?: string): string | undefined {
   if (path === '/' || path === '') return undefined
-  const nav = NAVIGATION.flatMap(group => group.items)
-    .filter(entry => owns(entry.to, path))
-    .sort((a, b) => b.to.length - a.to.length)[0]
-  if (nav && (path === nav.to || path === `${nav.to}/`)) return nav.label
-  return metaTitle || nav?.label
+  const matches = NAVIGATION.flatMap(group => group.items)
+    .filter((entry): entry is NavItem & { to: string } => !!entry.to && owns(entry.to, path))
+    .sort((a, b) => b.to.length - a.to.length)
+  const nav = matches[0]
+  if (!nav) return metaTitle
+  if (matches.filter(entry => entry.to.length === nav.to.length).length > 1) return metaTitle || nav.label
+  if (path === nav.to || path === `${nav.to}/`) return nav.label
+  return metaTitle || nav.label
 }

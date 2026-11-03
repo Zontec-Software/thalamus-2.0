@@ -130,7 +130,7 @@ watch([allLinks, section], () => nextTick(() => { revealTab(); measureTabs() }))
 
 const flags = computed(() => item.value ? itemFlags(store.state, item.value) : [])
 const photo = computed(() => item.value ? mainPhoto(item.value) : undefined)
-const canDelete = computed(() => !!catalog.value && !catalog.value.deletedAt && (catalog.value.lifecycle === 'Rascunho' || catalog.value.lifecycle === 'Inativo'))
+const canDelete = computed(() => !!catalog.value && !catalog.value.deletedAt && (catalog.value.lifecycle === 'Em criação' || catalog.value.lifecycle === 'Inativo'))
 const deleting = ref(false)
 const deleteKind = computed(() => item.value && references(store.state, item.value.id).length ? 'lógica' : 'física')
 

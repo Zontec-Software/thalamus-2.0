@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight } from 'lucide-vue-next'
-import { AREAS, areaDestination, moduleFeature } from '../navigation'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { IconSeta } from '../icons/ds'
+import { AREAS, areaDestination, moduleFeature, navTarget } from '../navigation'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 
@@ -15,7 +15,7 @@ const can = (module?: string) => !module || store.can(moduleFeature(module))
 const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
 /** Fotos da fábrica, por baixo da cor do bloco da home. Gestão, serviços e finanças ficam só no grafismo. */
 const AREA_PHOTO: Record<string, string> = {
-  cadastros: 'roboflex/pecas-bancada.jpg',
+  engenharia: 'roboflex/pecas-bancada.jpg',
   suprimentos: 'roboflex/pecas-prensa.jpg',
   comercial: 'roboflex/linha-cases.jpg',
   operacoes: 'roboflex/pecas-prensa.jpg',
@@ -24,7 +24,7 @@ const AREA_PHOTO: Record<string, string> = {
 const area = computed(() => AREAS.find(entry => entry.id === route.params.id))
 const photo = computed(() => (area.value && AREA_PHOTO[area.value.id]) || '')
 const groups = computed(() => (area.value?.groups ?? [])
-  .map(group => ({ ...group, items: group.items.filter(item => can(item.module)) }))
+  .map(group => ({ ...group, items: group.items.filter(item => item.pending || can(item.module)) }))
   .filter(group => group.items.length))
 
 watch(() => ui.role, () => {
@@ -45,14 +45,22 @@ watch(() => ui.role, () => {
     <section v-for="group in groups" :key="group.label" class="area-group">
       <h2>{{ group.label }}</h2>
       <div class="area-cards">
-        <RouterLink v-for="item in group.items" :key="item.to" :to="item.to" class="area-card">
+        <component
+          :is="item.to && !item.pending ? RouterLink : 'div'"
+          v-for="item in group.items"
+          :key="item.label"
+          v-bind="item.to && !item.pending ? { to: navTarget(item) } : {}"
+          class="area-card"
+          :class="{ 'is-pending': item.pending }"
+        >
           <span class="area-card-icon"><component :is="item.icon" :size="20" /></span>
           <span class="area-card-copy">
             <strong>{{ item.label }}</strong>
             <small>{{ item.hint }}</small>
           </span>
-          <ArrowRight class="area-card-go" :size="16" />
-        </RouterLink>
+          <small v-if="item.pending" class="pending-note">Em breve</small>
+          <IconSeta v-else class="area-card-go" :size="16" />
+        </component>
       </div>
     </section>
   </div>

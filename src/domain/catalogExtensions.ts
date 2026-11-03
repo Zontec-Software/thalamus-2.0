@@ -496,7 +496,7 @@ const UNIT_NAME: Record<string, string> = { un: 'Unidade', kg: 'Quilograma', h: 
 
 export function spedEligible(item: Item) {
   const catalog = catalogOf(item)
-  return !catalog.deletedAt && catalog.nature !== 'Kit virtual' && catalog.lifecycle !== 'Rascunho' && catalog.lifecycle !== 'Em homologação'
+  return !catalog.deletedAt && catalog.nature !== 'Kit virtual' && catalog.lifecycle !== 'Em criação' && catalog.lifecycle !== 'Em homologação'
 }
 
 /** Registros 0190, 0200 e 0220 do Bloco 0 da EFD ICMS/IPI para os itens ativos. */
@@ -605,7 +605,7 @@ export function createModel(state: ErpState, input: { templateId: string; name: 
   return model
 }
 
-/** Cada combinação vira item real em rascunho, herdando fiscal, comercial e logística do item-modelo. EAN, preço, estrutura e mídia são de cada variante. */
+/** Cada combinação vira item real em criação, herdando fiscal, comercial e logística do item-modelo. EAN, preço, estrutura e mídia são de cada variante. */
 export function generateVariants(state: ErpState, modelId: string, combos: Record<string, string>[], actor: string, role: Role = 'Gestor') {
   const model = state.itemModels.find(entry => entry.id === modelId)
   if (!model) throw new DomainError('Grade não encontrada')
@@ -631,7 +631,7 @@ export function generateVariants(state: ErpState, modelId: string, combos: Recor
     commit(catalog, actor, [{ field: 'Grade', from: '', to: `${model.name} · ${values.join(' · ')} (gerado de ${template.code})` }])
     created.push(item)
   }
-  log(state, 'Produtos', actor, `Grade ${model.name}: ${created.length} variante(s) gerada(s) em rascunho`, undefined, template.id)
+  log(state, 'Produtos', actor, `Grade ${model.name}: ${created.length} variante(s) gerada(s) em criação`, undefined, template.id)
   return created
 }
 

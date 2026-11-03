@@ -64,8 +64,8 @@ export function productActions(state: ErpState, can: (feature: string) => boolea
       specific.push({ id: `${item.id}-${flag}`, kind: mapped.kind, title: mapped.title, detail: productDetail(item), productId: item.id, aba: mapped.aba })
     }
 
-    if (catalog.lifecycle === 'Rascunho' && can('produtos.nucleo.gerir') && !specific.length) {
-      specific.push({ id: `${item.id}-rascunho`, kind: 'Completar', title: 'Concluir o rascunho', detail: productDetail(item), productId: item.id, aba: 'nucleo' })
+    if (catalog.lifecycle === 'Em criação' && can('produtos.nucleo.gerir') && !specific.length) {
+      specific.push({ id: `${item.id}-criacao`, kind: 'Completar', title: 'Concluir o cadastro', detail: productDetail(item), productId: item.id, aba: 'nucleo' })
     }
     if (catalog.lifecycle === 'Em homologação') {
       for (const role of requiredApprovals(item).filter(entry => !catalog.approvals[entry])) {

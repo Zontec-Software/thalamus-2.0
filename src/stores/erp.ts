@@ -19,12 +19,20 @@ import type { ErpState } from '../domain/engine'
 import { createSeedState } from '../mocks/seed'
 import type { OmieGateway } from '../services/omie/gateway'
 import { MockOmieGateway } from '../services/omie/mockOmieGateway'
-import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NonConformity, Resource, Role, SalesOrder, UnitConversion } from '../types/domain'
+import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NewActivityFile, NewActivityInput, NonConformity, Resource, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v56'
+const STORAGE_KEY = 'thalamus-erp-v61'
+
+/** Versões anteriores ficam no navegador e estouram a cota. Não há migração: a chave atual é a única que vale. */
+function forgetOlderSaves() {
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith('thalamus-erp-v') && key !== STORAGE_KEY) localStorage.removeItem(key)
+  }
+}
 
 function load(): ErpState {
+  forgetOlderSaves()
   const seed = createSeedState()
   const saved = localStorage.getItem(STORAGE_KEY)
   if (saved) {
@@ -54,7 +62,10 @@ export const useErpStore = defineStore('erp', () => {
   syncAccessCatalog(state)
   watch(state, () => {
     clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(state)), 300)
+    saveTimer = setTimeout(() => {
+      forgetOlderSaves()
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)) } catch { /* a cota cheia não pode derrubar a tela */ }
+    }, 300)
   }, { deep: true })
   budget.absorbOmieCategories(state, ui.activeTenantId)
 
@@ -272,8 +283,18 @@ export const useErpStore = defineStore('erp', () => {
   const moveOpportunity = bind(enterprise.moveOpportunity, opportunity => `${opportunity.id}: ${opportunity.stage}`)
   const advanceOpportunity = bind(enterprise.advanceOpportunity, opportunity => `${opportunity.id}: ${opportunity.stage}`)
   const loseOpportunity = bind(enterprise.loseOpportunity, 'Oportunidade marcada como perdida')
-  const addActivity = bind(enterprise.addActivity, 'Atividade registrada')
-  const toggleActivity = bind(enterprise.toggleActivity)
+  const addActivity = (id: string, input: NewActivityInput) => run(
+    () => enterprise.addActivity(state, id, input, actor(), ui.sessionUserId),
+    activity => activity.calendar ? `Reunião na agenda de ${activity.calendar.ownerName}. O Google Calendar ainda é simulado.` : 'Atividade registrada',
+  )
+  const addActivityAttachment = (id: string, activityId: string, file: NewActivityFile) => run(
+    () => enterprise.addActivityAttachment(state, id, activityId, file, actor()),
+    'Anexo registrado',
+  )
+  const toggleActivity = (id: string, activityId: string) => run(
+    () => enterprise.toggleActivity(state, id, activityId, actor()),
+    activity => activity.done && activity.type === 'Reunião' ? 'Reunião concluída. Transcrição e gravação simuladas do Google foram anexadas.' : activity.done ? 'Atividade concluída' : 'Atividade reaberta',
+  )
   const createProposal = bind(enterprise.createProposal, proposal => `${proposal.id} criada`)
   const updateProposal = bind(enterprise.updateProposal)
   const addProposalLine = bind(enterprise.addProposalLine, 'Linha adicionada')
@@ -492,7 +513,7 @@ export const useErpStore = defineStore('erp', () => {
   const removeBomLine = (revisionId: string, componentId: string) => as((name, role) => catalog.removeBomLine(state, revisionId, componentId, name, role), undefined, 'produtos.manufatura.gerir')
   const discardBomVersion = (revisionId: string) => as((name, role) => catalog.discardBomVersion(state, revisionId, name, role), 'Versão descartada', 'produtos.manufatura.gerir')
 
-  const createCatalogItem = (input: catalog.NewItemInput) => as((name, role) => catalog.createItem(state, input, name, role), item => `${item.code} salvo como rascunho`, 'produtos.nucleo.gerir')
+  const createCatalogItem = (input: catalog.NewItemInput) => as((name, role) => catalog.createItem(state, input, name, role), item => `${item.code} salvo em criação`, 'produtos.nucleo.gerir')
   const updateItemCore = (itemId: string, patch: catalog.CorePatch) => as((name, role) => catalog.updateCore(state, itemId, patch, name, role), 'Núcleo salvo', 'produtos.nucleo.gerir')
   const updateItemCommercial = (itemId: string, patch: Parameters<typeof catalog.updateCommercial>[2]) => as((name, role) => catalog.updateCommercial(state, itemId, patch, name, role), 'Camada comercial salva', 'produtos.comercial.gerir')
   const updateItemFiscal = (itemId: string, patch: Parameters<typeof catalog.updateFiscal>[2]) => as((name, role) => catalog.updateFiscal(state, itemId, patch, name, role), 'Camada fiscal salva', 'produtos.fiscal.gerir')
@@ -509,7 +530,7 @@ export const useErpStore = defineStore('erp', () => {
   const submitItem = (itemId: string) => as((name, role) => catalog.submitItem(state, itemId, name, role), 'Item enviado para homologação', 'produtos.nucleo.gerir')
   const approveItem = (itemId: string, approval: ApprovalRole) => as((name, role) => catalog.approveItem(state, itemId, approval, name, role), result => result === 'Ativo' ? 'Aprovação registrada: item ativado' : 'Aprovação registrada', `produtos.homologar.${approval}` as FunctionalityId)
   const finishActivation = (itemId: string) => as((name, role) => catalog.finishActivation(state, itemId, name, role), 'Item ativado')
-  const returnItem = (itemId: string, reason: string) => as((name, role) => catalog.returnItem(state, itemId, reason, name, role), 'Item devolvido a rascunho')
+  const returnItem = (itemId: string, reason: string) => as((name, role) => catalog.returnItem(state, itemId, reason, name, role), 'Item devolvido para Em criação')
   const blockItem = (itemId: string, reason: string) => as((name, role) => catalog.blockItem(state, itemId, reason, name, role), 'Item bloqueado')
   const reactivateItem = (itemId: string, reason: string) => as((name, role) => catalog.reactivateItem(state, itemId, reason, name, role), 'Item reativado')
   const obsoleteItem = (itemId: string, reason: string) => as((name, role) => catalog.obsoleteItem(state, itemId, reason, name, role), 'Item obsoletado')
@@ -549,7 +570,7 @@ export const useErpStore = defineStore('erp', () => {
   const addFiscalRule = ext(extensions.addFiscalRule, 'Regra incluída na matriz fiscal')
   const removeFiscalRule = ext(extensions.removeFiscalRule, 'Regra removida da matriz')
   const createModel = ext(extensions.createModel, model => `Grade ${model.name} criada`)
-  const generateVariants = ext(extensions.generateVariants, items => `${items.length} variante(s) criada(s) em rascunho`)
+  const generateVariants = ext(extensions.generateVariants, items => `${items.length} variante(s) criada(s) em criação`)
   const setMediaUsage = ext(extensions.setMediaUsage, 'Uso do documento salvo')
   const saveClassAttribute = ext(catalog.saveClassAttribute, def => `Atributo ${def.label} salvo`)
   const removeClassAttribute = ext(catalog.removeClassAttribute, 'Atributo removido')
@@ -677,7 +698,7 @@ export const useErpStore = defineStore('erp', () => {
     savePackaging, createChange, requestOpportunityChange, updateChange, openChangeRevision, moveChange, resolveFiscalConflict, pushFiscal, simulateOmieFiscal,
     createDemand, attendDemand, attendDemandFromStock, contractService, completeDemand, cancelDemand,
     createPurchaseOrder, selectQuote, cancelPurchaseOrder, advancePurchaseOrder,
-    createOpportunity, updateOpportunity, setSalesGoal, moveOpportunity, advanceOpportunity, loseOpportunity, addActivity, toggleActivity,
+    createOpportunity, updateOpportunity, setSalesGoal, moveOpportunity, advanceOpportunity, loseOpportunity, addActivity, addActivityAttachment, toggleActivity,
     createProposal, updateProposal, addProposalLine, updateProposalLine, removeProposalLine, advanceProposal, rejectProposal,
     createTechnicalOrder, scheduleTechnicalOrder, updateTechnicalOrder, addTechnicalPart, advanceTechnicalOrder, cancelTechnicalOrder,
     createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk,

@@ -13,10 +13,10 @@ const t = (target: string | undefined, title: string, body: string, panel?: Tour
 export const WELCOME_KEY = 'welcome-areas'
 
 export const WELCOME_TOUR: TourStep[] = [
-  t(undefined, 'Bem-vindo ao Thalamus 2.0', 'O sistema é dividido em sete áreas: cadastros, suprimentos, comercial, operações, serviços, gestão e finanças. Cada uma mostra apenas o trabalho daquele contexto.'),
-  t('home-blocks', 'A tela inicial é o mapa', 'Cada bloco é uma área. O clique abre o mapa dos módulos liberados para o seu perfil. Os atalhos abrem a tela direto. Quem só tem um módulo entra nele sem passar pelo mapa.'),
-  t('home-producao', 'Operações', 'Aqui ficam o painel da fábrica, o fluxo, o planejamento, a produção, a qualidade e o tablet. Ao entrar, a barra de módulos no topo mostra apenas isso.'),
-  t('home-cadastros', 'Cadastros', 'Produtos e revisões, pessoas, serviços e ativos formam a base compartilhada dos demais fluxos.'),
+    t(undefined, 'Bem-vindo ao Thalamus 2.0', 'O sistema se organiza em dez módulos. Cinco formam a cadeia de valor, do primeiro contato ao atendimento depois da entrega. Cinco sustentam essa cadeia: pessoas, patrimônio, finanças, gestão e a administração do sistema.'),
+  t('home-blocks', 'A tela inicial é o mapa', 'Cada bloco é um módulo. O clique destaca o bloco e mostra o que cada atalho faz. O atalho abre a tela. O nome apagado é um processo previsto, ainda sem tela.'),
+  t('home-producao', 'Operações', 'Aqui ficam o planejamento, a produção, a qualidade, a expedição e a manutenção. O painel, o fluxo, a injeção e a montagem ficam na barra de módulos, depois de entrar.'),
+  t('home-engenharia', 'Engenharia', 'Produtos e estruturas ficam neste bloco. Pessoas e patrimônio estão na faixa de apoio, cada um no seu módulo.'),
   t('search', 'Busca', 'De qualquer área, encontre pedidos, OPs, produtos, oportunidades, demandas, projetos, chamados ou pessoas. Produto e pessoa abrem a página do cadastro; o restante abre o detalhe à direita.'),
   t('role', 'Visualizar perfis', 'Só o Administrador vê este seletor. Ele mostra como outro perfil enxerga a interface sem trocar a identidade real. Perfis recebem funcionalidades, não apenas módulos.'),
   t('help', 'Guia de cada tela', 'Depois de entrar numa área, cada tela explica a si mesma na primeira visita. Este botão reabre o guia.'),
@@ -46,9 +46,9 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('area-modules', 'Módulos da área', 'Cada cartão é um módulo que o seu perfil pode abrir. O nome da área, no topo, traz de volta para este mapa. A seta ao lado troca de área.'),
   ],
   '/': [
-    t('home-blocks', 'As áreas do sistema', 'Entre em uma área por vez. O menu lateral acompanha a área em que você está.'),
-    t('home-producao', 'Produção', 'Painel, fluxo, planejamento, injeção, montagem e tablet ficam juntos neste bloco.'),
-    t('home-cadastros', 'Cadastros', 'Produtos, postos, pessoas e ativos. Separado da operação do dia.'),
+    t('home-blocks', 'As duas faixas', 'A cadeia de valor segue o pedido. O apoio sustenta todas as etapas. O clique no bloco mostra o detalhe de cada atalho. O nome apagado ainda não tem tela.'),
+    t('home-producao', 'Operações', 'Planejamento, ordens, apontamento, qualidade, expedição e manutenção. Painel, fluxo, injeção e montagem ficam na barra, depois de entrar.'),
+    t('home-engenharia', 'Engenharia', 'Produtos e estruturas. O catálogo de serviços fica na barra deste módulo.'),
   ],
   '/painel': [
     t('kpis', 'Indicadores do dia', 'Visão rápida de pedidos em carteira, riscos, eficiência e materiais críticos. Os números são calculados a partir das operações reais registradas.'),
@@ -73,8 +73,8 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
   ],
   '/produtos': [
     t('product-side', 'As abas do módulo', 'Portfólio e Classificação ficam na faixa do topo. Ações reúne o que o seu perfil pode fazer agora: completar cadastro, homologar, revisar estrutura, fiscal ou mudança. O número é a quantidade dessas pendências. Ao abrir um produto, estas abas somem e as seções da ficha entram na mesma faixa.'),
-    t('product-list', 'Lista feita para milhares de produtos', 'As guias separam a vida do produto. A versão vigente fica em Ativos; se outra versão está em desenvolvimento, o mesmo produto também aparece em Em Revisão. Inativo só mostra quem foi inativado. A faixa de tipos e o filtro de cada coluna continuam valendo dentro da guia aberta.'),
-    t('new-record', 'Um código por produto', 'O produto nasce em rascunho, com código sequencial e sem significado. O sistema avisa se já existe descrição parecida. Rascunho não entra em pedido, compra nem produção.'),
+    t('product-list', 'Lista feita para milhares de produtos', 'As guias separam a vida do produto. Em criação é o cadastro ainda não liberado. A versão vigente fica em Ativos; se outra versão está em desenvolvimento, o mesmo produto também aparece em Em Revisão. Inativo só mostra quem foi inativado. O tipo, e o restante, se filtram no cabeçalho de cada coluna.'),
+    t('new-record', 'Um código por produto', 'O produto nasce em criação, com código sequencial e sem significado. O sistema avisa se já existe descrição parecida. Em criação não entra em pedido, compra nem produção.'),
   ],
   '/produtos/item': [
     t('product-header', 'A ficha do produto', 'Foto, código, tipo, classificação e versão vigente. As etiquetas abaixo apontam pendências, como atributo obrigatório vazio ou fiscal em conflito com o Omie.'),
@@ -138,25 +138,25 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('demand-links', 'Origem, categoria e período', 'A origem abre a OP, o chamado ou o projeto. O pedido e o orçamento mostram a categoria, o mês e o saldo que esta demanda consome.', 'demand'),
   ],
   '/crm': [
-    t('crm-areas', 'O CRM em cinco abas', 'Painel, Oportunidades, Funil, Propostas e Agenda. O número em cada aba é o que pede ação. Vendedor e grupo, à direita, filtram todas as abas.'),
-    t('crm-goal', 'Meta, MRR e ticket', 'MRR é a receita mensal recorrente: o valor que passa a entrar todo mês quando o negócio fecha. A meta compara a soma do MRR conquistado com o alvo. O mês vale um doze avos da meta anual. Em aberto é o MRR ainda em negociação, e o ponderado aplica a probabilidade da fase. Win rate é a parte das encerradas que virou conquista. O ticket, valor do negócio, fica na ficha e na lista. Definir meta fica com quem gerencia o comercial.'),
+    t('crm-areas', 'O CRM em duas áreas', 'Painel e Oportunidades. Vendedor e grupo, à direita, filtram as duas.'),
+    t('crm-goal', 'Meta, funil e pizza', 'A meta do ano é rateada por mês e cada mês pode ser ajustado. O funil afunila de cima para baixo e a fase com mais oportunidades fica mais larga. A pizza mostra a mesma distribuição. Temperatura filtra o painel inteiro, sem sair da tela.'),
     t('crm-attention', 'Precisa de atenção', 'Oportunidades sem status, sem próxima ação ou com fechamento vencido. Clique para abrir a ficha e resolver.'),
   ],
   '/crm/oportunidades': [
-    t('record-list', 'Todas as oportunidades', 'Guias por situação, atalhos de temperatura e de alerta, e filtro em cada coluna. Ticket é o valor do negócio. MRR é a receita mensal recorrente, a que conta para a meta. Clique na linha para abrir a ficha.'),
-    t('new-record', 'Nova oportunidade', 'Cliente, vendedor, origem e a próxima ação com data. A ação já entra na agenda e a ficha abre em seguida.'),
+    t('record-list', 'Todas as oportunidades', 'Uma pesquisa só, em qualquer coluna ou situação. A descrição da linha é temperatura, cliente, ticket e fase. Clique abre um cartão com flag, ticket, CAC e a última atualização. Abrir oportunidade entra na ficha.'),
+    t('new-record', 'Nova oportunidade', 'Empresa, vendedor, cliente, origem, tipo, vertical e previsão. Nasce fria. O relato escrito ou o áudio simulado preenchem os campos reconhecidos.'),
   ],
   '/crm/funil': [
     t('crm-funnel', 'Funil comercial', 'Cada coluna soma o MRR da fase, a receita mensal recorrente. No cartão, o ticket é o valor do negócio. Avançar move uma fase. Conquista só vem pelo aceite da proposta. Clique no cartão para abrir a ficha.'),
   ],
   '/crm/agenda': [
-    t('crm-agenda', 'Agenda comercial', 'As próximas ações de todas as oportunidades, das atrasadas às dos próximos dias. Concluir marca a atividade como feita; a linha abre a ficha em Ações.'),
+    t('crm-agenda', 'Agenda comercial', 'As próximas ações de todas as oportunidades, das atrasadas às dos próximos dias. Reunião mostra de quem é a agenda. Concluir marca a atividade como feita; a linha abre a ficha em Ações.'),
   ],
   '/crm/oportunidade': [
     t('opp-header', 'Ficha da oportunidade', 'Cliente, vendedor e empresa no topo, com os alertas abertos. Criar proposta monta o rascunho com os produtos de interesse. Marcar como perdida pede o motivo e recusa as propostas abertas.'),
     t('opp-stages', 'A fase anda com o trabalho', 'Clique numa fase para avançar ou voltar. Conquista não é um clique: a oportunidade só é conquistada quando o cliente aceita a proposta.'),
-    t('opp-kpis', 'O que cada número é', 'Ticket é o valor do negócio, estimado pelos produtos ou trazido pela última proposta. MRR é a receita mensal recorrente e entra na meta. Temperatura é o julgamento do vendedor: Quente, Morno ou Frio. A probabilidade acompanha a fase, de 10% na prospecção a 55% na proposta. Fechamento é a data prevista. Próxima ação abre a agenda. Custo total soma as demandas de material. Cada indicador abre a aba onde ele se resolve.'),
-    t('opp-tabs', 'Abas da ficha', 'Dados se editam e se salvam aqui. Ações é a agenda desta oportunidade. Observações guarda o texto livre. Desenvolvimento abre o PAP, as demandas e o projeto.'),
+    t('opp-kpis', 'Apresentação', 'Temperatura, ticket, MRR, CAC e previsão ficam na apresentação e podem ser editados. O status aceita texto ou o áudio simulado.'),
+    t('opp-tabs', 'Dados e histórico', 'Dados traz cliente, contato, vendedor, tipo, origem, vertical e a motivação. As propostas mostram número, valor e se estão aprovadas, em análise ou canceladas. Ações reúne tarefa, reunião, demanda, e-mail, ligação, PAP e produto no mesmo campo. O histórico fica na outra subtela.'),
   ],
   '/crm/propostas': [
     t('crm-proposals', 'Propostas', 'Em andamento, aceitas e recusadas. A validade vencida aparece em vermelho para cobrar retorno. Clique para abrir a proposta.', 'close'),
