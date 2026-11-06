@@ -1,6 +1,8 @@
 # Contrato futuro do backend — Core
 
-O schema `t2_core`, dentro do único backend `thalamus-2-core`, existe antes de qualquer publicação e é a fonte de verdade para identidade, sessão, empresas, grupos econômicos, perfis e funcionalidades. Os outros módulos desse mesmo Laravel não leem esse schema.
+O schema `t2_core`, no `thalamus2-core/api` (antigo `thalamus-2-core`), existe antes de qualquer publicação e é a fonte de verdade para identidade, sessão, empresas, grupos econômicos, perfis e funcionalidades. As APIs dos módulos não leem esse schema: resolvem a sessão em `GET /api/internal/session`, com o token do usuário e o cabeçalho `X-Internal-Key`, e recebem usuário, empresa ativa, funcionalidades e versão de permissão.
+
+Endpoints acrescentados para o sistema oficial: `GET /api/internal/session` (interno), `GET /api/users` e `POST /api/users` (contas da empresa ativa, com perfil), e a lista `tenants` no contexto da sessão para o seletor de empresa. Funcionalidades novas: `pessoas.gerir`, `pessoas.salario.ver`, `parceiros.gerir`, `crm.gerir`, `crm.meta.gerir` e o módulo `Parceiros`.
 
 ## Recursos
 
@@ -49,7 +51,11 @@ PATCH /api/access-profiles/{id}
 POST /api/users/{id}/profiles
 DELETE /api/users/{id}/profiles/{profileId}
 GET  /api/access-audits
+
+GET  /api/directory
 ```
+
+`GET /api/directory` vale para qualquer conta com sessão na empresa ativa: devolve `id`, `name` e `sector` das contas ativas, sem e-mail nem perfil. Os módulos usam para escolher responsável (por exemplo, dono da oportunidade no CRM).
 
 Todo endpoint mutável exige `organizacao.acessos.gerir`, exceto o fluxo do próprio usuário para login, logout e escolha de empresa autorizada.
 

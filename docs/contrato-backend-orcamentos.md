@@ -1,6 +1,6 @@
 # Contrato futuro do backend — Orçamentos
 
-Este documento registra o schema `t2_orcamentos` dentro do `thalamus-2-core`, para quando Finanças for evoluída. Não define a ordem do produto: cadastros, operação, compras e vendas seguem funcionando no frontend até a vez de cada um. Login, empresa e permissão ficam no schema `t2_core`. O mockup de Finanças tem o DRE e Orçamentos. O orçamento destina o valor da categoria a setores utilizadores. Não há centro de custo no módulo. Contas a pagar e contas a receber aparecem no menu como abas em estruturação, sem dado: o título continua no Omie até elas serem desenhadas junto com Gestão de contratos e Ativos. O mockup continua sendo a referência funcional. Cada registro pertence a uma empresa, e a visão de grupo econômico é apenas consolidada e autorizada, conforme `docs/multitenancy.md`.
+Este documento registra o schema `t2_orcamentos` do `thalamus2-financas/api` (frontend `thalamus2-financas/web`). Os setores vêm da API de Pessoas (`GET /api/sectors`), nunca do schema dela. A primeira entrega oficial cobre grupos, categorias, orçamento anual com distribuição mensal e destinação por setor, previsão, retenção por saldo com decisão e alerta (detalhe na seção "Primeira entrega"); evento de pagamento Omie, planejamento assistido e consolidado de grupo continuam no mockup. O DRE desta entrega é a leitura descrita na seção Primeira entrega. Não define a ordem do produto: cadastros, operação, compras e vendas seguem funcionando no frontend até a vez de cada um. Login, empresa e permissão ficam no schema `t2_core`. O mockup de Finanças tem o DRE e Orçamentos. O orçamento destina o valor da categoria a setores utilizadores. Não há centro de custo no módulo. Contas a pagar e contas a receber aparecem no menu como abas em estruturação, sem dado: o título continua no Omie até elas serem desenhadas junto com Gestão de contratos e Ativos. O mockup continua sendo a referência funcional. Cada registro pertence a uma empresa, e a visão de grupo econômico é apenas consolidada e autorizada, conforme `docs/multitenancy.md`.
 
 ## Recursos
 
@@ -53,6 +53,70 @@ Todo request mutável exige validação explícita. Erros usam `message`/`error`
 11. A visão geral acompanha custo, despesa e investimento (grupos que não são receita nem dedução) e não armazena totais derivados. Financeiro e Administrador veem todas as categorias; os demais veem só as contas em que são o responsável. Receita e dedução são planejadas à parte e lidas no DRE. Depreciação orçada sai dos ativos; a categoria correspondente classifica o lançamento e não recebe um segundo valor. Conta sem orçado, realizado e previsão no intervalo não entra nessa visão. A origem do desvio de uma conta agrupa previsão aberta e realizado do intervalo pelo setor do lançamento e compara com o valor destinado ao setor; o que não tem utilizador não libera demanda. O DRE mostra o pago por setor.
 12. Toda mutação usa o tenant resolvido no servidor a partir da sessão; `tenant_id` nunca é aceito livremente no corpo do request.
 13. A visão de grupo econômico soma somente empresas autorizadas e categorias explicitamente mapeadas para uma categoria corporativa. Categoria não mapeada é exibida como não classificada; o saldo e o bloqueio continuam na empresa de origem.
+
+## Primeira entrega (`thalamus2-financas`)
+
+A tela `/orcamentos` do mockup foi copiada para `thalamus2-financas/web` (`BudgetsView`, `BudgetRecord`, `PeriodScopeBar`, `usePeriodScope`, `domain/budget.ts`), trocando só a origem dos dados por um adaptador (`stores/orcamentos.ts`). O sino da casca (`thalamus2-core/web`) mostra as previsões retidas e os avisos de limiar lendo esta API. A tela `/dre` também foi copiada (`DreView`, `domain/dre.ts`), lendo `GET /api/dre`.
+
+Rotas sob `core.session` e `feature:modulo.orcamentos.consultar`. Quem só consulta vê as contas em que é responsável (com pais e filhas); quem gere planejamento ou categorias vê todas.
+
+| Rota | Permissão extra | Faz |
+| --- | --- | --- |
+| `GET /api/budget-workspace?year` | — | Tudo o que a tela precisa do ano: empresas legíveis, grupos, categorias, orçamentos (com mensal e setores), lançamentos do ano e do anterior, exceções, alertas, abordagens do assistente e simulação salva. Com `consultar_consolidado`, inclui as empresas do grupo |
+| `GET /api/budget-groups` | — | Grupos fixos e criados, mais a lista de motivos de alteração |
+| `POST /api/budget-groups` | `categorias.gerir` | Grupo novo com código livre de dois dígitos |
+| `GET /api/budgets?year&from_month&to_month` | — | Visão por grupo: orçado da fatia, previsto, realizado, saldo, uso, sinais, retenções e alertas pendentes |
+| `GET /api/budget-categories` | — | Opções de categoria (folha, natureza, situação) |
+| `GET /api/budget-categories/{id}?year` | — | Conta com orçamento do ano, distribuição, setores, subcategorias, previsões, exceções, alertas e histórico |
+| `POST /api/budget-categories` | `categorias.gerir` | Categoria ou subcategoria; a primeira subcategoria herda orçamentos, setores, responsável e executor |
+| `PATCH /api/budget-categories/{id}` | `categorias.gerir` | Renomear, inativar ou reativar com motivo; inativar leva as subcategorias |
+| `PUT /api/budget-categories/{id}/assignment` | `categorias.gerir` | Responsável (diretório do core) e setor executor (Pessoas) |
+| `PUT /api/budget-categories/{id}/budgets/{year}` | `planejamento.gerir` | Valor do ano com motivo; na categoria pai divide em partes iguais entre as subcategorias ativas |
+| `PUT /api/budget-categories/{id}/budgets/{year}/monthly` | `planejamento.gerir` | Doze valores; a soma vira o valor do ano |
+| `PATCH /api/budget-categories/{id}/budgets/{year}/configuration` | `planejamento.gerir` | Limiar de alerta e bloqueio acima do saldo |
+| `PUT /api/budget-categories/{id}/budgets/{year}/allocations` | `planejamento.gerir` | Setores utilizadores; soma até o valor da conta |
+| `POST /api/budget-forecasts` | `planejamento.gerir` | Previsão idempotente por `source_module` + `source_id`; acima do saldo com bloqueio fica retida |
+| `POST /api/budget-forecasts/cancel` | `planejamento.gerir` | Cancela pela origem, com motivo; encerra exceção e bloqueio |
+| `POST /api/budget-planning/growth` | `planejamento.gerir` | Percentual sobre o realizado do ano anterior, por conta |
+| `POST /api/budget-planning/revenue-target` | `planejamento.gerir` | Meta de faturamento: calcula o crescimento sobre a receita do ano anterior e aplica a cada conta |
+| `POST /api/budget-planning/approach` | `planejamento.gerir` | Abordagem conservadora, média ou agressiva do assistente |
+| `POST /api/budget-planning/seasonality` | `planejamento.gerir` | Reparte o ano pelo peso de cada mês no realizado do ano anterior |
+| `POST /api/budget-simulations/{year}` | `planejamento.gerir` | Salva o retrato do plano do ano (uma simulação por empresa e ano) |
+| `POST /api/budget-simulations/{year}/apply` | `planejamento.gerir` | Copia a simulação salva para o orçamento |
+| `POST /api/budget-planning/group-revenue-target` | `planejamento.gerir` + `consultar_consolidado` | Meta do grupo: o percentual é calculado sobre a receita somada e gravado no orçamento de cada empresa autorizada |
+| `GET /api/budget-exceptions?status` | — | Fila de "Saldo excedido" |
+| `POST /api/budget-exceptions/{id}/decision` | `liberar_saldo` | Liberar aplica o retido; recusar cancela a previsão. Justificativa obrigatória |
+| `GET /api/budget-alerts?status` | — | Alertas e bloqueios (com `exception_id` do bloqueio) |
+| `POST /api/budget-alerts/{id}/acknowledge` | responsável ou quem gere | Ciente no alerta de limiar; bloqueio só se encerra com a decisão |
+
+Tabela nova: `budget_simulations` (`tenant_id`, `year`, `lines` json, `saved_by`, `saved_at`; única por empresa e ano).
+
+Diferenças em relação ao contrato acima e ao mockup:
+
+- O valor mora na folha (categoria sem subcategoria ou subcategoria), e a categoria pai mostra a soma.
+- `orcamentos.gerir` foi dividida em `orcamentos.planejamento.gerir` (valores, regra, setores, simulação, previsões) e `orcamentos.categorias.gerir` (cadastro, responsável e executor). No mockup, regra e destinação ainda pedem `categorias.gerir`; no oficial pedem `planejamento.gerir`.
+- O cancelamento é `POST /api/budget-forecasts/cancel` com `source_module`, `source_id` e motivo no corpo.
+- Hoje a previsão é registrada e cancelada à mão na ficha, com `source_module` = `Manual` (só no oficial). Compras e contratos usarão a mesma rota quando forem oficiais.
+- A visão do grupo não junta categorias por código: cada empresa tem a própria linha, e só a taxonomia fixa soma na mesma seção. Grupo criado por uma empresa aparece com o nome dela. Juntar contas entre empresas exige o mapeamento corporativo da regra 13, que ainda não existe.
+- Mudar o valor de uma conta mantém a participação dos setores sobre o valor; reduzir abaixo do destinado reduz os setores na mesma proporção. Mudar o valor do ano refaz a distribuição mensal em doze partes.
+- O ciente fica com quem gere ou com quem foi avisado (`notified_user_ids`). O aviso aparece na tela e no sino; ainda não há e-mail.
+- O nome do grupo econômico não vem na sessão do core; a tela mostra "Grupo".
+
+### DRE
+
+`GET /api/dre?year&from_month&to_month&scope=tenant|group` fica em `routes/dre.php`, exigido dentro do grupo autenticado (`core.session`) e com a permissão `modulo.dre.consultar`. Não herda `modulo.orcamentos.consultar`. `scope=group` exige `orcamentos.consultar_consolidado` e soma somente `CurrentSession::readableTenantIds('orcamentos.consultar_consolidado')`. A rota não lê tenant enviado pelo navegador.
+
+O cálculo segue a regra 10 e `dre.ts`: receita, deduções, custos, variáveis, fixas, EBITDA, premiação, depreciação, não operacionais, lucro e CAPEX fora do resultado. Orçado é a fatia das categorias no intervalo; realizado é o lançamento `Realizado pago` ou `Realizado recebido` ainda não cancelado. Previsão não entra. A leitura em frases sai desses mesmos números. Depreciação e premiação ficam zeradas e a resposta diz o motivo: Ativos e Indicadores ainda não são oficiais. Receitas e despesas não operacionais e os impostos sobre o lucro também ficam zerados, porque não há conta. Contas a pagar e a receber não entram.
+
+Ainda não foi entregue:
+
+- O realizado pago e recebido: o webhook de pagamento e estorno do Omie não existe. A API já soma `Realizado pago` e `Realizado recebido` no saldo e no planejamento, mas nada cria esses lançamentos; as colunas ficam zeradas.
+- A depreciação orçada, que vem de Ativos. No DRE a linha fica zerada até lá. A premiação também fica zerada até Indicadores ser oficial.
+- As contas a pagar e a receber.
+- A sincronização de categorias com o Omie, o vínculo com nota fiscal e as exceções "Sem categoria" e "Sem vínculo".
+- O dossiê do assistente (mercado, internet, atas) continua texto de demonstração, como no mockup.
+
+Tudo isso continua no mockup.
 
 ## Pré-requisitos da implementação
 

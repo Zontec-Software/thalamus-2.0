@@ -864,6 +864,8 @@ export interface JobCatalog {
   cbo: string
   mission: string
   requirements: string[]
+  /** Valor do cargo. Quem ocupa uma posição deste cargo recebe este salário. */
+  salary?: number
   status: EntityStatus
 }
 
@@ -962,7 +964,6 @@ export interface Employment {
   endedOn?: string
   status: 'Ativo' | 'Encerrado'
   workplace?: string
-  salary?: number
   cbo?: string
 }
 

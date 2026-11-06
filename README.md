@@ -2,6 +2,8 @@
 
 Protótipo navegável do ERP integrado da Roboflex (cases robustos para tablets). Ele conecta cadastros, suprimentos, comercial, operações, serviços, gestão e finanças operacionais. O Omie simulado continua dono do pedido aprovado, faturamento e dados fiscais; o Thalamus coordena a execução.
 
+Este repositório é o **mockup geral**. O sistema oficial, com banco real, fica nos repositórios `thalamus2-<modulo>`, cada um com as pastas `api/` e `web/`, e recebe só os módulos já revisados aqui. Ver `docs/repositorios-oficiais.md`.
+
 ## Executar
 
 Requer Node.js 20.19 ou superior.

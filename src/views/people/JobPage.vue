@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronRight } from 'lucide-vue-next'
+import BaseModal from '../../components/BaseModal.vue'
 import CrumbBack from '../../components/CrumbBack.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import { matchingCandidate, peopleBoard } from '../../domain/people'
@@ -32,6 +33,7 @@ const suggested = computed(() => applications.value.filter(entry => {
 const pending = computed(() => applications.value.filter(entry => entry.stage !== 'Efetivado' && entry.stage !== 'Encerrado').length)
 
 const form = reactive({ title: '', sectorId: '', requesterId: '', ownerId: '', description: '', requirements: '', openedOn: today(), targetOn: '' })
+const candidateOpen = ref(false)
 const candidateForm = reactive({ name: '', email: '', phone: '', resumeName: '', resumeText: '' })
 const duplicate = reactive({ id: '', name: '' })
 const extraItem = reactive({ label: '', owner: 'Admissão', kind: 'geral' as PeopleChecklistKind, required: true })
@@ -44,6 +46,13 @@ function sectorName(id?: string) {
 }
 function lines(value: string) {
   return value.split('\n').map(entry => entry.trim()).filter(Boolean)
+}
+function readingOf(applicationId: string) {
+  const latest = store.state.candidateBriefings.find(briefing => briefing.applicationId === applicationId)
+  if (!latest) return 'Sem leitura'
+  const total = latest.criteria.length
+  if (!total) return 'Sem requisitos'
+  return `${latest.evidence.length} de ${total}`
 }
 function openTab(aba: Tab) {
   router.replace({ query: { aba } })
@@ -63,6 +72,12 @@ function createJob() {
 }
 function saveStatus(status: JobOpeningStatus) {
   if (job.value) store.setJobStatus(job.value.id, status)
+}
+function openCandidate() {
+  Object.assign(candidateForm, { name: '', email: '', phone: '', resumeName: '', resumeText: '' })
+  duplicate.id = ''
+  duplicate.name = ''
+  candidateOpen.value = true
 }
 function submitCandidate(mode: 'check' | 'force' | 'link') {
   if (!job.value) return
@@ -160,58 +175,74 @@ watch(() => route.path, path => {
         <button type="button" :class="{ active: tab === 'candidatos' }" @click="openTab('candidatos')">Candidatos<b v-if="applications.length">{{ applications.length }}</b></button>
       </div>
 
-      <div v-if="tab === 'vaga'">
-        <p>{{ job.description || 'Sem descrição.' }}</p>
-        <h3 class="partner-h">Requisitos</h3>
-        <p v-if="job.requirements.length">{{ job.requirements.join(' · ') }}</p>
-        <p v-else class="empty-note">Nenhum requisito informado.</p>
-        <h3 class="partner-h">Sugeridos para revisão humana</h3>
-        <p v-if="!suggested.length" class="empty-note">Nenhuma sugestão em aberto. A leitura não ordena nem elimina candidatos.</p>
-        <button v-for="entry in suggested" :key="entry.id" class="list-row" @click="router.push(`/pessoas/admissao/${job.id}/candidatura/${entry.id}`)">
-          <div><strong>{{ store.state.candidates.find(person => person.id === entry.candidateId)?.name }}</strong><span>Critérios da vaga com evidência no texto. A decisão é humana.</span></div>
-          <StatusBadge value="Sugerido" />
-        </button>
-        <h3 class="partner-h">Checklist da vaga</h3>
-        <p class="hint">Modelo de demonstração. Item novo vale para candidaturas que entrarem depois.</p>
-        <div v-for="item in checklist?.items ?? []" :key="item.id" class="list-row static">
-          <div><strong>{{ item.label }}</strong><span>{{ item.owner }} · {{ item.required ? 'obrigatório neste modelo' : 'opcional' }}</span></div>
-        </div>
+      <div v-if="tab === 'vaga'" class="admit-stack">
+        <section class="admit-block">
+          <header><div><h3>Por que a vaga existe</h3></div></header>
+          <blockquote class="admit-quote">{{ job.description || 'Sem descrição.' }}</blockquote>
+        </section>
+        <section class="admit-block">
+          <header><div><h3>Requisitos</h3><p>A leitura da candidatura compara o currículo com esta lista, um a um.</p></div></header>
+          <ul v-if="job.requirements.length" class="admit-reqs plain">
+            <li v-for="requirement in job.requirements" :key="requirement"><strong>{{ requirement }}</strong></li>
+          </ul>
+          <p v-else class="empty-note">Nenhum requisito informado.</p>
+        </section>
+        <section class="admit-block">
+          <header><div><h3>Prontos para uma pessoa revisar</h3><p>A leitura não ordena nem elimina. Aqui só entra quem tem todos os requisitos no texto e ainda não foi descartado.</p></div></header>
+          <p v-if="!suggested.length" class="empty-note">Ninguém neste grupo.</p>
+          <button v-for="entry in suggested" :key="entry.id" class="list-row" @click="router.push(`/pessoas/admissao/${job.id}/candidatura/${entry.id}`)">
+            <div><strong>{{ store.state.candidates.find(person => person.id === entry.candidateId)?.name }}</strong><span>{{ readingOf(entry.id) }} no texto do currículo</span></div>
+            <StatusBadge value="Sugerido" />
+          </button>
+        </section>
+        <section class="admit-block">
+          <header><div><h3>Checklist da vaga</h3><p>Modelo de demonstração. Item novo vale para candidaturas que entrarem depois.</p></div></header>
+          <div v-for="item in checklist?.items ?? []" :key="item.id" class="list-row static">
+            <div><strong>{{ item.label }}</strong><span>{{ item.owner }} · {{ item.required ? 'obrigatório' : 'opcional' }}</span></div>
+          </div>
         <div class="form-grid">
           <div class="field"><label>Novo item</label><input v-model="extraItem.label" /></div>
           <div class="field"><label>Responsável</label><input v-model="extraItem.owner" /></div>
         </div>
         <button class="button secondary small" @click="addItem">Incluir no modelo</button>
+        </section>
       </div>
 
-      <div v-else>
+      <div v-else class="admit-stack">
+        <div class="partner-h-row">
+          <p class="hint" style="margin:0">A leitura usa o texto informado no cadastro. O arquivo não é guardado.</p>
+          <button class="button" type="button" @click="openCandidate">Incluir candidato</button>
+        </div>
         <table class="dense">
-          <thead><tr><th>Candidato</th><th>Etapa</th><th>Pendências</th></tr></thead>
+          <thead><tr><th>Candidato</th><th>Etapa</th><th>Leitura</th><th>Pendências</th></tr></thead>
           <tbody>
             <tr v-for="entry in applications" :key="entry.id" class="clickable" @click="router.push(`/pessoas/admissao/${job.id}/candidatura/${entry.id}`)">
               <td><span class="cell-main">{{ store.state.candidates.find(person => person.id === entry.candidateId)?.name }}</span></td>
               <td><StatusBadge :value="entry.stage" /></td>
+              <td>{{ readingOf(entry.id) }}</td>
               <td>{{ store.state.peopleChecklists.find(list => list.refId === entry.id)?.items.filter(item => item.required && item.status !== 'Concluído').length ?? 0 }}</td>
             </tr>
           </tbody>
         </table>
         <p v-if="!applications.length" class="empty-note">Nenhum candidato nesta vaga.</p>
-        <h3 class="partner-h">Registrar candidato</h3>
-        <div class="form-grid">
-          <div class="field"><label>Nome</label><input v-model="candidateForm.name" /></div>
-          <div class="field"><label>E-mail</label><input v-model="candidateForm.email" /></div>
-          <div class="field"><label>Telefone</label><input v-model="candidateForm.phone" /></div>
-          <div class="field"><label>Nome do arquivo</label><input v-model="candidateForm.resumeName" placeholder="Só o nome. O arquivo não é guardado." /></div>
-          <div class="field"><label>Texto do currículo</label><textarea v-model="candidateForm.resumeText" rows="3" placeholder="Texto de demonstração para a leitura assistida."></textarea></div>
-        </div>
-        <div class="drawer-actions">
-          <button class="button" @click="submitCandidate('check')">Registrar candidato</button>
-          <template v-if="duplicate.id">
-            <span class="hint">Possível duplicata: {{ duplicate.name }}.</span>
-            <button class="button secondary" @click="submitCandidate('link')">Unir a este candidato</button>
-            <button class="button secondary" @click="submitCandidate('force')">Manter outro cadastro</button>
-          </template>
-        </div>
       </div>
     </article>
+
+    <BaseModal :open="candidateOpen" title="Incluir candidato" subtitle="O arquivo não é guardado. A leitura usa só o texto informado aqui." width="640px" @close="candidateOpen = false">
+      <div class="form-grid">
+        <div class="field"><label>Nome</label><input v-model="candidateForm.name" /></div>
+        <div class="field"><label>E-mail</label><input v-model="candidateForm.email" /></div>
+        <div class="field"><label>Telefone</label><input v-model="candidateForm.phone" /></div>
+        <div class="field"><label>Nome do arquivo</label><input v-model="candidateForm.resumeName" placeholder="Só o nome. O arquivo não é guardado." /></div>
+        <div class="field wide"><label>Texto do currículo</label><textarea v-model="candidateForm.resumeText" rows="4" placeholder="Texto de demonstração para a leitura assistida."></textarea></div>
+      </div>
+      <p v-if="duplicate.id" class="hint">Possível duplicata: {{ duplicate.name }}.</p>
+      <template #footer>
+        <button class="button secondary" type="button" @click="candidateOpen = false">Cancelar</button>
+        <button v-if="duplicate.id" class="button secondary" type="button" @click="submitCandidate('link')">Unir a este candidato</button>
+        <button v-if="duplicate.id" class="button secondary" type="button" @click="submitCandidate('force')">Manter outro cadastro</button>
+        <button class="button" type="button" :disabled="!candidateForm.name.trim()" @click="submitCandidate('check')">Registrar candidato</button>
+      </template>
+    </BaseModal>
   </template>
 </template>

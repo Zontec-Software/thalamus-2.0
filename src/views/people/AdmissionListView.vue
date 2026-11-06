@@ -61,7 +61,7 @@ function count(jobId: string) {
       <thead><tr><th>Vaga</th><th>Setor</th><th>Responsável</th><th>Abertura</th><th>Em aberto</th><th>Situação</th></tr></thead>
       <tbody>
         <tr v-for="entry in jobs" :key="entry.id" class="clickable" @click="router.push(`/pessoas/admissao/${entry.id}`)">
-          <td><span class="cell-main">{{ entry.title }}</span><span class="cell-sub">{{ entry.requirements.join(' · ') || 'Sem requisitos' }}</span></td>
+          <td><span class="cell-main">{{ entry.title }}</span><span class="cell-sub">{{ entry.requirements.length ? entry.requirements.join(', ') : 'Sem requisitos' }}</span></td>
           <td>{{ sectorName(entry.sectorId) }}</td>
           <td>{{ personName(entry.ownerId) }}</td>
           <td>{{ fmtDate(entry.openedOn) }}<span v-if="entry.targetOn" class="cell-sub">Alvo {{ fmtDate(entry.targetOn) }}</span></td>

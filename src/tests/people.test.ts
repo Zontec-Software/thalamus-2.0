@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { today } from '../domain/engine'
 import { createUser } from '../domain/enterprise'
 import {
-  addProjectParticipation, canSeePersonBlock, companyAccessOf, createPosition, directManager, directoryCard, grantCompanyAccess, occupantsAt, openLinkedEmployment, personView, placeSector, removePosition, resetPin, setCompanyProfile, setPersonPhoto, setSectorLeadership, suggestIdentity, updatePosition,
+  addProjectParticipation, canSeePersonBlock, companyAccessOf, createJob, createPosition, directManager, directoryCard, grantCompanyAccess, occupantsAt, openLinkedEmployment, personView, placeSector, removePosition, resetPin, setCompanyProfile, setPersonPhoto, setSectorLeadership, suggestIdentity, updateJob, updatePosition,
 } from '../domain/organization'
 import {
   BRIEFING_VERSION, changeAssignment, closeOffboarding, createJobOpening, hireCandidate, prepareBriefing, recordReview, registerCandidate, revokeAccess, reviewsShareScale, setApplicationStage, setChecklistItem, startOffboarding,
@@ -12,6 +12,16 @@ import { createSeedState } from '../mocks/seed'
 const TENANT = 'tenant-roboflex'
 
 describe('pessoas', () => {
+  it('guarda o salário no cargo, não no vínculo', () => {
+    const state = createSeedState()
+    expect(state.jobs.find(entry => entry.id === 'job-op')?.salary).toBe(3200)
+    expect(state.employments.every(entry => !('salary' in entry))).toBe(true)
+    const created = createJob(state, TENANT, { name: 'Ferramenteiro', level: 'Pleno', cbo: '', mission: 'Cuidar do molde', requirements: [], salary: 4500 }, 'Marina')
+    expect(created.salary).toBe(4500)
+    expect(() => createJob(state, TENANT, { name: 'Outro', level: '', cbo: '', mission: 'Apoio', requirements: [], salary: -1 }, 'Marina')).toThrow(/salário/i)
+    expect(updateJob(state, created.id, { salary: 4800 }, 'Marina').salary).toBe(4800)
+  })
+
   it('efetiva o candidato no cadastro único e guarda a candidatura', () => {
     const state = createSeedState()
     const job = createJobOpening(state, TENANT, { title: 'Técnico', description: 'Apoio', requirements: ['solda'], openedOn: '2026-10-01' }, 'Marina')

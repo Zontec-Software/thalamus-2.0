@@ -62,6 +62,10 @@ Eventos sem categoria, com múltiplas categorias ou com erro ficam na fila de ex
 6. Conciliar diariamente pedidos, estoque, compras, faturamento e pagamentos/estornos. Divergências aparecem como erro na tela de integração.
 7. Persistir o evento de pagamento e a atualização do ledger na mesma transação, com unicidade do id externo e bloqueio concorrente da categoria/período.
 
+## No sistema oficial
+
+O adaptador real está no `thalamus2-shared/kernel` (`Integrations\OmieClient`), com a chave por empresa registrada pelo mestre na Plataforma do core. O oficial chama hoje: `UpsertProduto` (Engenharia, botão Enviar ao Omie do item), `UpsertCliente` (Comercial, parceiro), `IncluirCategoria`/`AlterarCategoria` e `ListarMovimentos` (Finanças: categorias e pagamentos baixados como realizado). Pedidos, NF-e, estoque, compras, expedição e webhooks seguem só aqui no mockup.
+
 ## Próxima etapa
 
 Implementar `OmieGateway` em um serviço de backend. Antes disso, validar com a conta Omie:

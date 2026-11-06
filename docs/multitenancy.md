@@ -66,7 +66,7 @@ O usuário do banco da aplicação continua limitado ao schema do módulo. O iso
 
 ## Autorização
 
-O schema `t2_core` do `thalamus-2-core` mantém usuários, empresas, grupos, funcionalidades, perfis e vínculos. O contrato está em `docs/contrato-backend-core.md`.
+O schema `t2_core` do `thalamus2-core/api` mantém usuários, empresas, grupos, funcionalidades, perfis e vínculos. O contrato está em `docs/contrato-backend-core.md`.
 
 Há dois escopos independentes:
 
@@ -157,7 +157,7 @@ Escala ou exigência contratual podem justificar banco dedicado para um tenant. 
 
 ## Sequência de implantação
 
-1. Criar, no `thalamus-2-core`, o schema `t2_core` com empresas, grupos econômicos, usuários, associações, permissões e `TenantContext`.
+1. Criar, no `thalamus2-core/api`, o schema `t2_core` com empresas, grupos econômicos, usuários, associações, permissões e `TenantContext`.
 2. Incluir `tenant_id` no primeiro módulo que sair do mockup, antes da primeira migration de negócio desse módulo.
 3. Criar categorias corporativas e o mapeamento local antes da tela consolidada.
 4. Publicar primeiro a visão individual por empresa.

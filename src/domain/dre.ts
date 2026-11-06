@@ -80,8 +80,8 @@ export function indicatorScore(state: ErpState) {
 /**
  * Estimativa da premiação SUPERA. A política de referência paga o benefício
  * quando o gatilho de resultado é atingido. Aqui o gatilho é nota a partir de
- * 80 e EBITDA positivo; o valor é 1% do EBITDA vezes a nota. Sem salário em
- * Pessoas, o percentual substitui a folha.
+ * 80 e EBITDA positivo; o valor é 1% do EBITDA vezes a nota. O salário do cargo
+ * ainda não entra neste cálculo; o percentual substitui a folha.
  */
 export function superaEstimate(ebitda: number, score: number) {
   if (!(ebitda > 0) || score < 80) return 0

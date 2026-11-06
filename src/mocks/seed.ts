@@ -208,11 +208,11 @@ function baseState(): ErpState {
       { id: 'job-fin', tenantId: 'tenant-roboflex', name: 'Analista financeiro', level: 'Pleno', cbo: '2522-10', mission: 'Orçamentos e acompanhamento', requirements: ['Acompanhamento orçamentário'], status: 'Ativo' },
       { id: 'job-ast', tenantId: 'tenant-roboflex', name: 'Técnico de campo', level: 'Pleno', cbo: '3131-15', mission: 'Triagem e execução de assistência', requirements: ['Atendimento em campo'], status: 'Ativo' },
       { id: 'job-dir', tenantId: 'tenant-roboflex', name: 'Diretor industrial', level: 'Diretoria', cbo: '1223-05', mission: 'Responder pela operação e pelas áreas de apoio', requirements: ['Gestão industrial'], status: 'Ativo' },
-      { id: 'job-op', tenantId: 'tenant-roboflex', name: 'Operador industrial', level: 'Operacional', cbo: '7842-05', mission: 'Apontamento e autocontrole', requirements: ['Injeção'], status: 'Ativo' },
+      { id: 'job-op', tenantId: 'tenant-roboflex', name: 'Operador industrial', level: 'Operacional', cbo: '7842-05', mission: 'Apontamento e autocontrole', requirements: ['Injeção'], salary: 3200, status: 'Ativo' },
       { id: 'job-compras', tenantId: 'tenant-roboflex', name: 'Comprador', level: 'Pleno', cbo: '3542-05', mission: 'Cotações e pedidos de compra', requirements: ['Cotação'], status: 'Ativo' },
       { id: 'job-lider', tenantId: 'tenant-roboflex', name: 'Líder de produção', level: 'Liderança', cbo: '7601-05', mission: 'Conduzir a operação do turno', requirements: ['Liderança de célula'], status: 'Ativo' },
       { id: 'job-manut', tenantId: 'tenant-roboflex', name: 'Técnico de manutenção', level: 'Pleno', cbo: '9113-05', mission: 'Disponibilidade das máquinas', requirements: ['Manutenção industrial'], status: 'Ativo' },
-      { id: 'job-z-eng', tenantId: 'tenant-roboflex-sul', name: 'Engenheiro de produto', level: 'Pleno', cbo: '2144-05', mission: 'Apoio de engenharia da Zontec', requirements: ['Processo de injeção'], status: 'Ativo' },
+      { id: 'job-z-eng', tenantId: 'tenant-roboflex-sul', name: 'Engenheiro de produto', level: 'Pleno', cbo: '2144-05', mission: 'Apoio de engenharia da Zontec', requirements: ['Processo de injeção'], salary: 4100, status: 'Ativo' },
     ],
     positions: [
       { id: 'pos-com', tenantId: 'tenant-roboflex', name: 'Executiva comercial', sectorId: 'sec-com', jobId: 'job-com', description: 'CRM, propostas e carteira de clientes', headcount: 1, status: 'Ativo' },
@@ -547,7 +547,7 @@ function seedPeople(state: ErpState) {
     })
     state.employments.push({
       id: `emp-${user.id}`, tenantId: personTenant, personId, contractType: 'CLT', startedOn: '2024-01-01', status: 'Ativo',
-      salary: user.id === 'u6' ? 3200 : undefined, workplace: user.sector,
+      workplace: user.sector,
     })
   }
   state.workspaceConnections = [
@@ -559,7 +559,7 @@ function seedPeople(state: ErpState) {
     id: diegoSul, tenantId: 'tenant-roboflex-sul', fullName: 'Diego Martins', corporateEmail: 'diego.martins@zontec.com.br',
     cpf: '111.222.333-44', education: [], family: [], emergencies: [], banks: [],
   })
-  state.employments.push({ id: 'emp-z-diego', tenantId: 'tenant-roboflex-sul', personId: diegoSul, contractType: 'CLT', startedOn: '2025-03-01', status: 'Ativo', salary: 4100, workplace: 'Engenharia Zontec' })
+  state.employments.push({ id: 'emp-z-diego', tenantId: 'tenant-roboflex-sul', personId: diegoSul, contractType: 'CLT', startedOn: '2025-03-01', status: 'Ativo', workplace: 'Engenharia Zontec' })
   state.users.push({
     id: 'u19', name: 'Diego Martins', role: 'Manutenção', sector: 'Engenharia Zontec', shift: 'Administrativo', pin: '1919',
     email: 'diego.martins@zontec.com.br', positionId: 'pos-z-eng', personId: diegoSul, homeTenantId: 'tenant-roboflex-sul', active: true,

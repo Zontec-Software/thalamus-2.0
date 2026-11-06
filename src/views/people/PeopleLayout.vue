@@ -13,8 +13,7 @@ const router = useRouter()
 const openedForTour = ref(false)
 const openedStructure = ref(false)
 
-const lists = new Set(['/pessoas', '/pessoas/admissao', '/pessoas/desligamento', '/pessoas/organograma', '/pessoas/cargos'])
-const showNav = computed(() => lists.has(route.path))
+const showNav = computed(() => route.path === '/pessoas' || route.path.startsWith('/pessoas/'))
 const board = computed(() => peopleBoard(store.state, ui.activeTenantId))
 const vacant = computed(() => store.state.sectors.filter(entry => entry.tenantId === ui.activeTenantId && !entry.managerPositionId).length)
 const links = computed(() => [
@@ -26,7 +25,8 @@ const links = computed(() => [
 ])
 
 function current(link: { to: string; exact?: boolean }) {
-  return link.exact ? route.path === link.to : route.path.startsWith(link.to)
+  if (link.exact) return route.path === '/pessoas' || route.path === '/pessoas/nova' || route.path.startsWith('/pessoas/pessoa/')
+  return route.path === link.to || route.path.startsWith(`${link.to}/`)
 }
 
 function tourPerson() {

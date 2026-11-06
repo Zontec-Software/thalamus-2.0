@@ -45,13 +45,13 @@ Pedido aprovado → OP com revisão congelada → reserva → separação → ex
 
 ## Persistência do protótipo
 
-O estado fica no `localStorage`, na chave `thalamus-erp-v50`. Não há banco de dados nem API nesta fase. Restaurar a demonstração recria o seed completo.
+O estado fica no `localStorage`, na chave `thalamus-erp-v63`. Não há banco de dados nem API nesta fase. Restaurar a demonstração recria o seed completo.
 
 Campo novo no estado exige subir a chave. Não há migração: a chave nova nasce do seed, e a antiga é descartada.
 
 ## Fronteiras para implementação real
 
-- Um backend Laravel (`thalamus-2-core`) e um frontend. A fronteira do módulo é o schema. O esboço inteiro permanece usável. O schema `t2_core` vem primeiro. Finanças, quando for a vez, é o orçamento em `t2_orcamentos`. O mockup ainda não tem título a pagar nem a receber: as abas existem em estruturação e serão desenhadas com Gestão de contratos e Ativos. Até lá o registro é do Omie, e o Thalamus só lê o pagamento e o recebimento como realizado. Indicadores permanecem leitura sobre os outros.
+- Um Laravel e um schema por módulo (`thalamus2-<modulo>/api`), um frontend remoto por módulo (`thalamus2-<modulo>/web`) carregado pela casca `thalamus2-core/web`, e o `thalamus2-core/api` com o schema `t2_core` como fonte única de sessão, empresa e permissão. Só os módulos revisados vão para o oficial: Pessoas, Engenharia (Produtos), Comercial (CRM e Parceiros) e Finanças (Orçamento). Este repositório continua como mockup geral. Detalhes em `docs/repositorios-oficiais.md`. Finanças, quando for a vez, é o orçamento em `t2_orcamentos`. O mockup ainda não tem título a pagar nem a receber: as abas existem em estruturação e serão desenhadas com Gestão de contratos e Ativos. Até lá o registro é do Omie, e o Thalamus só lê o pagamento e o recebimento como realizado. Indicadores permanecem leitura sobre os outros.
 - Banco relacional com migrações e controle de concorrência.
 - Arquivos em armazenamento de objetos, vinculados por metadados. No protótipo, a mídia do item fica no navegador, com limite por arquivo.
 - Consulta ao cadastro nacional de GTIN (CCG) para o cruzamento GTIN × NCM. No protótipo é uma tabela fixa.

@@ -37,7 +37,7 @@ const googleTouched = ref(false)
 const accountEmail = ref('')
 const moveForm = reactive({ sector: '', positionId: '', validFrom: today() })
 const reviewForm = reactive({ scoreLabel: '', scale: '', period: '', origin: '' })
-const contract = reactive({ contractType: '', salary: 0, cbo: '', workplace: '' })
+const contract = reactive({ contractType: '', cbo: '', workplace: '' })
 
 const companySectors = computed(() => store.state.sectors.filter(entry => entry.tenantId === (record.value?.tenantId ?? ui.activeTenantId)))
 const companyProfiles = computed(() => store.state.accessProfiles.filter(entry => entry.tenantId === ui.activeTenantId))
@@ -104,7 +104,7 @@ const tab = computed<Tab>(() => {
   return tabs.value.some(entry => entry.id === name) ? name as Tab : 'dados'
 })
 
-watch(employment, current => Object.assign(contract, { contractType: current?.contractType ?? '', salary: current?.salary ?? 0, cbo: current?.cbo ?? '', workplace: current?.workplace ?? '' }), { immediate: true })
+watch(employment, current => Object.assign(contract, { contractType: current?.contractType ?? '', cbo: current?.cbo ?? '', workplace: current?.workplace ?? '' }), { immediate: true })
 watch(person, current => Object.assign(moveForm, { sector: current ? sectorOf(store.state, current)?.name ?? current.sector : '', positionId: '', validFrom: today() }), { immediate: true })
 watch(() => route.path, path => {
   if (!path.endsWith('/nova')) return
@@ -124,8 +124,7 @@ function create() {
 }
 function saveContract() {
   if (!employment.value) return
-  const patch = canSeePersonBlock(fileView.value, 'salario') ? { ...contract } : { contractType: contract.contractType, cbo: contract.cbo, workplace: contract.workplace }
-  store.updateEmployment(employment.value.id, patch)
+  store.updateEmployment(employment.value.id, { contractType: contract.contractType, cbo: contract.cbo, workplace: contract.workplace })
 }
 function update(patch: Partial<Pick<User, 'shift' | 'active'>>) {
   if (person.value) store.updateUser(person.value.id, patch)
@@ -226,7 +225,7 @@ function registerReview() {
             <div class="field"><label>Início</label><input :value="fmtDate(employment.startedOn)" disabled /></div>
             <div class="field"><label>CBO</label><input v-model="contract.cbo" /></div>
             <div class="field"><label>Local de trabalho</label><input v-model="contract.workplace" /></div>
-            <div v-if="canSeePersonBlock(fileView, 'salario')" class="field"><label>Salário</label><input v-model.number="contract.salary" type="number" min="0" /><small>{{ fmtCurrency(contract.salary || 0) }}</small></div>
+            <div v-if="canSeePersonBlock(fileView, 'salario')" class="field"><label>Salário</label><input :value="job?.salary != null ? fmtCurrency(job.salary) : 'Não informado no cargo'" disabled /><small v-if="job">Vem do cargo {{ job.name }}. Quem ocupa uma posição deste cargo recebe o mesmo valor. Altera em <RouterLink to="/pessoas/cargos">Cargos</RouterLink>.</small><small v-else>Sem cargo, não há salário.</small></div>
           </div>
           <div class="save-bar"><button class="button" @click="saveContract">Salvar contrato</button></div>
         </section>

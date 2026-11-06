@@ -1,6 +1,6 @@
 # Contrato futuro do backend — Produtos
 
-Este documento registra o schema `t2_produtos` dentro do `thalamus-2-core`, para quando o cadastro de itens for evoluído. Login, empresa e permissão ficam no schema `t2_core`. O mockup continua sendo a referência funcional (`src/domain/catalog.ts`, `catalogExtensions.ts` e `engineering.ts`). Cada registro pertence a uma empresa (tenant), conforme `docs/multitenancy.md`. Código igual em empresas diferentes não significa o mesmo item.
+Este documento registra o schema `t2_engenharia` do `thalamus2-engenharia/api` (frontend `thalamus2-engenharia/web`). A primeira entrega oficial cobre item, classe, ciclo de vida com homologação, fiscal com marca de envio ao Omie, preço de venda e estrutura por versão; ferramental, embalagem, roteiro, mídia e ECO continuam só no mockup até a próxima rodada. Login, empresa e permissão ficam no schema `t2_core`. O mockup continua sendo a referência funcional (`src/domain/catalog.ts`, `catalogExtensions.ts` e `engineering.ts`). Cada registro pertence a uma empresa (tenant), conforme `docs/multitenancy.md`. Código igual em empresas diferentes não significa o mesmo item.
 
 ## Recursos
 
@@ -31,6 +31,7 @@ Este documento registra o schema `t2_produtos` dentro do `thalamus-2-core`, para
 - `GET|POST /api/engineering-changes`, `PATCH /api/engineering-changes/{id}`, `POST /api/engineering-changes/{id}/items/{item_id}/revision`, `POST /api/engineering-changes/{id}/stage`
 - `POST /api/items/{id}/fiscal/push`, `POST /api/items/{id}/fiscal/resolve` (`keep: Thalamus|Omie`)
 - `POST /api/integrations/omie/product-events` (webhook de alteração de produto no Omie)
+- `GET /api/sellable-items?q=` e `GET /api/sellable-items/{id}`: leitura para outros módulos, só com sessão. Devolve `id`, `code`, `description`, `unit` e `price` (preço de venda vigente ou `null`) dos itens liberados para venda; 404 para item fora dessa condição. O CRM usa na linha da proposta.
 
 Todo request mutável exige validação explícita e usa o tenant da sessão; `tenant_id` nunca vem do corpo.
 
@@ -52,6 +53,27 @@ Todo request mutável exige validação explícita e usa o tenant da sessão; `t
 - **Produção** congela a revisão e o roteiro na OP, inclusive ferramental e primeira peça.
 - **Manutenção** é dona do ativo e do contador de golpes; o item `FE` aponta para o ativo.
 - **Omie** recebe o produto ativo e conversa sobre o fiscal em mão dupla, conforme `docs/integracao-omie.md`.
+
+## Entrega oficial (`thalamus2-engenharia`)
+
+As telas do oficial são as do mockup (`/produtos`, `/produtos/item/:id`, `/produtos/classificacao`, `/produtos/acoes`, `/produtos/ferramental`), copiadas com o mesmo domínio e os mesmos tipos. Um adaptador (`web/src/stores/produtos.ts`) troca o `localStorage` pela API. O que está no ar difere do contrato completo acima nestes pontos:
+
+- **Estado:** `GET /api/engineering/state` devolve o catálogo da empresa da sessão no formato do mockup (`itemClasses`, `items` com `catalog`, `productRevisions`, `engineeringChanges`, `priceTables`, `fiscalRules`, `itemModels`). A tela recarrega o estado depois de cada ação. A auditoria vem à parte: `GET /api/items/{id}/audit`.
+- **Tipos:** códigos do Omie (`00` Mercadoria para revenda, `01` Matéria-prima, `02` Embalagem, `03` Produto em processo, `04` Produto acabado, `06` Subproduto, `07` Material de uso e consumo, `08` Ferramental/ativo). Exigem estrutura `03`, `04` e `06`; são vendáveis `00` e `04`; GTIN obrigatório em `04`.
+- **Permissões por camada:** `produtos.nucleo.gerir` (núcleo, atributos, classes, grades), `produtos.estoque.gerir` (parâmetros, conversões, embalagem), `produtos.manufatura.gerir` (versões, linhas, prazo de produção), `produtos.ferramental.gerir`, `produtos.comercial.gerir` (comercial, preços, tabelas, códigos de barras), `produtos.fiscal.gerir` (fiscal, benefícios, reforma, matriz, conflito), `produtos.midia.gerir`, `produtos.ciclo.gerir` (submit, activate, block, reactivate, obsolete, inativação, exclusão e restauração). Custo-padrão aceita estoque ou manufatura; exceção de campo-chave aceita núcleo ou fiscal, e o domínio confere o campo.
+- **Homologação por área:** `POST /api/items/{id}/approve` com `area`; cada área exige `produtos.homologar.<área>` (`fiscal`, `pcp`, `comercial`). Fiscal sempre; PCP nos tipos com estrutura; comercial nos vendáveis. Editar o bloco de uma área desfaz a aprovação dela. Sem pendência, o item fica Ativo. `send-back` aceita qualquer `homologar.*` ou `ciclo.gerir`.
+- **Camadas:** uma rota por bloco (`PATCH /api/items/{id}/core|fiscal|commercial|stock`, `PUT /attributes|packaging|tooling|usage|criticality|production-lead`, `POST /conversions|costs|prices|barcodes|benefits|reform|media`). As que mudam o registro recebem `version` e devolvem 409 `stale_version`.
+- **Exceção de campo-chave:** `POST /api/items/{id}/key-changes` e `POST /api/key-changes/{id}/decide` (`produtos.excecao_campo_chave.decidir`). Quem solicitou não decide.
+- **Estrutura:** `POST /api/items/{id}/revisions`, `PUT|DELETE /api/revisions/{id}/lines/{component}`, `POST /check`, `DELETE /api/revisions/{id}`; `POST /release` exige `produtos.revisao.liberar`. Componente precisa estar em uso, não pode ser ferramental (`08`) nem gerar ciclo.
+- **Mudança de engenharia:** `POST /api/engineering-changes`, `PUT /{code}`, `POST /{code}/move` e `POST /{code}/items/{item}/revision`. Analisar cabe a quem mantém a estrutura, aprovar exige `produtos.homologar.tecnica` e implementar exige `produtos.revisao.liberar`, que libera as versões ligadas a ela na data efetiva.
+- **Exclusão:** `DELETE /api/items/{id}` com motivo. Item em criação nunca usado é apagado de verdade; os demais ficam com exclusão lógica e voltam por `POST /restore`.
+- **Mídia:** upload multipart até 10 MB, guardado no disco local por empresa, servido só com sessão por `GET /api/item-media/{id}/file`.
+- **Omie:** ativação e mudança fiscal depois de ativo marcam `Enviar ao Omie` e gravam `ProdutoAtivado` ou `ProdutoFiscalAlterado` no `kernel_outbox`. O conflito fiscal e a escolha entre Thalamus e Omie existem no domínio e em teste, mas nada no oficial gera conflito real enquanto não houver webhook.
+- **Tabelas novas** (migration `2026_11_05_100000_extend_produtos_layers`): `item_barcodes`, `price_tables`, `item_models`, `fiscal_rules`, `item_media`, `engineering_changes`; colunas novas em `items` (camadas de estoque, embalagem, ferramental, fiscal estendido, grade, exclusão lógica), `class_attributes.variant_axis` e `revisions.change_code`.
+
+Escondido no oficial até o módulo dono existir: saldo, reservado, lotes, movimentações, curva ABC, filiais e a tela de estoque (Almoxarifado); roteiro, postos, OPs e custo de máquina e mão de obra (Produção); aba Projetos e aprovação técnica (Projetos); retrato de homologação de fornecedor (Compras); pendências de pedido, compra e OP na inativação. Também ficaram fora os botões de demonstração "Simular alteração no Omie", "Enviar ao Omie" e "Gerar próximo EAN", e o aviso do CCG.
+
+Simplificações conscientes: NCM e CEST validados só pelo formato no servidor (a tabela local do front só sugere, e a exigência de CEST em NCM com ST fica só na tela); não há consulta ao CCG; o catálogo inteiro é carregado no navegador.
 
 ## Pré-requisitos da implementação
 

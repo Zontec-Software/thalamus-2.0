@@ -12,6 +12,8 @@ Base da decisão:
 
 Status: **em construção**. As decisões fechadas estão na seção 14. O que ainda depende do DevOps está na seção 15.
 
+> **Revisão de 04/11/2026.** O sistema oficial passou a ter um repositório por módulo da home (`thalamus2-<modulo>`), com o Laravel e o schema do módulo em `api/` e o frontend remoto em `web/`, carregado pela casca `thalamus2-core/web`. Este repositório (`thalamus-2.0`) fica como mockup geral. A lista completa e as regras estão em `docs/repositorios-oficiais.md`. As seções abaixo já refletem a decisão; onde o texto antigo falava em "um Laravel só" e "uma SPA", vale o novo.
+
 ---
 
 ## 1. Regras que a infraestrutura já nasce cumprindo
@@ -19,7 +21,7 @@ Status: **em construção**. As decisões fechadas estão na seção 14. O que a
 | Regra | Como aparece no deploy |
 | --- | --- |
 | A versão publicada é identificável | Imagem com tag `sha-<commit>` e, em produção, `vAAAA.MM.N`. Sem tag mutável |
-| O que está no git é o que está rodando | Manifestos Kubernetes no repositório `thalamus-infra`. Voltar versão é reverter um commit |
+| O que está no git é o que está rodando | Manifestos Kubernetes no repositório `thalamus2-infra`. Voltar versão é reverter um commit |
 | Homologação e produção recebem a mesma imagem | `main` publica em homologação; a tag de versão promove essa imagem |
 | A rotina agendada mora no produto | Deployment `thalamus2-scheduler`, uma réplica, definido no git |
 | A API e as filas longas são processos distintos | Deployments separados, mesma imagem, comando diferente |
@@ -44,7 +46,7 @@ Resumo do que vale para o 2.0:
 | --- | --- |
 | Schema por módulo | Adotada desde o primeiro módulo (seção 6) |
 | Comunicação por API | Adotada: módulo lê só o próprio schema; o restante é contrato ou evento (seção 5) |
-| Backend por módulo | Adiada. Por enquanto um repositório Laravel. A separação é o schema. Um processo por módulo fica para quando houver motivo de publicar aquele pedaço sozinho |
+| Backend por módulo | Adotada em 04/11/2026: um repositório Laravel por módulo da home, cada um com o próprio schema. O core valida a sessão para todos |
 | Projeto piloto | O primeiro módulo que sair do mockup ensina o padrão. O restante do sistema continua funcional nesse meio-tempo (seção 12) |
 | Especificação padronizada para IA | Documento formal, mockup, contrato e testes passam a ser exigência da esteira (seção 12) |
 
@@ -55,9 +57,12 @@ Resumo do que vale para o 2.0:
 ```mermaid
 flowchart LR
   U[Navegador / tablet] -->|HTTPS| ING[Ingress + TLS]
-  ING --> WEB[thalamus2-web<br/>uma SPA Vue 3]
-  ING --> API[thalamus2-core<br/>um Laravel]
-  API --> DBC[(schema t2_core)]
+  ING --> WEB[thalamus2-core/web<br/>casca Vue 3]
+  WEB -->|remoteEntry| MWEB[thalamus2-modulo/web]
+  ING --> CORE[thalamus2-core/api]
+  ING --> API[thalamus2-modulo/api]
+  API -->|sessão| CORE
+  CORE --> DBC[(schema t2_core)]
   API --> DBM[(schema do módulo)]
   API --> REDIS[(Redis já operado<br/>fila, cache, locks)]
   WK[worker e scheduler<br/>mesma imagem] --> REDIS
@@ -69,11 +74,11 @@ flowchart LR
 Princípios:
 
 1. **Plataforma conhecida, disciplina nova.** GitHub Actions, registro de imagens e Kubernetes com Rancher. A publicação usa tag imutável, manifesto no git e promoção da mesma imagem.
-2. **Um frontend.** Os módulos são rotas e pastas da mesma aplicação Vue. O navegador baixa só o módulo aberto.
-3. **Dois repositórios por enquanto.** O frontend é uma SPA. O backend é um Laravel, com um schema por módulo na mesma instância MySQL. Todo dado de negócio pertence a uma empresa (`tenant_id`). Módulo não consulta o schema alheio; pede o dado ao código daquele módulo.
+2. **Uma casca, módulos remotos.** A casca `thalamus2-core/web` tem login, menu e home; cada módulo é um remoto de Module Federation com build e imagem próprios. O navegador baixa só o módulo aberto.
+3. **Repositório por módulo.** Cada módulo da home tem `-web` e `-api`. Cada API tem o próprio schema na mesma instância MySQL. Todo dado de negócio pertence a uma empresa (`tenant_id`). Módulo não consulta o schema alheio; pede o dado à API daquele módulo.
 4. **Um processo por papel.** HTTP, workers e scheduler são deployments diferentes da mesma imagem.
 5. **Estado fora do pod.** Banco, Redis e armazenamento de objetos guardam o que precisa sobreviver a um reinício.
-6. **Autenticação própria.** Usuários, perfis, empresas, grupos econômicos e sessão nascem no schema `t2_core`, dentro do mesmo Laravel. Perfis concedem funcionalidades e podem ser atribuídos em conjunto; Administrador é imutável e sempre recebe tudo.
+6. **Autenticação própria.** Usuários, perfis, empresas, grupos econômicos e sessão nascem no schema `t2_core`, no `thalamus2-core/api`. As outras APIs validam o token nele. Perfis concedem funcionalidades e podem ser atribuídos em conjunto; Administrador é imutável e sempre recebe tudo.
 
 O modelo completo de tenant, grupo econômico, autorização consolidada e propagação de contexto está em `docs/multitenancy.md`.
 
@@ -98,17 +103,23 @@ Nessa realidade, microfrontend cobra um preço alto e entrega pouco:
 - uma mudança que atravessa dois módulos (o caso normal do ERP) espera dois deploys;
 - a IA passa a manter vários padrões em vez de um.
 
-### Decisão
+### Decisão (revista em 04/11/2026)
 
-O frontend do Thalamus 2.0 é **uma aplicação Vue**, neste repositório.
+A análise acima foi feita para uma SPA única. A decisão passou a ser **uma casca e um remoto por módulo da home**, com os custos que isso traz controlados assim:
+
+| Custo | Como fica controlado |
+| --- | --- |
+| Sessão, menu e visual entre aplicações | A casca é dona da sessão e do menu; o visual vem do pacote `thalamus2-ui`, compartilhado como singleton |
+| Vários padrões para manter | Todos os `-web` nascem do mesmo molde, com a mesma estrutura de pastas e o mesmo `AGENTS.md` |
+| Mudança que atravessa módulos | O contrato do módulo é versionado; a casca tolera remoto fora do ar |
 
 | Camada | Como fica |
 | --- | --- |
-| Módulo | Pasta própria: `src/views/<modulo>`, `src/domain`, rotas em `src/router` |
-| Carregamento | Rota com import dinâmico. Quem abre Orçamentos baixa o pacote de Orçamentos; o restante fica para quando for aberto |
-| Visual e sessão | Um design system, um login, um menu |
-| Publicação | Uma imagem `thalamus2-web`, um domínio |
-| Teste | `vue-tsc`, ESLint, Vitest e build, como no `AGENTS.md` |
+| Módulo | Repositório `thalamus2-<modulo>/web`, que expõe `./module` (rotas, menu, manual) |
+| Carregamento | Module Federation. Quem abre Orçamentos baixa o remoto de Finanças |
+| Visual e sessão | `thalamus2-ui` (design system e cliente HTTP); um login e um menu, na casca |
+| Publicação | Uma imagem por `-web`; a casca responde no domínio do ERP e lê os endereços dos remotos em `/config.js` |
+| Teste | `vue-tsc`, Vitest e build em cada repositório |
 
 O tablet do chão de fábrica pode virar **um segundo aplicativo** no dia em que precisar de ciclo próprio: tela cheia, posto fixo, rede instável. Esse segundo app consome a mesma API. Ele é outro cliente, com outro deployment, e continua fora da composição de microfrontends.
 
@@ -118,47 +129,41 @@ O tablet do chão de fábrica pode virar **um segundo aplicativo** no dia em que
 
 ### 5.1 Repositórios
 
-Por enquanto são dois. A área do menu não abre repositório.
+Um par `-web`/`-api` por módulo da home, mais a base. A lista completa, com portas e schemas, está em `docs/repositorios-oficiais.md`.
 
-| Repositório | Conteúdo | Quando |
-| --- | --- | --- |
-| `thalamus-2.0` | Frontend único | Existe |
-| `thalamus-2-core` | Backend Laravel inteiro. Módulos são pastas; a fronteira entre eles é o schema | Agora. A pasta local é `C:\Users\Mari\Documents\GitHub\thalamus-2-core` |
-| `thalamus-infra` | Manifestos Kubernetes (Kustomize), políticas e runbooks | Só na publicação |
+| Repositório | Conteúdo |
+| --- | --- |
+| `thalamus-2.0` | Mockup geral, com todos os módulos |
+| `thalamus2-core` | `api/`: antigo `thalamus-2-core`. Login, empresas, grupos, perfis, cofre Omie e validação de sessão. `web/`: casca |
+| `thalamus2-shared` | Pacotes compartilhados: `ui/` (npm) e `kernel/` (composer) |
+| `thalamus2-pessoas`, `thalamus2-comercial`, `thalamus2-engenharia`, `thalamus2-financas` | Módulos revisados, cada um com `api/` e `web/` |
+| `thalamus2-infra` | `docker compose` local, manifestos Kubernetes (Kustomize), políticas e runbooks |
 
-Dentro do `thalamus-2-core`, cada módulo usa só o próprio schema: `t2_core`, `t2_orcamentos`, `t2_cadastros`, `t2_suprimentos`, `t2_comercial`, `t2_operacoes`. Finanças, quando for evoluída, é o orçamento em `t2_orcamentos`. Indicadores leem os outros módulos pelo código deles, sem schema próprio. O esboço inteiro continua usável no frontend enquanto o schema correspondente ainda não existe.
+Schemas: `t2_core`, `t2_pessoas`, `t2_comercial`, `t2_engenharia`, `t2_orcamentos`. Os próximos (`t2_suprimentos`, `t2_operacoes`) nascem com o repositório do módulo. Indicadores leem as APIs dos outros módulos, sem schema próprio.
 
 ### 5.2 Deployments por ambiente
 
 | Deployment | Imagem | Réplicas (hml / prd) | Papel |
 | --- | --- | --- | --- |
-| `thalamus2-web` | `devroboflex/thalamus2-web` | 1 / 2 | SPA em `nginx-unprivileged`, com fallback de rota para `index.html` |
-| `thalamus2-core` | `devroboflex/thalamus2-core` | 1 / 2 | HTTP de todos os módulos (PHP-FPM + nginx no mesmo pod, ou FrankenPHP) |
-| `thalamus2-core-worker` | mesma imagem | 1 / 2 | `php artisan horizon` |
-| `thalamus2-core-scheduler` | mesma imagem | 1 / 1 | `php artisan schedule:work` |
-| `thalamus2-core-migrate` (Job) | mesma imagem | sob demanda | Migrations, schema por schema, começando por `t2_core` |
+| `thalamus2-core-web` | `devroboflex/thalamus2-core-web` | 1 / 2 | Casca em `nginx-unprivileged`, com fallback de rota para `index.html` |
+| `thalamus2-<modulo>-web` | `devroboflex/thalamus2-<modulo>-web` | 1 / 2 | `remoteEntry.js` e assets do módulo, em `nginx-unprivileged`. Build de `web/` |
+| `thalamus2-<modulo>-api` | `devroboflex/thalamus2-<modulo>-api` | 1 / 2 | HTTP do módulo (PHP-FPM + nginx no mesmo pod, ou FrankenPHP). Build de `api/`. O core é `thalamus2-core-api` |
+| `thalamus2-<modulo>-worker` | mesma imagem da API | 1 / 2 | `php artisan horizon`, quando o módulo tiver fila |
+| `thalamus2-<modulo>-scheduler` | mesma imagem da API | 1 / 1 | `php artisan schedule:work`, quando o módulo tiver rotina |
+| `thalamus2-<modulo>-migrate` (Job) | mesma imagem da API | sob demanda | Migrations do schema do módulo. `t2_core` primeiro |
 
 O scheduler e as migrations ficam definidos no git, no mesmo repositório de infraestrutura.
 
-### 5.3 Um Laravel, um schema por módulo
+### 5.3 Um Laravel por módulo
 
-O repositório tem esta forma:
-
-```text
-app/Modules/<Modulo>/
-  Http/        rotas, controllers, form requests
-  Domain/      regras transacionais
-  Database/    migrations do schema do módulo
-  Jobs/        fila do módulo
-```
+Cada `api/` tem a forma padrão do Laravel (`app/Domain`, `app/Http`, `database/migrations`) e depende do `thalamus2-shared/kernel`.
 
 Regras desde o primeiro commit:
 
-- Cada módulo usa a própria conexão de banco, no próprio schema, com usuário limitado a esse schema. Toda tabela de negócio recebe `tenant_id`.
-- Módulo não lê o schema de outro. O dado alheio entra por uma chamada ao código daquele módulo, ou por evento.
-- O schema `t2_core` é a única fonte de usuário, empresa, grupo econômico e permissão. Os outros módulos recebem o contexto já resolvido.
+- Cada API usa só o próprio schema, com usuário limitado a esse schema. Toda tabela de negócio recebe `tenant_id`.
+- API não lê o schema de outra. O dado alheio entra por HTTP à API daquele módulo, repassando o token do usuário, ou por evento.
+- O `thalamus2-core/api` é a única fonte de usuário, empresa, grupo econômico e permissão. As outras APIs resolvem a sessão em `GET /api/internal/session`, com chave interna e cache curto.
 - Eventos de domínio (`PrevisaoRegistrada`, `NotaOmieRecebida`) passam por uma tabela de *outbox* no schema de quem emite e saem pela fila.
-- Separar um módulo em outro repositório fica para quando ele precisar de publicação própria. Até lá, a fronteira é o schema.
 
 ---
 
@@ -169,7 +174,7 @@ Regras desde o primeiro commit:
 | Motor | MySQL 8, na mesma hospedagem já operada hoje. Nesta fase não se contrata banco gerenciado |
 | Instância | Uma por ambiente, a que já existe. Homologação e produção usam instâncias diferentes. O 2.0 entra com schemas novos, sem tabela compartilhada |
 | Redis | A instância já operada no ambiente. Fila, cache e lock do 2.0 usam prefixo próprio. Não se contrata Redis gerenciado nesta fase |
-| Schemas | No mesmo MySQL: `t2_core`, `t2_orcamentos`, `t2_cadastros`, `t2_suprimentos`, `t2_comercial`, `t2_operacoes`, criados quando o módulo correspondente entrar no Laravel. O nome é fixo; o ambiente é a instância. Cada tabela de negócio é isolada por `tenant_id` |
+| Schemas | No mesmo MySQL: `t2_core`, `t2_pessoas`, `t2_comercial`, `t2_engenharia`, `t2_orcamentos`, e os próximos (`t2_suprimentos`, `t2_operacoes`) criados quando o repositório do módulo nascer. O nome é fixo; o ambiente é a instância. Cada tabela de negócio é isolada por `tenant_id` |
 | Usuários | Um usuário de aplicação por schema, com `SELECT, INSERT, UPDATE, DELETE`. Um usuário de migração por schema, usado só pelo Job |
 | Migrations | Por módulo, no Job `thalamus2-migrate`, antes do rollout. Em produção, só com aprovação no GitHub Environment |
 | Mudança de schema | Compatível com a versão anterior (expandir, migrar, contrair), para voltar a imagem sem voltar o banco |
@@ -184,7 +189,7 @@ Se o produto for vendido para outras empresas, a mesma separação evolui para i
 
 | Ambiente | Onde | Domínios | Dados | Omie |
 | --- | --- | --- | --- | --- |
-| Local | `docker compose` no repositório da API (MySQL, Redis, MinIO, Mailpit) | `localhost` | Seed | Simulado |
+| Local | `docker compose` em `thalamus2-infra/local` (MySQL com os schemas, APIs e frontends) | `localhost` | Banco vazio, cadastro pela tela | Desligado |
 | Homologação | Namespace `thalamus2-hml` | `erp-homologacao.thalamus.ind.br` e `api-erp-homologacao.thalamus.ind.br` | Seed | Conta Omie de testes |
 | Produção | Namespace `thalamus2-prd` | `erp.thalamus.ind.br` e `api-erp.thalamus.ind.br` | Reais | Conta Omie da Roboflex |
 | Demonstração | GitHub Pages do repositório `thalamus-2.0` | `zontec-software.github.io/thalamus-2.0` | localStorage do navegador | Simulado |
@@ -218,7 +223,7 @@ npx vitest run
 npm run build
 ```
 
-Backend (`thalamus-2-core`):
+Backend (a pasta `api/` de cada `thalamus2-*`):
 
 ```bash
 composer validate --strict
@@ -231,10 +236,10 @@ Nos dois: build da imagem, varredura de vulnerabilidades (Trivy) com falha em se
 
 ### 8.3 Do git até o cluster
 
-Os manifestos ficam em `thalamus-infra`, com Kustomize:
+Os manifestos ficam em `thalamus2-infra`, com Kustomize:
 
 ```text
-thalamus-infra/
+thalamus2-infra/
   apps/thalamus2/
     base/                 deployments, services, ingress, HPA, PDB, probes
     overlays/
@@ -260,7 +265,7 @@ Node 22 LTS no build também cobre o Vite 8, que pede Node 20.19 ou mais.
 ## 9. Configuração, segredos e segurança
 
 - O repositório traz `.env.example` com os nomes. O valor fica fora do git.
-- Segredos de execução (banco, Omie, sessão, armazenamento) ficam em Secrets do Kubernetes, cifrados com Sealed Secrets ou External Secrets e versionados em `thalamus-infra`.
+- Segredos de execução (banco, Omie, sessão, armazenamento) ficam em Secrets do Kubernetes, cifrados com Sealed Secrets ou External Secrets e versionados em `thalamus2-infra`.
 - Segredos da esteira ficam em GitHub Environments, com revisor obrigatório em `producao`.
 - A conta Omie de testes e a de produção são credenciais diferentes.
 - Ingress com TLS (cert-manager), HSTS e cabeçalhos de segurança no nginx.
@@ -292,7 +297,7 @@ Node 22 LTS no build também cobre o Vite 8, que pede Node 20.19 ou mais.
 | Filas | Painel do Horizon, visível para o perfil Administrador |
 | Alertas | Fila de falhas do Omie acima de zero por 15 minutos, scheduler sem execução, erro 5xx acima de 1%, backup do dia ausente |
 | Recursos | `requests` e `limits` em todo deployment, `PodDisruptionBudget` em produção e HPA na API e no frontend |
-| Runbooks | Em `thalamus-infra/runbooks`: publicar, voltar versão, restaurar backup, reprocessar a fila do Omie, trocar segredo |
+| Runbooks | Em `thalamus2-infra/runbooks`: publicar, voltar versão, restaurar backup, reprocessar a fila do Omie, trocar segredo |
 
 ---
 
@@ -316,8 +321,8 @@ Toda geração de código com IA, por módulo, segue:
 
 | Fase | Entregas | Pronto quando |
 | --- | --- | --- |
-| **0. Acesso** | Login, empresas, grupos econômicos e permissões no schema `t2_core` do `thalamus-2-core`. O frontend inteiro continua usável | Uma pessoa entra com usuário e senha, escolhe a empresa e percorre o sistema que já existe |
-| **1. Plataforma** | Imagens em `devroboflex`, `thalamus-infra` e o schema `t2_core` no MySQL já operado | O Core sobe em homologação pela esteira, com a mesma imagem que poderá ir a produção |
+| **0. Acesso** | Login, empresas, grupos econômicos e permissões no schema `t2_core` do `thalamus2-core/api`, com a casca `thalamus2-core/web`. O mockup geral continua usável | Uma pessoa entra com usuário e senha, escolhe a empresa e percorre o sistema que já existe |
+| **1. Plataforma** | Imagens em `devroboflex`, `thalamus2-infra` e o schema `t2_core` no MySQL já operado | O Core sobe em homologação pela esteira, com a mesma imagem que poderá ir a produção |
 | **2. Módulo em evolução** | Schema e pasta daquele módulo dentro do mesmo Laravel, no padrão da seção 12. Os outros módulos seguem no frontend | O módulo evoluído usa a própria API e o restante do fluxo continua operável |
 | **3. Produção desse módulo** | Backup com restauração testada, probes, runbook e a conta Omie da parte que esse módulo possui | Esse módulo em produção, com as outras telas ainda disponíveis |
 
@@ -325,7 +330,7 @@ Toda geração de código com IA, por módulo, segue:
 
 ## 14. Decisões fechadas
 
-1. **Dois repositórios por enquanto:** `thalamus-2.0` e `thalamus-2-core`. A separação dos módulos é o schema, na mesma instância MySQL. O frontend inteiro permanece funcional. Login e permissão, no schema `t2_core`, vêm antes da publicação. O módulo seguinte é o que estiver sendo aprofundado. Indicadores não têm schema. O repositório de infraestrutura só entra na publicação. Um repositório Laravel por módulo fica adiado.
+1. **Repositório por módulo (04/11/2026):** `thalamus-2.0` fica como mockup geral. O oficial tem um repositório por módulo, com `api/` e `web/` dentro: `thalamus2-core` (core e casca), `thalamus2-pessoas`, `thalamus2-comercial`, `thalamus2-engenharia` e `thalamus2-financas`, mais o pacote `thalamus2-shared` (`ui/` e `kernel/`). Imagens e deployments continuam separados por camada. Um schema por API, na mesma instância MySQL. Banco começa vazio. Login e permissão, no `t2_core`, vêm antes da publicação. Indicadores não têm schema. Ver `docs/repositorios-oficiais.md`.
 2. **Registro de imagens:** Docker Hub da organização, em `devroboflex`, como já operado hoje.
 3. **MySQL e Redis:** permanecem na hospedagem já usada. O 2.0 cria schemas e prefixos novos. Não se contrata serviço gerenciado nesta fase.
 4. **Login e permissão antes do deploy.** O ERP só é publicado depois que o usuário entra com credencial própria e a API restringe empresa, grupo e ação.

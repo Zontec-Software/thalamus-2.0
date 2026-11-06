@@ -76,7 +76,7 @@ export function updatePerson(state: ErpState, personId: string, patch: Partial<O
   return person
 }
 
-export function updateEmployment(state: ErpState, employmentId: string, patch: Partial<Pick<Employment, 'contractType' | 'workplace' | 'salary' | 'cbo' | 'startedOn'>>, actor: string) {
+export function updateEmployment(state: ErpState, employmentId: string, patch: Partial<Pick<Employment, 'contractType' | 'workplace' | 'cbo' | 'startedOn'>>, actor: string) {
   const employment = find(state.employments, employmentId, 'Vínculo')
   if (employment.status !== 'Ativo') throw new DomainError('O vínculo encerrado permanece como histórico')
   Object.assign(employment, patch)
@@ -105,14 +105,35 @@ export function createSector(state: ErpState, tenantId: string, input: { name: s
   return sector
 }
 
-export function createJob(state: ErpState, tenantId: string, input: { name: string; level: string; cbo: string; mission: string; requirements: string[] }, actor: string) {
+function readSalary(salary?: number) {
+  if (salary === undefined) return undefined
+  if (!Number.isFinite(salary) || salary < 0) throw new DomainError('O salário do cargo não pode ser negativo')
+  return salary
+}
+
+export function createJob(state: ErpState, tenantId: string, input: { name: string; level: string; cbo: string; mission: string; requirements: string[]; salary?: number }, actor: string) {
   if (!input.name.trim() || !input.mission.trim()) throw new DomainError('Informe o nome e a missão do cargo')
   const job: JobCatalog = {
     id: nextId(state, 'CRG'), tenantId, name: input.name.trim(), level: input.level.trim(), cbo: input.cbo.trim(),
-    mission: input.mission.trim(), requirements: input.requirements.map(entry => entry.trim()).filter(Boolean), status: 'Ativo',
+    mission: input.mission.trim(), requirements: input.requirements.map(entry => entry.trim()).filter(Boolean),
+    salary: readSalary(input.salary), status: 'Ativo',
   }
   state.jobs.push(job)
   log(state, 'Pessoas', actor, `Cargo ${job.name} no catálogo`, undefined, job.id)
+  return job
+}
+
+export function updateJob(state: ErpState, id: string, patch: Partial<Pick<JobCatalog, 'name' | 'level' | 'cbo' | 'mission' | 'requirements' | 'salary'>>, actor: string) {
+  const job = find(state.jobs, id, 'Cargo')
+  if (patch.name !== undefined && !patch.name.trim()) throw new DomainError('Informe o nome do cargo')
+  if (patch.mission !== undefined && !patch.mission.trim()) throw new DomainError('Informe a missão do cargo')
+  if (patch.name !== undefined) job.name = patch.name.trim()
+  if (patch.level !== undefined) job.level = patch.level.trim()
+  if (patch.cbo !== undefined) job.cbo = patch.cbo.trim()
+  if (patch.mission !== undefined) job.mission = patch.mission.trim()
+  if (patch.requirements) job.requirements = patch.requirements.map(entry => entry.trim()).filter(Boolean)
+  if ('salary' in patch) job.salary = readSalary(patch.salary)
+  log(state, 'Pessoas', actor, `Cargo ${job.name} atualizado`, undefined, job.id)
   return job
 }
 

@@ -108,7 +108,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('new-record', 'Nova pessoa', 'Nome, setor, uma vaga que já existe, turno e o perfil da Gestão de acesso. O cargo é o dessa vaga. O resto da ficha vem depois. O PIN do tablet é gerado e não fica à mostra.', 'close'),
     t('org-chart', 'Organograma', 'À esquerda, os setores. Cada vaga já tem um cargo, mesmo vazia. A pessoa ocupa a vaga. A chefia é outra vaga e pode ficar em outro setor. Editar muda o cargo, o setor, a chefia e os lugares. Remover tira a vaga livre.', 'close'),
     t('person-file', 'Dados pessoais', 'A foto fica no topo. Sem arquivo, aparecem as iniciais. O resto é uma página só, por seções, com um botão de salvar. Documento, endereço, família e saúde aparecem só para o RH e para a própria pessoa.'),
-    t('person-role', 'Vínculo e trajetória', 'A ficha mostra a posição que a pessoa ocupa. O cargo é o dessa vaga e se troca no organograma. Mudar de posição tem data e não mexe no acesso.'),
+    t('person-role', 'Vínculo e trajetória', 'A ficha mostra a posição que a pessoa ocupa. O cargo é o dessa vaga e se troca no organograma. O salário é o do cargo. Mudar de posição tem data e não mexe no acesso.'),
     t('person-access', 'A conta, não o catálogo', 'Os perfis são os da Gestão de acesso, por empresa. Eles definem o que a pessoa vê. A conta Google é criada aqui, com o e-mail confirmado, e suspensa na data do desligamento. A senha não aparece.'),
   ],
   '/servicos': [

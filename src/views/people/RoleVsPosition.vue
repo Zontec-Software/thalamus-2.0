@@ -32,7 +32,7 @@ const places = (count: number) => count === 1 ? '1 vaga' : `${count} vagas`
     <div class="role-vs-cols">
       <div>
         <b><BriefcaseBusiness :size="15" /> Cargo</b>
-        <span>Descreve o trabalho, uma vez, em Cargos: missão, nível, CBO e requisitos. Não tem chefe nem lugar vazio.</span>
+        <span>Descreve o trabalho, uma vez, em Cargos: missão, nível, CBO, requisitos e salário. Não tem chefe nem lugar vazio.</span>
       </div>
       <div>
         <b><SquareUser :size="15" /> Posição</b>

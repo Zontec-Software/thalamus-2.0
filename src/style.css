@@ -120,6 +120,11 @@ a { color: inherit; }
 .icon-plain { border: 0; background: transparent; color: var(--muted); padding: 4px; display: grid; place-items: center; border-radius: 6px; }
 .icon-plain:hover { background: #EEF3F8; color: #201E1E; }
 .user-chip { display: flex; align-items: center; gap: 9px; padding-left: 6px; }
+button.user-chip { border: 0; background: transparent; padding: 0 0 0 6px; text-align: left; }
+.topbar-actions > .task-link,
+.topbar-actions > .role-switch,
+.topbar-actions > .menu-wrap,
+.topbar-actions > .button { flex: none; }
 .user-chip > span, .user-chip > img { width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0; }
 .user-chip > span { display: grid; place-items: center; background: var(--green-100); color: var(--green-800); font-weight: 700; font-size: 13px; }
 .user-chip > img { object-fit: cover; display: block; }
@@ -1601,4 +1606,23 @@ button.slice-links:hover { color: #1d3b32; }
 .split-footer .split-sum { flex: 1; min-width: 0; }
 .split-footer .row-actions { flex: none; }
 .button.ghost.on { color: var(--green-800); background: #e7f3ec; }
+.admit-stack { display: grid; gap: 22px; }
+.admit-block header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 10px; }
+.admit-block h3 { margin: 0; font: 700 15px Outfit, sans-serif; color: #1d2848; }
+.admit-block header p { margin: 3px 0 0; max-width: 62ch; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.admit-quote { margin: 0; padding: 12px 14px; border-radius: 10px; background: #f4f6f8; color: #243044; font-size: 14.5px; line-height: 1.55; }
+.admit-reqs { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.admit-reqs li { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 2px 12px; align-items: start; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: white; }
+.admit-reqs.plain li { grid-template-columns: 1fr; }
+.admit-reqs .mark { font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: #6a7680; padding-top: 3px; }
+.admit-reqs li.ok { background: #f4faf6; border-color: #d5e8dc; }
+.admit-reqs li.ok .mark { color: #1c7a45; }
+.admit-reqs li.gap { background: #fdf8f2; border-color: #eadcc8; }
+.admit-reqs li.gap .mark { color: #9a5d13; }
+.admit-reqs strong { font-size: 14px; line-height: 1.35; }
+.admit-reqs p { grid-column: 2; margin: 2px 0 0; color: #3d4a44; font-size: 13px; line-height: 1.45; }
+.admit-decision { display: grid; gap: 8px; padding: 12px 14px; border-radius: 12px; background: #f6f8fb; }
+.admit-decision p, .admit-decision small { margin: 0; line-height: 1.45; }
+.admit-decision small { color: var(--muted); font-size: 12px; }
+.admit-decision .field { margin-bottom: 0; }
 

@@ -13,8 +13,10 @@ O sistema é desenhado **módulo a módulo**. Para cada módulo existe um **docu
 
 Fases:
 
-1. **Agora:** mockup navegável em Vue (este repositório), com estado em `localStorage` e Omie simulado.
-2. **Em seguida:** um único backend Laravel, `thalamus-2-core`, ao lado deste repositório. A separação dos módulos é o schema. O schema `t2_core` (login, usuário mestre, empresas, grupos, permissões e cofre Omie) vem antes de qualquer publicação. O esboço inteiro continua funcional no frontend. Cada módulo evoluído ganha pasta e schema nesse mesmo repositório. Indicadores não têm schema. O produto é independente.
+1. **Mockup geral:** este repositório. Vue navegável, estado em `localStorage`, Omie simulado. Todos os módulos continuam aqui, e é aqui que a regra nasce e é revisada.
+2. **Sistema oficial:** repositórios `thalamus2-<modulo>`, cada um com as pastas `api/` e `web/`, ao lado deste, com banco real e cadastro pela tela. Um Laravel e um schema por módulo; o `thalamus2-core/api` (schema `t2_core`) é a única fonte de login, empresa, grupo e permissão. O `thalamus2-core/web` é a casca que carrega os módulos. Só vai para o oficial o módulo já revisado no mockup. A lista, o padrão de nomes e as regras estão em `docs/repositorios-oficiais.md`.
+
+O mockup é a **homologação** e o oficial é a **produção**. As telas do oficial são cópias das do mockup; só muda o crucial para o sistema real (login, empresa, permissões validadas na API, persistência). Uma mudança revisada aqui é levada para lá copiando a tela, portando a regra com teste e atualizando a seção "Entrega oficial" do contrato. Mudança no `style.css` chega ao oficial pelo `thalamus2-shared/ui/scripts/sync-mockup.ps1`; mudança no catálogo de `src/domain/access.ts` precisa ir também para o `FunctionalityCatalog.php` do core. Indicadores não têm schema. O produto é independente.
 
 O objetivo é o que há de melhor no mercado, **ajustado à realidade da Roboflex**. É normal implementar algo completo no mockup e recortar depois.
 
@@ -63,7 +65,8 @@ Depois de mexer num módulo, verificar sempre:
 - **Documentos:** `README.md`, `docs/arquitetura-erp-v3.md`, `docs/integracao-omie.md` e a tabela `OWNERSHIP` em `src/services/omie/gateway.ts`.
 - **Canvas de conformidade** do módulo, quando existir, em `~/.cursor/projects/<workspace>/canvases/`.
 - **Testes:** `src/tests`. Toda regra de negócio nova tem teste.
-- **Backend:** o contrato do módulo em `docs/contrato-backend-<modulo>.md`. A API do 2.0 ainda não existe neste workspace.
+- **Backend:** o contrato do módulo em `docs/contrato-backend-<modulo>.md`.
+- **Sistema oficial:** se o módulo já existe em `thalamus2-<modulo>` (`api/` e `web/`), a mudança revisada aqui precisa ser levada para lá (regra, teste, tela e manual). Perguntar antes.
 
 ### Fronteira entre mockup e realidade
 

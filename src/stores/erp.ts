@@ -22,7 +22,7 @@ import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NewActivityFile, NewActivityInput, NonConformity, Resource, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v61'
+const STORAGE_KEY = 'thalamus-erp-v63'
 
 /** Versões anteriores ficam no navegador e estouram a cota. Não há migração: a chave atual é a única que vale. */
 function forgetOlderSaves() {
@@ -397,6 +397,7 @@ export const useErpStore = defineStore('erp', () => {
   const updateEmployment = bind(organization.updateEmployment, 'Vínculo atualizado')
   const createSector = bind(organization.createSector, sector => `Setor ${sector.name} criado`)
   const createJob = bind(organization.createJob, job => `Cargo ${job.name} no catálogo`)
+  const updateJob = bind(organization.updateJob, job => `Cargo ${job.name} atualizado`)
   const createPosition = bind(organization.createPosition, position => `Posição ${position.name} aberta`)
   const updatePosition = bind(organization.updatePosition, position => `Posição ${position.name} atualizada`)
   const removePosition = bind(organization.removePosition, position => `Posição ${position.name} removida do organograma`)
@@ -704,6 +705,6 @@ export const useErpStore = defineStore('erp', () => {
     createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk,
     createBudget, distributeGroupBudget, setAnnualBudget, adjustBudget, createBudgetCategory, updateBudgetCategory, configureBudget, decideBudgetException, acknowledgeBudgetAlert, linkBudgetInvoice,
     applyBudgetGrowth, applyRevenueTarget, applyBudgetApproach, applyPriorSeasonality, setMonthlyBudget, setSectorAllocations, setCategoryAssignment, createBudgetGroup, createPlannedCompany, saveBudgetSimulation, applyBudgetSimulation, applyGroupGrowth, applyGroupRevenueTarget,
-    createUser, linkAccountToPerson, updateUser, updatePerson, setPersonPhoto, updateEmployment, createSector, createJob, createPosition, updatePosition, removePosition, placeSector, setSectorLeadership, suggestIdentity, confirmIdentity, refuseIdentity, addProjectParticipation, grantCompanyAccess, openLinkedEmployment, resetPin, provisionDirectoryAccount, retryDirectoryAccount, createJobOpening, updateJobOpening, setJobStatus, addPeopleChecklistItem, registerCandidate, noteCandidateView, prepareBriefing, reviewBriefing, scheduleInterview, setInterviewConfirmation, recordSelectionResult, setApplicationStage, setPeopleChecklistItem, hireCandidate, changeAssignment, recordReview, startOffboarding, revokeAccess, closeOffboarding, createPartner, updatePartnerMaster, addPartnerContact, setPartnerVertical, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, setServiceStatus, openServiceRoutingChange, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
+    createUser, linkAccountToPerson, updateUser, updatePerson, setPersonPhoto, updateEmployment, createSector, createJob, updateJob, createPosition, updatePosition, removePosition, placeSector, setSectorLeadership, suggestIdentity, confirmIdentity, refuseIdentity, addProjectParticipation, grantCompanyAccess, openLinkedEmployment, resetPin, provisionDirectoryAccount, retryDirectoryAccount, createJobOpening, updateJobOpening, setJobStatus, addPeopleChecklistItem, registerCandidate, noteCandidateView, prepareBriefing, reviewBriefing, scheduleInterview, setInterviewConfirmation, recordSelectionResult, setApplicationStage, setPeopleChecklistItem, hireCandidate, changeAssignment, recordReview, startOffboarding, revokeAccess, closeOffboarding, createPartner, updatePartnerMaster, addPartnerContact, setPartnerVertical, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, setServiceStatus, openServiceRoutingChange, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
   }
 })

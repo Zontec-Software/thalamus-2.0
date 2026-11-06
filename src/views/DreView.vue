@@ -137,6 +137,6 @@ function rowClass(entry: DreLine) {
     <h2>De onde saem depreciação e premiação</h2>
     <p>Depreciação orçada de {{ assets.count }} ativos: <strong>{{ fmtCurrency(assets.total) }}</strong> por ano, linear, proporcional aos meses escolhidos. <RouterLink class="link" to="/ativos">Ativos</RouterLink></p>
     <p>Premiação orçada com nota {{ statement.score.score.toFixed(0) }} (entrega {{ statement.score.onTime.toFixed(0) }}, qualidade {{ statement.score.quality.toFixed(0) }}) sobre {{ statement.score.people }} pessoas. É 1% do EBITDA quando a nota passa de 80. <RouterLink class="link" to="/indicadores">Indicadores</RouterLink> · <RouterLink class="link" to="/pessoas">Pessoas</RouterLink></p>
-    <p class="cell-sub">Estimativa de demonstração. O salário não está em Pessoas e o valor de aquisição do ativo é de exemplo. IRPJ e o não operacional ainda não têm conta.</p>
+    <p class="cell-sub">Estimativa de demonstração. O salário do cargo ainda não entra neste cálculo e o valor de aquisição do ativo é de exemplo. IRPJ e o não operacional ainda não têm conta.</p>
   </article>
 </template>
