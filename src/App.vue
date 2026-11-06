@@ -151,10 +151,6 @@ function maybeStartTour() {
   }, 700)
 }
 
-function openPlatform() {
-  store.enterPlatform()
-  router.push('/plataforma')
-}
 watch(() => route.path, () => { areaOpen.value = false; maybeStartTour() }, { immediate: true })
 watch(() => store.isPlatformMaster(), master => {
   if (master && route.path !== '/plataforma' && !route.path.startsWith('/ajuda')) router.replace('/plataforma')
@@ -264,7 +260,6 @@ watch(() => ui.tourSteps.length, length => { if (length === 0) maybeStartTour() 
             </div>
           </div>
 
-          <button v-if="!store.isPlatformMaster()" class="button ghost small" @click="openPlatform">Plataforma</button>
           <div class="user-chip"><img v-if="sessionPhoto" :src="sessionPhoto" :alt="`Foto de ${sessionAccount?.name}`" /><span v-else>{{ sessionInitials }}</span><div><strong>{{ ui.userName }}</strong><small>{{ store.isPlatformMaster() ? 'Usuário mestre' : ui.role }}</small></div></div>
         </div>
       </header>
