@@ -58,8 +58,17 @@ export const router = createRouter({
         { path: 'organograma', component: () => import('../views/people/StructureView.vue'), meta: { title: 'Organograma', eyebrow: 'Pessoas' } },
         { path: 'estrutura', redirect: '/pessoas/organograma' },
         { path: 'cargos', component: () => import('../views/people/JobsCatalogView.vue'), meta: { title: 'Cargos', eyebrow: 'Pessoas' } },
+        { path: 'treinamentos', component: () => import('../views/people/TrainingsView.vue'), meta: { title: 'Treinamentos', eyebrow: 'Pessoas' } },
       ],
     },
+    { path: '/revisoes', component: () => import('../views/RevisionsView.vue'), meta: { title: 'Revisões', eyebrow: 'Engenharia' } },
+    { path: '/pd', component: () => import('../views/ProjectsView.vue'), meta: { title: 'Projetos de P&D', eyebrow: 'Engenharia' } },
+    { path: '/recebimento', component: () => import('../views/ReceivingView.vue'), meta: { title: 'Recebimento', eyebrow: 'Suprimentos' } },
+    { path: '/garantia', component: () => import('../views/WarrantyView.vue'), meta: { title: 'Garantia', eyebrow: 'Serviços' } },
+    { path: '/locacao', component: () => import('../views/RentalView.vue'), meta: { title: 'Contratos de locação', eyebrow: 'Serviços' } },
+    { path: '/patrimonio', redirect: '/patrimonio/movimentacoes' },
+    { path: '/patrimonio/:secao', component: () => import('../views/PatrimonyView.vue'), meta: { title: 'Patrimônio', eyebrow: 'Patrimônio' } },
+    { path: '/cadastros', component: () => import('../views/RegistryView.vue'), meta: { title: 'Cadastros gerais', eyebrow: 'Administração' } },
     { path: '/parceiros/:id?', component: () => import('../views/PartnersView.vue'), meta: { title: 'Parceiros', eyebrow: 'Suprimentos' } },
     { path: '/servicos/:id?', component: () => import('../views/ServicesCatalogView.vue'), meta: { title: 'Serviços', eyebrow: 'Engenharia' } },
     { path: '/postos/:id?', component: () => import('../views/PostsView.vue'), meta: { title: 'Postos', eyebrow: 'Administração' } },
@@ -127,6 +136,7 @@ router.beforeEach(to => {
   }
   const module = moduleOf(to.path)
   if (!module) return true
+  if (module === 'Pessoas' && /^\/pessoas\/pessoa\/[^/]+$/.test(to.path)) return true
   if (store.can(moduleFeature(module))) return true
   ui.notify('error', 'Acesso não permitido', `O perfil visualizado não tem acesso ao módulo ${module}`)
   return to.path === '/tarefas' ? true : '/tarefas'

@@ -25,11 +25,13 @@
 
 ### Comercial até recebimento
 
-Oportunidade → proposta multilinha, com o preço vigente da tabela padrão → aceite, que explode os kits virtuais em componentes → pedido aprovado no Omie simulado → planejamento → produção → qualidade → expedição → faturamento no Omie → conta a receber.
+Oportunidade → proposta multilinha, com o preço vigente da tabela padrão → aceite, que explode os kits virtuais em componentes e cria o pedido de venda no Thalamus, aguardando análise → confirmação, que envia o pedido ao Omie simulado quando a empresa usa o Omie → planejamento → produção → qualidade → expedição → faturamento no Omie → entrega confirmada, que abre a garantia → conta a receber.
+
+A proposta com desconto acima de 15% passa por aprovação de outra pessoa. A enviada vence pela validade. Nova versão cancela a anterior. O pedido muda linha só com motivo e antes do planejamento; depois disso, o cancelamento passa pelo PCP.
 
 ### Necessidade até pagamento
 
-Demanda/OP/OS/Projeto → previsão por categoria e mês → compra/execução sem duplicar a previsão → recebimento físico e conta a pagar → nota do Omie entra no realizado. A nota mostra o documento de origem quando ele já veio; sem esse vínculo, o Financeiro liga na mão. Compras, projetos e as outras origens passarão a enviar o vínculo quando forem refeitos. Cancelamento baixa a previsão; estorno reabre o saldo previsto. Eventos externos são idempotentes.
+Demanda/OP/OS/Projeto → previsão por categoria e mês → compra/execução sem duplicar a previsão → recebimento com conferência (só o aceito entra no saldo; o restante fica bloqueado até outra pessoa decidir) e conta a pagar → nota do Omie entra no realizado. A nota mostra o documento de origem quando ele já veio; sem esse vínculo, o Financeiro liga na mão. Compras, projetos e as outras origens passarão a enviar o vínculo quando forem refeitos. Cancelamento baixa a previsão; estorno reabre o saldo previsto. Eventos externos são idempotentes.
 
 Se o lançamento ultrapassar o saldo e o bloqueio estiver ativo, a previsão entra no ledger como **retida**, fora do saldo, e abre uma exceção. O Gestor ou o Administrador libera ou recusa; o Financeiro, que define o orçamento, não autoriza a própria exceção. O Administrador também informa orçamento e reclassifica pagamento retido. Compra e contratação da origem esperam a liberação. Pagamentos sem categoria, com múltiplas categorias ou com falha de sincronização ficam na fila até o Financeiro reclassificar, e só então entram no realizado.
 
@@ -37,15 +39,25 @@ A taxonomia tem grupo, categoria e subcategoria. O orçamento do ano é informad
 
 ### Pós-venda
 
-Chamado de assistência → vínculo com cliente, pedido, lote ou serial → agenda → execução → laudo → conta a receber quando cobrável. Peças indisponíveis geram demanda.
+Entrega confirmada → garantia (pendente até a regra da empresa ser aprovada) → chamado de assistência com a cobertura proposta → vínculo com cliente, pedido, lote ou serial → agenda → execução → laudo → conta a receber quando cobrável. Peças indisponíveis geram demanda.
+
+Locação: proposta → aprovação de outra pessoa com bem locável disponível, valor, cobrança e condição de pagamento → bem Locado → retorno com a condição registrada (com avaria, o bem fica parado).
+
+### Engenharia, pessoas e patrimônio
+
+- Revisão de estrutura e roteiro: quem elabora não libera nem rejeita; rejeitar exige motivo. Projetos de P&D ficam na Engenharia, com item de código provisório bloqueado para venda.
+- Treinamentos: registro e validade, com alerta de vencido e a vencer. Não bloqueiam a operação.
+- Patrimônio: a localização do bem só muda por movimentação aprovada por outra pessoa e concluída. Inventário por instalação concilia ou fica pendente até cada divergência ser tratada. Depreciação é só cadastro.
+- Cadastros gerais: unidades, moedas, condições de pagamento, origens e motivos usados pelos módulos.
+- Fonte oficial por entidade na Integração Omie; pendente bloqueia a sincronização.
 
 ### Produção
 
-Pedido aprovado → OP com revisão congelada → reserva → separação → execução no tablet → inspeção → expedição. A separação pode ser desfeita antes do primeiro apontamento. O posto é cadastro da empresa (tipo, minutos por dia e custo-hora). O ativo físico aponta para o posto; o ferramental continua no item.
+Pedido confirmado → OP com revisão congelada → reserva → separação → execução no tablet → inspeção → expedição. A separação pode ser desfeita antes do primeiro apontamento. O posto é cadastro da empresa (tipo, minutos por dia e custo-hora). O ativo físico aponta para o posto; o ferramental continua no item.
 
 ## Persistência do protótipo
 
-O estado fica no `localStorage`, na chave `thalamus-erp-v63`. Não há banco de dados nem API nesta fase. Restaurar a demonstração recria o seed completo.
+O estado fica no `localStorage`, na chave `thalamus-erp-v66`. Não há banco de dados nem API nesta fase. Restaurar a demonstração recria o seed completo.
 
 Campo novo no estado exige subir a chave. Não há migração: a chave nova nasce do seed, e a antiga é descartada.
 

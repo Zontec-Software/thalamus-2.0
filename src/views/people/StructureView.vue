@@ -2,7 +2,6 @@
 import { computed, reactive, ref } from 'vue'
 import { Plus } from 'lucide-vue-next'
 import BaseModal from '../../components/BaseModal.vue'
-import RoleVsPosition from './RoleVsPosition.vue'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import { occupantsAt } from '../../domain/organization'
@@ -11,6 +10,7 @@ const store = useErpStore()
 const ui = useUiStore()
 const selectedId = ref('')
 const dialog = ref<'' | 'setor' | 'posicao' | 'editar'>('')
+const busy = ref('')
 const editingId = ref('')
 const sectorForm = reactive({ name: '' })
 const positionForm = reactive({ jobId: '', sectorId: '', parentPositionId: '', headcount: 1 })
@@ -88,29 +88,55 @@ function openEdit(id: string) {
   Object.assign(positionForm, { jobId: position.jobId, sectorId: position.sectorId, parentPositionId: position.parentPositionId ?? '', headcount: position.headcount })
   dialog.value = 'editar'
 }
+function closeDialog() {
+  if (busy.value) return
+  dialog.value = ''
+}
 function addSector() {
-  if (!selected.value) return
-  const created = store.createSector(ui.activeTenantId, { name: sectorForm.name, parentId: selected.value.id })
-  if (created && created !== true) {
-    dialog.value = ''
-    selectedId.value = created.id
+  if (busy.value || !selected.value) return
+  busy.value = 'setor'
+  try {
+    const created = store.createSector(ui.activeTenantId, { name: sectorForm.name, parentId: selected.value.id })
+    if (created && created !== true) {
+      dialog.value = ''
+      selectedId.value = created.id
+    }
+  } finally {
+    busy.value = ''
   }
 }
 function addPosition() {
-  if (!selected.value) return
-  const created = store.createPosition(ui.activeTenantId, { sectorId: selected.value.id, jobId: positionForm.jobId, parentPositionId: positionForm.parentPositionId || undefined, headcount: Number(positionForm.headcount) })
-  if (created) dialog.value = ''
+  if (busy.value || !selected.value) return
+  busy.value = 'posicao'
+  try {
+    const created = store.createPosition(ui.activeTenantId, { sectorId: selected.value.id, jobId: positionForm.jobId, parentPositionId: positionForm.parentPositionId || undefined, headcount: Number(positionForm.headcount) })
+    if (created) dialog.value = ''
+  } finally {
+    busy.value = ''
+  }
 }
 function savePosition() {
-  const saved = store.updatePosition(ui.activeTenantId, editingId.value, { sectorId: positionForm.sectorId, jobId: positionForm.jobId, parentPositionId: positionForm.parentPositionId || undefined, headcount: Number(positionForm.headcount) })
-  if (saved) {
-    dialog.value = ''
-    if (positionForm.sectorId) selectedId.value = positionForm.sectorId
+  if (busy.value) return
+  busy.value = 'salvar'
+  try {
+    const saved = store.updatePosition(ui.activeTenantId, editingId.value, { sectorId: positionForm.sectorId, jobId: positionForm.jobId, parentPositionId: positionForm.parentPositionId || undefined, headcount: Number(positionForm.headcount) })
+    if (saved) {
+      dialog.value = ''
+      if (positionForm.sectorId) selectedId.value = positionForm.sectorId
+    }
+  } finally {
+    busy.value = ''
   }
 }
 function removePosition() {
-  const removed = store.removePosition(ui.activeTenantId, editingId.value)
-  if (removed) dialog.value = ''
+  if (busy.value) return
+  busy.value = 'remover'
+  try {
+    const removed = store.removePosition(ui.activeTenantId, editingId.value)
+    if (removed) dialog.value = ''
+  } finally {
+    busy.value = ''
+  }
 }
 </script>
 
@@ -122,7 +148,6 @@ function removePosition() {
         <p>As vagas da empresa. Cada uma já tem um cargo, mesmo vazia. A pessoa ocupa a vaga.</p>
       </div>
     </div>
-    <RoleVsPosition />
     <div class="grid-2 org-layout" data-tour="org-chart">
       <nav class="tree org-tree" aria-label="Setores">
         <div v-for="row in tree" :key="row.sector.id" class="tree-row" :class="{ active: selected?.id === row.sector.id }" :style="{ paddingLeft: `${8 + row.depth * 18}px` }">
@@ -153,7 +178,6 @@ function removePosition() {
           </div>
           <div class="field"><label>Quem lidera</label>
             <select :value="selected.managerPositionId ?? ''" @change="store.setSectorLeadership(selected!.id, ($event.target as HTMLSelectElement).value)">
-              <option value="" disabled>{{ selectedPositions.length ? 'Escolha uma posição' : 'Crie uma posição primeiro' }}</option>
               <option v-for="entry in selectedPositions" :key="entry.id" :value="entry.id">{{ entry.name }} · {{ occupants(entry.id).map(user => user.name).join(', ') || 'vaga livre' }}</option>
             </select>
           </div>
@@ -184,39 +208,40 @@ function removePosition() {
     </div>
   </article>
 
-  <BaseModal :open="dialog === 'setor'" title="Novo setor" :subtitle="selected ? `Abaixo de ${selected.name}` : ''" @close="dialog = ''">
-    <div class="field"><label>Nome</label><input v-model="sectorForm.name" placeholder="Ex.: Ferramentaria" @keyup.enter="addSector" /></div>
+  <BaseModal :open="dialog === 'setor'" title="Novo setor" :subtitle="selected ? `Abaixo de ${selected.name}` : ''" @close="closeDialog">
+    <div class="field"><label>Nome</label><input v-model="sectorForm.name" placeholder="Ex.: Ferramentaria" :disabled="busy === 'setor'" @keyup.enter="addSector" /></div>
+    <p v-if="busy === 'setor'" class="hint">Criando o setor…</p>
     <template #footer>
-      <button class="button secondary" @click="dialog = ''">Cancelar</button>
-      <button class="button" @click="addSector">Criar setor</button>
+      <button class="button secondary" type="button" :disabled="busy === 'setor'" @click="closeDialog">Cancelar</button>
+      <button class="button" type="button" :disabled="busy === 'setor'" @click="addSector">{{ busy === 'setor' ? 'Criando…' : 'Criar setor' }}</button>
     </template>
   </BaseModal>
 
-  <BaseModal :open="dialog === 'posicao'" title="Nova posição" :subtitle="selected ? `Uma vaga em ${selected.name}` : ''" width="640px" @close="dialog = ''">
-    <RoleVsPosition compact />
+  <BaseModal :open="dialog === 'posicao'" title="Nova posição" :subtitle="selected ? `Uma vaga em ${selected.name}` : ''" width="640px" @close="closeDialog">
     <div class="form-grid">
-      <div class="field"><label>Cargo da vaga</label><select v-model="positionForm.jobId"><option value="" disabled>Escolha o cargo</option><option v-for="entry in jobs" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>A vaga já nasce com esse cargo e pode ficar livre. A pessoa entra depois. Falta o cargo? <RouterLink to="/pessoas/cargos">Cadastre em Cargos</RouterLink>.</small></div>
-      <div class="field"><label>Responde a</label><select v-model="positionForm.parentPositionId"><option value="">Ninguém neste nível</option><optgroup v-for="group in parentGroups" :key="group.sector.id" :label="group.sector.name"><option v-for="entry in group.positions" :key="entry.id" :value="entry.id">{{ entry.name }} · {{ occupants(entry.id).map(user => user.name).join(', ') || 'vaga livre' }}</option></optgroup></select><small>Outra vaga, do mesmo setor ou de outro. O nome repetido é outra vaga.</small></div>
-      <div class="field"><label>Vagas</label><input v-model.number="positionForm.headcount" type="number" min="1" /></div>
+      <div class="field"><label>Cargo da vaga</label><select v-model="positionForm.jobId" :disabled="busy === 'posicao'"><option v-for="entry in jobs" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>A vaga já nasce com esse cargo e pode ficar livre. A pessoa entra depois. Falta o cargo? <RouterLink to="/pessoas/cargos">Cadastre em Cargos</RouterLink>.</small></div>
+      <div class="field"><label>Responde a</label><select v-model="positionForm.parentPositionId" :disabled="busy === 'posicao'"><option value="">Ninguém neste nível</option><optgroup v-for="group in parentGroups" :key="group.sector.id" :label="group.sector.name"><option v-for="entry in group.positions" :key="entry.id" :value="entry.id">{{ entry.name }} · {{ occupants(entry.id).map(user => user.name).join(', ') || 'vaga livre' }}</option></optgroup></select><small>Outra vaga, do mesmo setor ou de outro. O nome repetido é outra vaga.</small></div>
+      <div class="field"><label>Vagas</label><input v-model.number="positionForm.headcount" type="number" min="1" :disabled="busy === 'posicao'" /></div>
     </div>
+    <p v-if="busy === 'posicao'" class="hint">Criando a posição…</p>
     <template #footer>
-      <button class="button secondary" @click="dialog = ''">Cancelar</button>
-      <button class="button" :disabled="!positionForm.jobId" @click="addPosition">Criar posição</button>
+      <button class="button secondary" type="button" :disabled="busy === 'posicao'" @click="closeDialog">Cancelar</button>
+      <button class="button" type="button" :disabled="!positionForm.jobId || busy === 'posicao'" @click="addPosition">{{ busy === 'posicao' ? 'Criando…' : 'Criar posição' }}</button>
     </template>
   </BaseModal>
 
-  <BaseModal :open="dialog === 'editar'" title="Editar posição" :subtitle="positions.find(entry => entry.id === editingId)?.name" width="640px" @close="dialog = ''">
-    <p class="hint">Este cargo fica na vaga, livre ou ocupada. A pessoa ocupa a vaga pela ficha. Trocar a pessoa não troca o cargo.</p>
+  <BaseModal :open="dialog === 'editar'" title="Editar posição" :subtitle="positions.find(entry => entry.id === editingId)?.name" width="640px" @close="closeDialog">
+    <p class="hint">{{ busy === 'salvar' ? 'Salvando a posição…' : busy === 'remover' ? 'Removendo a posição…' : 'Este cargo fica na vaga, livre ou ocupada. A pessoa ocupa a vaga pela ficha. Trocar a pessoa não troca o cargo.' }}</p>
     <div class="form-grid">
-      <div class="field"><label>Cargo da vaga</label><select v-model="positionForm.jobId"><option v-for="entry in jobs" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
-      <div class="field"><label>Setor</label><select v-model="positionForm.sectorId"><option v-for="entry in sectors" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
-      <div class="field"><label>Responde a</label><select v-model="positionForm.parentPositionId"><option value="">Ninguém neste nível</option><optgroup v-for="group in parentGroups" :key="group.sector.id" :label="group.sector.name"><option v-for="entry in group.positions" :key="entry.id" :value="entry.id">{{ entry.name }} · {{ occupants(entry.id).map(user => user.name).join(', ') || 'vaga livre' }}</option></optgroup></select><small>Pode ser uma vaga de outro setor. As opções estão agrupadas pelo setor da vaga.</small></div>
-      <div class="field"><label>Vagas</label><input v-model.number="positionForm.headcount" type="number" min="1" /></div>
+      <div class="field"><label>Cargo da vaga</label><select v-model="positionForm.jobId" :disabled="!!busy"><option v-for="entry in jobs" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+      <div class="field"><label>Setor</label><select v-model="positionForm.sectorId" :disabled="!!busy"><option v-for="entry in sectors" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+      <div class="field"><label>Responde a</label><select v-model="positionForm.parentPositionId" :disabled="!!busy"><option value="">Ninguém neste nível</option><optgroup v-for="group in parentGroups" :key="group.sector.id" :label="group.sector.name"><option v-for="entry in group.positions" :key="entry.id" :value="entry.id">{{ entry.name }} · {{ occupants(entry.id).map(user => user.name).join(', ') || 'vaga livre' }}</option></optgroup></select><small>Pode ser uma vaga de outro setor. As opções estão agrupadas pelo setor da vaga.</small></div>
+      <div class="field"><label>Vagas</label><input v-model.number="positionForm.headcount" type="number" min="1" :disabled="!!busy" /></div>
     </div>
     <template #footer>
-      <button class="button danger" style="margin-right: auto" @click="removePosition">Remover</button>
-      <button class="button secondary" @click="dialog = ''">Cancelar</button>
-      <button class="button" :disabled="!positionForm.jobId || !positionForm.sectorId" @click="savePosition">Salvar</button>
+      <button class="button danger" type="button" style="margin-right: auto" :disabled="!!busy" @click="removePosition">{{ busy === 'remover' ? 'Removendo…' : 'Remover' }}</button>
+      <button class="button secondary" type="button" :disabled="!!busy" @click="closeDialog">Cancelar</button>
+      <button class="button" type="button" :disabled="!positionForm.jobId || !positionForm.sectorId || !!busy" @click="savePosition">{{ busy === 'salvar' ? 'Salvando…' : 'Salvar' }}</button>
     </template>
   </BaseModal>
 </template>

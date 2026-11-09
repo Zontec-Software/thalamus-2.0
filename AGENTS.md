@@ -75,7 +75,8 @@ Ao entregar, dizer explicitamente **o que é simulação** e precisa virar integ
 ## Restrições permanentes
 
 - Responder sempre **em português**.
-- **Omie é dono** do pedido aprovado, dos dados fiscais e da nota fiscal. O Thalamus coordena a execução.
+- O **pedido de venda nasce no Thalamus** (aceite da proposta) e vai ao Omie na confirmação, quando a empresa usa o Omie. O sistema funciona sem o Omie. A fonte oficial de cada entidade é decidida na tela Integração Omie; pendente bloqueia a sincronização.
+- **Omie é dono** da apuração fiscal, da nota fiscal e dos títulos. O cadastro fiscal do item nasce no Thalamus.
 - **Finanças é operacional**: compromissos e títulos. Banco e contabilidade ficam fora.
 - Repositórios legados são **apenas consulta**. Nunca copiar código de lá.
 - Não editar o arquivo de plano em `~/.cursor/plans/`.

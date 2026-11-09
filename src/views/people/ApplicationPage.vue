@@ -5,6 +5,7 @@ import { ChevronRight } from 'lucide-vue-next'
 import CrumbBack from '../../components/CrumbBack.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import PersonPhoto from './PersonPhoto.vue'
+import ShiftField from './ShiftField.vue'
 import { suggestDirectoryEmail } from '../../domain/directory'
 import { isChecklistLate } from '../../domain/people'
 import { useErpStore } from '../../stores/erp'
@@ -68,7 +69,7 @@ const interviewStatus = computed(() => {
 const interviewForm = reactive({ at: '', place: '', interviewerId: '' })
 const resultForm = reactive({ origin: 'Entrevista presencial', notes: '' })
 const reviewNote = ref('')
-const hireForm = reactive({ profileId: '', shift: 'Manhã' as User['shift'], positionId: '', google: true, googleEmail: '', touched: false })
+const hireForm = reactive({ profileId: '', shift: '' as User['shift'], positionId: '', google: true, googleEmail: '', touched: false })
 
 function personName(id?: string) {
   return store.state.users.find(entry => entry.id === id)?.name ?? '—'
@@ -247,7 +248,7 @@ watch(() => route.params.id, rememberView)
           <div class="form-grid">
             <div class="field"><label>Data e hora</label><input v-model="interviewForm.at" type="datetime-local" /></div>
             <div class="field"><label>Local</label><input v-model="interviewForm.place" placeholder="Sala ou link" /></div>
-            <div class="field"><label>Quem entrevista</label><select v-model="interviewForm.interviewerId"><option value="">Escolha uma pessoa</option><option v-for="entry in people" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+            <div class="field"><label>Quem entrevista</label><select v-model="interviewForm.interviewerId"><option v-for="entry in people" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
           </div>
           <button class="button secondary small" :disabled="!interviewForm.at || !interviewForm.place.trim() || !interviewForm.interviewerId" @click="schedule">Agendar</button>
         </section>
@@ -293,7 +294,7 @@ watch(() => route.params.id, rememberView)
           <header><div><h3>Como a pessoa entra</h3></div></header>
         <div class="form-grid">
           <div class="field"><label>Perfil</label><select v-model="hireForm.profileId"><option v-for="entry in hireProfiles" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>O mesmo catálogo da Gestão de acesso.</small></div>
-          <div class="field"><label>Turno</label><select v-model="hireForm.shift"><option>Manhã</option><option>Tarde</option><option>Administrativo</option></select></div>
+          <div class="field"><label>Turno</label><ShiftField v-model="hireForm.shift" /></div>
           <div class="field"><label>Posição</label><select v-model="hireForm.positionId"><option value="">Sem posição por enquanto</option><option v-for="entry in store.state.positions.filter(item => item.status === 'Ativo' && item.tenantId === (job?.tenantId ?? application?.tenantId))" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>A pessoa ocupa esta vaga. O cargo é o da vaga, definido no organograma.</small></div>
         </div>
         <p v-if="sameEmail" class="hint">O e-mail já é de {{ sameEmail.name }}. A efetivação une os cadastros e não cria outra conta Google.</p>

@@ -246,8 +246,39 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
   '/organizacao': [
     t('permissions', 'Perfis por funcionalidade', 'Crie perfis reutilizáveis e marque ações de negócio, como gerir orçamento ou liberar saldo. Atribua vários perfis a uma pessoa; as permissões se somam. No topo, a empresa ou o grupo mostram onde a conta entra. A soma não edita.'),
   ],
+  '/revisoes': [
+    t('record-list', 'Versões aguardando decisão', 'Estrutura e roteiro mudam por versão. Cada linha mostra quem elaborou e o checklist. Quem elaborou não libera: a decisão é de outra pessoa, e rejeitar exige motivo.'),
+  ],
+  '/pd': [
+    t('new-record', 'Novo projeto de P&D', 'O projeto nasce com escopo P&D, prioridade e marcos. O item novo ganha código provisório e fica bloqueado para venda até a estrutura ser liberada.'),
+    t('record-list', 'Projetos em andamento', 'Clique no projeto para ver marcos, orçamento, resultado e entregáveis.'),
+  ],
+  '/recebimento': [
+    t('record-list', 'O que chega', 'Pedidos de compra aprovados com quantidade em aberto. Conferir propõe a quantidade; informe o que chegou e o resultado da conferência.'),
+    t('receiving-blocked', 'Bloqueados', 'O que não foi aceito fica fora do saldo. Outra pessoa decide aceitar ou devolver, sempre com observação.'),
+  ],
+  '/garantia': [
+    t('warranty-policy', 'A regra da empresa', 'Prazo e condições. Sem aprovação, a garantia nasce pendente e a cobertura é só sugerida. Aprovar ativa as pendentes.'),
+    t('record-list', 'Garantias abertas na entrega', 'Cada entrega confirmada abre uma garantia. Vencida é calculada pela data; suspender e encerrar exigem motivo.'),
+  ],
+  '/locacao': [
+    t('new-record', 'Nova locação', 'Nasce como proposta, com cliente e período. Bem e condições podem vir depois.'),
+    t('record-list', 'Da proposta ao retorno', 'A linha diz o que falta para ativar. Quem propôs não aprova. No retorno, a condição do bem fica registrada; com avaria, o bem fica parado.'),
+  ],
+  '/pessoas/treinamentos': [
+    t('new-record', 'Registrar treinamento', 'Pessoa, treinamento, tipo, realização e validade. Sem realização, fica pendente.'),
+    t('record-list', 'Validade à vista', 'Vencido e a vencer em 30 dias aparecem destacados. Por enquanto o treinamento não bloqueia a operação.'),
+  ],
+  '/patrimonio/movimentacoes': [
+    t('record-list', 'Onde o bem está', 'A localização só muda pela movimentação concluída. Quem solicita não aprova; baixa exige motivo.'),
+  ],
+  '/cadastros': [
+    t('record-list', 'Listas compartilhadas', 'Origens, motivos, unidades, moedas e condições de pagamento usados pelos módulos. Inativar tira da escolha sem apagar o histórico.'),
+    t('new-record', 'Nova opção', 'Código e descrição não se repetem no mesmo tipo.'),
+  ],
   '/integracao': [
-    t('sync-table', 'Histórico de integração', 'Cada troca com o Omie fica registrada com direção, resultado e mensagem. Falhas podem ser reprocessadas após a correção.'),
+    t('sync-table', 'Histórico de integração', 'Cada troca com o Omie fica registrada com direção, resultado e mensagem. Falhas podem ser reprocessadas após a correção. Ignorado é o que não foi enviado porque a empresa não usa o Omie ou a fonte está pendente.'),
+    t('integration-sources', 'Fonte oficial por entidade', 'Para cada entidade, decida se a fonte é o Thalamus ou o Omie e o sentido da troca. Pendente desliga a sincronização daquela entidade até alguém decidir.'),
     t('integration-rules', 'Quem é dono de cada dado', 'O Thalamus planeja categorias e previsões. O Omie é a fonte do pagamento, do estorno, da nota e dos dados fiscais.'),
   ],
   '/tablet': [

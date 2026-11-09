@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { ClipboardList, Factory, RefreshCcw } from 'lucide-vue-next'
 import BaseModal from '../components/BaseModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
-import { FLOW_STAGES } from '../domain/engine'
+import { FLOW_STAGES, salesOrderStatus } from '../domain/engine'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 import { fmtCurrency, fmtDate, fmtNumber } from '../utils/format'
@@ -20,7 +20,9 @@ const orders = computed(() => store.state.salesOrders.filter(order => {
   return (!stage.value || store.stage(order) === stage.value) &&
     (!term || order.id.toLowerCase().includes(term) || store.customerName(order.customerId).toLowerCase().includes(term))
 }))
-const firstToPlan = computed(() => orders.value.find(order => store.stage(order) === 'Entrada')?.id)
+const statusOf = (order: typeof store.state.salesOrders[number]) => salesOrderStatus(store.state, order)
+const firstToPlan = computed(() => orders.value.find(order => store.stage(order) === 'Entrada' && statusOf(order) === 'Confirmado')?.id)
+const awaiting = computed(() => store.state.salesOrders.filter(order => statusOf(order) === 'Aguardando análise').length)
 const opSummary = (orderId: string) => {
   const list = store.opsOf(orderId)
   if (!list.length) return 'Ainda sem OPs'
@@ -73,24 +75,28 @@ function confirmPlan() {
     <button class="button" :disabled="syncing" data-tour="sync-omie" @click="sync"><RefreshCcw :size="15" /> {{ syncing ? 'Consultando Omie…' : `Sincronizar com Omie${store.state.omieQueue.length ? ` (${store.state.omieQueue.length} novos)` : ''}` }}</button>
   </div>
 
+  <p class="hint">O pedido nasce da proposta aceita, aguardando análise. Confirmado, segue para o PCP e para o Omie, se a empresa usa o Omie.{{ awaiting ? ` ${awaiting} aguardando análise.` : '' }}</p>
+
   <div class="callout" data-tour="op-legend"><Factory :size="18" /><div><strong>Dois tipos de ordem de produção</strong>A OP de injeção fabrica a peça plástica na máquina. A OP de montagem junta essas peças no case do cliente. Clique no pedido para ver as duas separadas.</div></div>
 
   <article class="card flush" data-tour="orders-table">
     <table>
-      <thead><tr><th>Pedido</th><th>Cliente</th><th>Produto</th><th>Qtd.</th><th>Valor</th><th>Entrega</th><th>Prioridade</th><th>Etapa</th><th>Progresso</th><th></th></tr></thead>
+      <thead><tr><th>Pedido</th><th>Cliente</th><th>Produto</th><th>Qtd.</th><th>Valor</th><th>Entrega</th><th>Prioridade</th><th>Situação</th><th>Etapa</th><th>Progresso</th><th></th></tr></thead>
       <tbody>
         <tr v-for="order in orders" :key="order.id" class="clickable" @click="ui.orderDrawer = order.id">
-          <td><span class="cell-main">{{ order.id }}</span><span class="cell-sub code">{{ order.omieId }}</span></td>
+          <td><span class="cell-main">{{ order.id }}</span><span class="cell-sub code">{{ order.omieId ?? (order.origin === 'Thalamus' ? 'nasceu no Thalamus' : '') }}</span></td>
           <td>{{ store.customerName(order.customerId) }}</td>
           <td>{{ productSummary(order) }}<span class="cell-sub">{{ order.lines?.length ? `${order.lines.length} linha(s) · ` : '' }}{{ opSummary(order.id) }}</span></td>
           <td>{{ order.quantity }}</td>
           <td>{{ fmtCurrency(order.value) }}</td>
           <td>{{ fmtDate(order.promisedDate) }}<span v-if="store.risks(order).length" class="cell-sub risk-text">{{ store.risks(order)[0] }}</span></td>
           <td><StatusBadge :value="order.priority" /></td>
+          <td><StatusBadge :value="statusOf(order)" /></td>
           <td><StatusBadge :value="store.stage(order)" tone="info" /></td>
           <td><div class="progress"><span :style="{ width: `${store.progress(order)}%` }"></span></div></td>
           <td @click.stop>
-            <button v-if="store.stage(order) === 'Entrada'" class="button small" :data-tour="order.id === firstToPlan ? 'plan-btn' : undefined" @click="planning = order.id"><ClipboardList :size="13" /> Planejar</button>
+            <button v-if="statusOf(order) === 'Aguardando análise'" class="button small" @click="store.confirmSalesOrder(order.id)">Confirmar</button>
+            <button v-else-if="store.stage(order) === 'Entrada' && statusOf(order) === 'Confirmado'" class="button small" :data-tour="order.id === firstToPlan ? 'plan-btn' : undefined" @click="planning = order.id"><ClipboardList :size="13" /> Planejar</button>
             <button v-else class="button secondary small" @click="ui.orderDrawer = order.id">Detalhes</button>
           </td>
         </tr>

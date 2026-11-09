@@ -44,8 +44,6 @@ export interface Area {
   groups: NavGroup[]
 }
 
-const soon = (label: string, icon: NavItem['icon'], hint: string): NavItem => ({ label, icon, hint, pending: true, home: true })
-
 /** Módulos do sistema; fonte única para a home, os menus e o seletor de área. */
 export const AREAS: Area[] = [
   {
@@ -57,7 +55,7 @@ export const AREAS: Area[] = [
         { label: 'Propostas', to: '/crm/propostas', icon: IconPedido, module: 'CRM', home: true, bar: false, hint: 'Propostas enviadas ao cliente' },
       ] },
       { label: 'Venda', items: [
-        { label: 'Pedidos de venda', to: '/pedidos', icon: IconPedido, module: 'Vendas', home: true, hint: 'Pedidos aprovados no Omie' },
+        { label: 'Pedidos de venda', to: '/pedidos', icon: IconPedido, module: 'Vendas', home: true, hint: 'Pedidos nascidos da proposta aceita' },
       ] },
     ],
   },
@@ -66,8 +64,8 @@ export const AREAS: Area[] = [
     groups: [
       { label: 'Produto', items: [
         { label: 'Produtos e estruturas', to: '/produtos', icon: IconEngenharia, module: 'Produtos', home: true, hint: 'Catálogo, estrutura, fiscal e revisões' },
-        soon('Revisões', ClipboardCheck, 'A revisão segue dentro da ficha do produto.'),
-        soon('Projetos de P&D', FolderKanban, 'Projeto de desenvolvimento de produto, separado do projeto corporativo.'),
+        { label: 'Revisões', to: '/revisoes', icon: ClipboardCheck, module: 'Produtos', home: true, hint: 'Versões de estrutura aguardando decisão' },
+        { label: 'Projetos de P&D', to: '/pd', icon: FolderKanban, module: 'Projetos', home: true, hint: 'Desenvolvimento de produto e item provisório' },
       ] },
       { label: 'Catálogo', items: [
         { label: 'Serviços', to: '/servicos', icon: BriefcaseBusiness, module: 'Serviços', hint: 'O que a empresa presta e cobra' },
@@ -80,7 +78,7 @@ export const AREAS: Area[] = [
       { label: 'Fornecedores', to: '/parceiros', query: { origem: 'suprimentos' }, icon: Handshake, module: 'Parceiros', home: true, hint: 'Quem vende para a empresa. O cadastro é o mesmo dos clientes.' },
       { label: 'Requisições', to: '/demandas', icon: ListChecks, module: 'Demandas', home: true, hint: 'O que falta comprar ou fabricar' },
       { label: 'Compras', to: '/compras', icon: ShoppingCart, module: 'Compras', home: true, hint: 'Da cotação ao pedido de compra' },
-      soon('Recebimento', PackageCheck, 'A conferência do que chegou ainda acontece dentro de Compras.'),
+      { label: 'Recebimento', to: '/recebimento', icon: PackageCheck, module: 'Recebimento', home: true, hint: 'Conferência do que chegou; só o aceito entra no saldo' },
       { label: 'Almoxarifado', to: '/estoque', icon: Warehouse, module: 'Almoxarifado', home: true, hint: 'Saldo, reserva e separação' },
     ] }],
   },
@@ -112,8 +110,8 @@ export const AREAS: Area[] = [
     id: 'servicos', band: 'cadeia', label: 'Serviços e Contratos', description: 'O cliente depois da entrega: atendimento técnico, garantia e contratos de locação.', icon: IconServicos,
     groups: [{ label: 'Depois da entrega', items: [
       { label: 'Assistência técnica', to: '/assistencia', icon: Headset, module: 'Assistência Técnica', home: true, hint: 'Atendimento depois da entrega' },
-      soon('Garantia', Shield, 'A garantia hoje é calculada dentro do chamado de assistência.'),
-      soon('Contratos de locação', FileText, 'Contrato de locação de equipamento ainda não tem tela.'),
+      { label: 'Garantia', to: '/garantia', icon: Shield, module: 'Garantia', home: true, hint: 'Cobertura por pedido entregue' },
+      { label: 'Contratos de locação', to: '/locacao', icon: FileText, module: 'Locação', home: true, hint: 'Da proposta ao retorno do bem' },
     ] }],
   },
   {
@@ -121,16 +119,16 @@ export const AREAS: Area[] = [
     groups: [{ label: 'Pessoas', items: [
       { label: 'Colaboradores', to: '/pessoas', icon: IconPessoas, module: 'Pessoas', home: true, hint: 'Quem trabalha na empresa' },
       { label: 'Cargos e funções', to: '/pessoas/cargos', icon: IconPessoas, module: 'Pessoas', home: true, bar: false, hint: 'O catálogo do trabalho' },
-      soon('Treinamentos', GraduationCap, 'Formação e reciclagem ainda não têm tela.'),
+      { label: 'Treinamentos', to: '/pessoas/treinamentos', icon: GraduationCap, module: 'Treinamentos', home: true, hint: 'Formação, validade e reciclagem' },
     ] }],
   },
   {
     id: 'patrimonio', band: 'apoio', label: 'Patrimônio', description: 'Bens da empresa: da aquisição à baixa.', icon: IconPatrimonio,
     groups: [{ label: 'Bens', items: [
       { label: 'Bens e equipamentos', to: '/ativos', icon: IconPatrimonio, module: 'Ativos', home: true, hint: 'Patrimônio acompanhado pela manutenção' },
-      soon('Movimentações', Truck, 'Transferência e baixa do bem ainda não têm tela.'),
-      soon('Inventário', ClipboardCheck, 'Contagem patrimonial, diferente do almoxarifado.'),
-      soon('Depreciação', Landmark, 'A depreciação estimada hoje aparece no DRE.'),
+      { label: 'Movimentações', to: '/patrimonio/movimentacoes', icon: Truck, module: 'Patrimônio', home: true, hint: 'Transferência, manutenção e baixa do bem' },
+      { label: 'Inventário', to: '/patrimonio/inventario', icon: ClipboardCheck, module: 'Patrimônio', home: true, hint: 'Contagem patrimonial por instalação' },
+      { label: 'Instalações e depreciação', to: '/patrimonio/instalacoes', icon: Landmark, module: 'Patrimônio', home: true, hint: 'Onde os bens ficam e os parâmetros de depreciação' },
     ] }],
   },
   {
@@ -157,7 +155,7 @@ export const AREAS: Area[] = [
     id: 'administracao', band: 'apoio', label: 'Administração do sistema', description: 'Configuração do Thalamus.', icon: IconAdministracao,
     groups: [{ label: 'Sistema', items: [
       { label: 'Usuários e permissões', to: '/organizacao', icon: IconAdministracao, module: 'Organização', home: true, hint: 'Perfis e o que cada um pode fazer' },
-      soon('Cadastros gerais', Cog, 'Tabelas compartilhadas que ainda não têm uma tela própria.'),
+      { label: 'Cadastros gerais', to: '/cadastros', icon: Cog, module: 'Cadastros gerais', home: true, hint: 'Unidades, moedas, condições de pagamento e motivos' },
       { label: 'Postos e centros de custo', to: '/postos', icon: Cog, module: 'Postos', home: true, hint: 'Máquinas, células e capacidade' },
       { label: 'Integração Omie', to: '/integracao', icon: Unplug, module: 'Integração Omie', home: true, hint: 'O que entrou e o que falhou' },
     ] }],

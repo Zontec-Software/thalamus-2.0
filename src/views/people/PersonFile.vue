@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
-import { canSeePersonBlock, personView, type PersonBlock } from '../../domain/organization'
+import { computed, reactive, ref, watch } from 'vue'
+import { canSeePersonBlock, cpfError, maskCpf, maskPhone, personView, type PersonBlock } from '../../domain/organization'
+import { lookupCep, maskZip, zipDigits, type CepAddress } from '../../domain/cep'
+import { ACCOUNT_KINDS, BONDS, CNH_CATEGORIES, EDUCATION, GENDER, MARITAL_STATUS, PCD, RACE, SEX, SHIRT_SIZES, SHOE_SIZES, STATES } from '../../domain/personCatalog'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import type { Person } from '../../types/domain'
@@ -27,21 +29,108 @@ const form = reactive({
 })
 const extra = reactive({ institution: '', course: '', level: '', relativeName: '', bond: '', emergencyName: '', emergencyPhone: '', emergencyBond: '', bank: '', agency: '', account: '', kind: 'Corrente' })
 
+const baseline = ref('')
+const applying = ref(false)
+const zipStatus = ref<'idle' | 'loading' | 'ready' | 'missing' | 'failed'>('idle')
+const locked = reactive({ street: false, district: false, city: false, state: false })
+let zipTicket = 0
+function lockFrom(address: CepAddress) {
+  locked.street = address.street !== ''
+  locked.district = address.district !== ''
+  locked.city = address.city !== ''
+  locked.state = address.state !== ''
+}
+function clearPulled() {
+  form.street = ''
+  form.district = ''
+  form.city = ''
+  form.state = ''
+  locked.street = false
+  locked.district = false
+  locked.city = false
+  locked.state = false
+}
+function rememberAddress() {
+  zipTicket += 1
+  zipStatus.value = 'idle'
+  if (zipDigits(form.zip).length === 8) lockFrom(form)
+  else Object.assign(locked, { street: false, district: false, city: false, state: false })
+}
+const zipHint = computed(() => {
+  if (zipStatus.value === 'loading') return 'Buscando o endereço…'
+  if (zipStatus.value === 'missing') return 'CEP não encontrado.'
+  if (zipStatus.value === 'failed') return 'Não foi possível consultar o CEP.'
+  if (zipStatus.value === 'ready' && (!locked.street || !locked.district)) return 'Este CEP não traz o logradouro completo. Complete o que ficou em branco.'
+  return ''
+})
+async function onZip(event: Event) {
+  form.zip = maskZip((event.target as HTMLInputElement).value)
+  const digits = zipDigits(form.zip)
+  const ticket = ++zipTicket
+  if (digits.length < 8) {
+    zipStatus.value = 'idle'
+    clearPulled()
+    return
+  }
+  zipStatus.value = 'loading'
+  try {
+    const found = await lookupCep(digits)
+    if (ticket !== zipTicket) return
+    if (!found) {
+      clearPulled()
+      zipStatus.value = 'missing'
+      return
+    }
+    Object.assign(form, found)
+    lockFrom(found)
+    zipStatus.value = 'ready'
+  } catch {
+    if (ticket !== zipTicket) return
+    clearPulled()
+    zipStatus.value = 'failed'
+  }
+}
+
 function load() {
+  if (baseline.value && JSON.stringify(form) !== baseline.value && !applying.value) return
   const current = person.value
   if (!current) return
   for (const key of Object.keys(form) as (keyof typeof form)[]) form[key] = String((current as unknown as Record<string, unknown>)[key] ?? '')
+  form.cpf = maskCpf(form.cpf)
+  form.phone = maskPhone(form.phone)
   Object.assign(form, {
     street: current.address?.street ?? '', number: current.address?.number ?? '', district: current.address?.district ?? '',
-    complement: current.address?.complement ?? '', zip: current.address?.zip ?? '', state: current.address?.state ?? '', city: current.address?.city ?? '',
+    complement: current.address?.complement ?? '', zip: maskZip(current.address?.zip ?? ''), state: current.address?.state ?? '', city: current.address?.city ?? '',
   })
+  baseline.value = JSON.stringify(form)
+  rememberAddress()
 }
+const dirty = computed(() => baseline.value !== '' && JSON.stringify(form) !== baseline.value)
+defineExpose({ isDirty: () => dirty.value })
 watch(person, load, { immediate: true })
 
+function listed(options: readonly string[], current: string) {
+  return current && !options.includes(current) ? [current, ...options] : options
+}
+
 const keep = (allowed: boolean, value: string, current: string | undefined) => allowed ? value || undefined : current
+const cpfProblem = computed(() => show('documentos') ? cpfError(form.cpf) : '')
+function onCpf(event: Event) {
+  form.cpf = maskCpf((event.target as HTMLInputElement).value)
+}
+function onPhone(event: Event) {
+  form.phone = maskPhone((event.target as HTMLInputElement).value)
+}
+function onEmergencyPhone(event: Event) {
+  extra.emergencyPhone = maskPhone((event.target as HTMLInputElement).value)
+}
 function savePersonal() {
   const current = person.value
   if (!current) return
+  if (cpfProblem.value) {
+    ui.notify('error', cpfProblem.value)
+    return
+  }
   const patch: Partial<Person> = {
     fullName: form.fullName, sex: form.sex || undefined, gender: form.gender || undefined,
     maritalStatus: form.maritalStatus || undefined, educationLevel: form.educationLevel || undefined,
@@ -54,12 +143,19 @@ function savePersonal() {
     cnhCategory: keep(show('documentos'), form.cnhCategory, current.cnhCategory),
   }
   if (show('endereco')) patch.address = { street: form.street, number: form.number, district: form.district, complement: form.complement || undefined, zip: form.zip, state: form.state, city: form.city }
-  store.updatePerson(current.id, patch)
+  applying.value = true
+  try {
+    store.updatePerson(current.id, patch)
+  } finally {
+    applying.value = false
+  }
 }
 function saveHealth() {
   const current = person.value
   if (!current) return
-  store.updatePerson(current.id, {
+  applying.value = true
+  try {
+    store.updatePerson(current.id, {
     shoeSize: form.shoeSize || undefined, shirtSize: form.shirtSize || undefined, commute: form.commute || undefined,
     race: keep(show('saude'), form.race, current.race),
     pcd: keep(show('saude'), form.pcd, current.pcd),
@@ -68,6 +164,9 @@ function saveHealth() {
     foodAllergy: keep(show('saude'), form.foodAllergy, current.foodAllergy),
     controlledMedicine: keep(show('saude'), form.controlledMedicine, current.controlledMedicine),
   })
+  } finally {
+    applying.value = false
+  }
 }
 function addEducation() {
   if (!person.value || !extra.institution.trim()) return
@@ -101,20 +200,20 @@ function addBank() {
         <div class="form-grid">
           <div class="field"><label>Nome completo</label><input v-model="form.fullName" /></div>
           <div v-if="show('documentos')" class="field"><label>Nascimento</label><input v-model="form.birthDate" type="date" /></div>
-          <div class="field"><label>Sexo</label><input v-model="form.sex" /></div>
-          <div class="field"><label>Gênero</label><input v-model="form.gender" /></div>
-          <div class="field"><label>Estado civil</label><input v-model="form.maritalStatus" /></div>
-          <div class="field"><label>Escolaridade</label><input v-model="form.educationLevel" /></div>
+          <div class="field"><label>Sexo</label><select v-model="form.sex"><option v-for="option in listed(SEX, form.sex)" :key="option">{{ option }}</option></select></div>
+          <div class="field"><label>Gênero</label><select v-model="form.gender"><option v-for="option in listed(GENDER, form.gender)" :key="option">{{ option }}</option></select></div>
+          <div class="field"><label>Estado civil</label><select v-model="form.maritalStatus"><option v-for="option in listed(MARITAL_STATUS, form.maritalStatus)" :key="option">{{ option }}</option></select></div>
+          <div class="field"><label>Escolaridade</label><select v-model="form.educationLevel"><option v-for="option in listed(EDUCATION, form.educationLevel)" :key="option">{{ option }}</option></select></div>
         </div>
       </section>
 
       <section v-if="show('documentos')" class="person-section">
         <h3>Documentos</h3>
         <div class="form-grid">
-          <div class="field"><label>CPF</label><input v-model="form.cpf" /></div>
+          <div class="field"><label>CPF</label><input :value="form.cpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" @input="onCpf" /><p v-if="cpfProblem" class="hint">{{ cpfProblem }}</p></div>
           <div class="field"><label>RG</label><input v-model="form.rg" /></div>
           <div class="field"><label>CNH</label><input v-model="form.cnh" /></div>
-          <div class="field"><label>Categoria da CNH</label><input v-model="form.cnhCategory" /></div>
+          <div class="field"><label>Categoria da CNH</label><select v-model="form.cnhCategory"><option v-for="option in listed(CNH_CATEGORIES, form.cnhCategory)" :key="option">{{ option }}</option></select></div>
         </div>
       </section>
 
@@ -123,36 +222,41 @@ function addBank() {
         <div class="form-grid">
           <div class="field"><label>E-mail corporativo</label><input v-model="form.corporateEmail" /></div>
           <div class="field"><label>E-mail pessoal</label><input v-model="form.personalEmail" /></div>
-          <div class="field"><label>Celular</label><input v-model="form.phone" /></div>
+          <div class="field"><label>Celular</label><input :value="form.phone" inputmode="tel" autocomplete="off" placeholder="(00) 00000-0000" @input="onPhone" /></div>
           <div class="field"><label>Ramal</label><input v-model="form.extension" /></div>
         </div>
       </section>
 
       <section v-if="show('endereco')" class="person-section">
         <h3>Endereço</h3>
-        <div class="form-grid">
-          <div class="field"><label>CEP</label><input v-model="form.zip" /></div>
-          <div class="field"><label>Logradouro</label><input v-model="form.street" /></div>
+        <div class="address-grid">
+          <div class="field"><label>CEP</label><input :value="form.zip" inputmode="numeric" autocomplete="postal-code" placeholder="00000-000" @input="onZip" /><small v-if="zipHint">{{ zipHint }}</small></div>
+          <div class="field street"><label>Logradouro</label><input v-model="form.street" :readonly="locked.street" /></div>
           <div class="field"><label>Número</label><input v-model="form.number" /></div>
           <div class="field"><label>Complemento</label><input v-model="form.complement" /></div>
-          <div class="field"><label>Bairro</label><input v-model="form.district" /></div>
-          <div class="field"><label>Cidade e estado</label><div style="display:flex;gap:8px"><input v-model="form.city" style="flex:1" /><input v-model="form.state" style="width:64px" maxlength="2" /></div></div>
+          <div class="field district"><label>Bairro</label><input v-model="form.district" :readonly="locked.district" /></div>
+          <div class="field city"><label>Cidade</label><input v-model="form.city" :readonly="locked.city" /></div>
+          <div class="field">
+            <label>Estado</label>
+            <input v-if="locked.state" :value="form.state" readonly />
+            <select v-else v-model="form.state"><option v-for="option in listed(STATES, form.state)" :key="option">{{ option }}</option></select>
+          </div>
         </div>
       </section>
 
       <section class="person-section">
         <h3>Observações</h3>
         <div class="field"><input v-model="form.notes" placeholder="Algo que a equipe precisa saber" /></div>
-        <div class="save-bar"><button class="button" @click="savePersonal">Salvar dados pessoais</button></div>
+        <div class="save-bar"><button class="button" :disabled="!!cpfProblem" @click="savePersonal">Salvar dados pessoais</button></div>
       </section>
 
       <section class="person-section">
         <h3>Contato de emergência</h3>
-        <div v-for="entry in person.emergencies" :key="entry.phone + entry.name" class="list-row static"><div><strong>{{ entry.name }}</strong><span>{{ entry.bond }} · {{ entry.phone }}</span></div></div>
+        <div v-for="entry in person.emergencies" :key="entry.phone + entry.name" class="list-row static"><div><strong>{{ entry.name }}</strong><span>{{ entry.bond }} · {{ maskPhone(entry.phone) }}</span></div></div>
         <div class="inline-form row">
           <input v-model="extra.emergencyName" class="filter" placeholder="Nome" />
-          <input v-model="extra.emergencyPhone" class="filter" placeholder="Telefone" />
-          <input v-model="extra.emergencyBond" class="filter" placeholder="Parentesco" />
+          <input :value="extra.emergencyPhone" class="filter" inputmode="tel" placeholder="(00) 00000-0000" @input="onEmergencyPhone" />
+          <select v-model="extra.emergencyBond" class="filter"><option v-for="option in BONDS" :key="option">{{ option }}</option></select>
           <button class="button secondary small" @click="addEmergency">Incluir</button>
         </div>
       </section>
@@ -162,7 +266,7 @@ function addBank() {
         <div v-for="entry in person.family" :key="entry.name" class="list-row static"><div><strong>{{ entry.name }}</strong><span>{{ entry.bond }}</span></div></div>
         <div class="inline-form row">
           <input v-model="extra.relativeName" class="filter" placeholder="Nome" />
-          <input v-model="extra.bond" class="filter" placeholder="Cônjuge, filho, dependente" />
+          <select v-model="extra.bond" class="filter"><option v-for="option in BONDS" :key="option">{{ option }}</option></select>
           <button class="button secondary small" @click="addRelative">Incluir</button>
         </div>
       </section>
@@ -173,7 +277,7 @@ function addBank() {
         <div class="inline-form row">
           <input v-model="extra.course" class="filter" placeholder="Curso" />
           <input v-model="extra.institution" class="filter" placeholder="Instituição" />
-          <input v-model="extra.level" class="filter" placeholder="Técnico, graduação…" />
+          <select v-model="extra.level" class="filter"><option v-for="option in EDUCATION" :key="option">{{ option }}</option></select>
           <button class="button secondary small" @click="addEducation">Incluir</button>
         </div>
       </section>
@@ -186,8 +290,8 @@ function addBank() {
           <div class="field"><label>Alergia a medicamento</label><input v-model="form.drugAllergy" /></div>
           <div class="field"><label>Outras alergias</label><input v-model="form.foodAllergy" /></div>
           <div class="field"><label>Medicamento controlado</label><input v-model="form.controlledMedicine" /></div>
-          <div class="field"><label>PCD</label><input v-model="form.pcd" /></div>
-          <div class="field"><label>Cor ou raça</label><input v-model="form.race" /></div>
+          <div class="field"><label>PCD</label><select v-model="form.pcd"><option v-for="option in listed(PCD, form.pcd)" :key="option">{{ option }}</option></select></div>
+          <div class="field"><label>Cor ou raça</label><select v-model="form.race"><option v-for="option in listed(RACE, form.race)" :key="option">{{ option }}</option></select></div>
           <div class="field"><label>Altura</label><input v-model="form.height" /></div>
         </div>
         <p class="hint">Registro para emergência e inclusão. Prontuário, ASO e afastamento não ficam aqui.</p>
@@ -195,8 +299,8 @@ function addBank() {
       <section class="person-section">
         <h3>Medidas e trajeto</h3>
         <div class="form-grid">
-          <div class="field"><label>Camisa</label><input v-model="form.shirtSize" /></div>
-          <div class="field"><label>Calçado</label><input v-model="form.shoeSize" /></div>
+          <div class="field"><label>Camisa</label><select v-model="form.shirtSize"><option v-for="option in listed(SHIRT_SIZES, form.shirtSize)" :key="option">{{ option }}</option></select></div>
+          <div class="field"><label>Calçado</label><select v-model="form.shoeSize"><option v-for="option in listed(SHOE_SIZES, form.shoeSize)" :key="option">{{ option }}</option></select></div>
           <div class="field"><label>Trajeto até a empresa</label><input v-model="form.commute" placeholder="Ônibus, 2 conduções" /></div>
         </div>
         <div class="save-bar"><button class="button" @click="saveHealth">Salvar</button></div>
@@ -211,7 +315,7 @@ function addBank() {
         <input v-model="extra.bank" class="filter" placeholder="Banco" />
         <input v-model="extra.agency" class="filter" placeholder="Agência" />
         <input v-model="extra.account" class="filter" placeholder="Conta" />
-        <select v-model="extra.kind" class="filter"><option>Corrente</option><option>Poupança</option><option>Salário</option></select>
+        <select v-model="extra.kind" class="filter"><option v-for="option in ACCOUNT_KINDS" :key="option">{{ option }}</option></select>
         <button class="button secondary small" @click="addBank">Incluir</button>
       </div>
     </section>

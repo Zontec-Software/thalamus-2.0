@@ -1,9 +1,10 @@
 import type {
-  AccessProfile, AccessRevocation, Asset, Assignment, Budget, BudgetAlert, BudgetCategory, BudgetEntry, BudgetException, BudgetGroupDef, BudgetSimulation, BusinessPartner, Candidate, CandidateBriefing, Customer, Demand, Downtime, EconomicGroup, Employment, EngineeringChange, FiscalRule, FlowEvent, FlowStage, Functionality, IdentityLink, Interview, Item, ItemClass, ItemModel, JobCatalog, JobOpening, JobPosition, Offboarding, OmieConnection, PeopleChecklist, PerformanceReview, Person, Application, ProjectParticipation, SelectionReview,
+  AccessProfile, AccessRevocation, Asset, Assignment, Budget, BudgetAlert, BudgetCategory, BudgetEntry, BudgetException, BudgetGroupDef, BudgetSimulation, BusinessPartner, Candidate, CandidateBriefing, Customer, Demand, Downtime, EconomicGroup, Employment, EngineeringChange, FiscalRule, FlowEvent, FlowStage, Functionality, IdentityLink, Interview, Item, ItemClass, ItemModel, JobCatalog, JobLevel, JobOpening, JobPosition, WorkShift, Offboarding, OmieConnection, PeopleChecklist, PerformanceReview, Person, Application, ProjectParticipation, SelectionReview,
   MachineState, MaintenanceOrder, NonConformity, Opportunity, OpMaterial, Operation, PriceTable, ProductRevision, ProductionOrder, Project, SalesGoal,
-  OmieCategory, OmiePayment, Proposal, PurchaseOrder, Requisition, RequisitionStatus, Resource, SalesOrder, Sector, ServiceCatalogItem,
+  OmieCategory, OmiePayment, Proposal, PurchaseOrder, Requisition, RequisitionStatus, Resource, SalesOrder, SalesOrderStatus, Sector, ServiceCatalogItem,
   ShopAlert, StockMovement, SupplierHomologation, SyncLog, TechnicalServiceOrder, Tenant, User, UserProfileAssignment,
   DirectoryAccount, WorkspaceConnection,
+  AssetInventory, AssetMovement, Facility, OmieEntity, OmieEntitySource, Receipt, RegistryEntry, RentalContract, Training, Warranty, WarrantyPolicy,
 } from '../types/domain'
 
 export interface ErpState {
@@ -29,6 +30,8 @@ export interface ErpState {
   directoryAccounts: DirectoryAccount[]
   employments: Employment[]
   jobs: JobCatalog[]
+  jobLevels: JobLevel[]
+  shifts: WorkShift[]
   identityLinks: IdentityLink[]
   projectParticipations: ProjectParticipation[]
   sectors: Sector[]
@@ -75,7 +78,40 @@ export interface ErpState {
   omieConnections: OmieConnection[]
   accessProfiles: AccessProfile[]
   userProfileAssignments: UserProfileAssignment[]
+  receipts: Receipt[]
+  warrantyPolicies: WarrantyPolicy[]
+  warranties: Warranty[]
+  rentalContracts: RentalContract[]
+  trainings: Training[]
+  facilities: Facility[]
+  assetMovements: AssetMovement[]
+  assetInventories: AssetInventory[]
+  registry: RegistryEntry[]
+  omieSources: OmieEntitySource[]
   counters: Record<string, number>
+}
+
+/** Empresa dos registros operacionais que ainda não carregam tenantId no mockup. */
+export const DEFAULT_TENANT = 'tenant-roboflex'
+
+const SYNC_ENTITY: Record<string, OmieEntity> = {
+  Cliente: 'Cliente', Fornecedor: 'Fornecedor', 'Pedido de venda': 'Pedido de venda', 'Pedido de compra': 'Pedido de compra',
+  Recebimento: 'Pedido de compra', Produto: 'Produto', 'Ajuste de estoque': 'Produto', Categoria: 'Categoria financeira',
+  'Centro de custo': 'Centro de custo', Faturamento: 'Faturamento', 'Cobrança de assistência': 'Faturamento',
+}
+
+/**
+ * Motivo para não sincronizar: empresa sem Omie ou entidade sem fonte oficial decidida.
+ * Sem motivo, a sincronização segue. O Thalamus funciona sem o Omie.
+ */
+export function omieBlock(state: Pick<ErpState, 'omieConnections' | 'omieSources'>, entity: string, tenantId = DEFAULT_TENANT): string | undefined {
+  const connection = state.omieConnections.find(entry => entry.tenantId === tenantId)
+  if (!connection || connection.status === 'Não configurada') return 'Empresa sem Omie: o registro fica só no Thalamus'
+  const mapped = SYNC_ENTITY[entity]
+  if (!mapped) return undefined
+  const source = state.omieSources.find(entry => entry.tenantId === tenantId && entry.entity === mapped)
+  if (!source || source.source === 'Pendente') return `Fonte oficial de ${mapped} ainda não decidida: sincronização desligada`
+  return undefined
 }
 
 export class DomainError extends Error {}
@@ -157,8 +193,11 @@ export function log(state: ErpState, module: string, actor: string, text: string
   if (state.events.length > 400) state.events.length = 400
 }
 
-export function addSyncLog(state: ErpState, entry: Omit<SyncLog, 'id' | 'at'>): SyncLog {
-  const record: SyncLog = { id: nextId(state, 'SY'), at: now(), ...entry }
+export function addSyncLog(state: ErpState, entry: Omit<SyncLog, 'id' | 'at'>, tenantId = DEFAULT_TENANT): SyncLog {
+  const blocked = entry.status === 'erro' ? undefined : omieBlock(state, entry.entity, tenantId)
+  const record: SyncLog = blocked
+    ? { id: nextId(state, 'SY'), at: now(), ...entry, status: 'ignorado', message: `${blocked}. ${entry.message}` }
+    : { id: nextId(state, 'SY'), at: now(), ...entry }
   state.syncLogs.unshift(record)
   return record
 }
@@ -396,6 +435,8 @@ export function planOrder(state: ErpState, orderId: string, actor: string) {
   applyDueRevisions(state)
   const order = getOrder(state, orderId)
   if (order.planned) throw new DomainError('Este pedido já foi planejado')
+  if (order.cancelledAt) throw new DomainError('Pedido cancelado não é planejado')
+  if (salesOrderStatus(state, order) === 'Aguardando análise') throw new DomainError('Confirme o pedido antes de planejar: a análise técnica e comercial ainda está aberta')
   const product = getItem(state, order.itemId)
   assertUsable(product, 'produção')
   if (!product.bom?.length || !product.routing?.length) throw new DomainError('Produto sem estrutura ou roteiro oficial')
@@ -513,9 +554,20 @@ export function adjustStock(state: ErpState, itemId: string, countedQty: number,
   return difference
 }
 
+/** OP de produto com estrutura só é liberada com a revisão aprovada que ela carrega. */
+export function assertApprovedRevision(state: ErpState, op: ProductionOrder) {
+  const item = getItem(state, op.itemId)
+  if (!item.bom?.length) return
+  const revision = state.productRevisions.find(entry => entry.id === op.revisionId)
+  if (!revision || (revision.status !== 'Liberada' && revision.status !== 'Substituída')) {
+    throw new DomainError(`${op.id} sem revisão aprovada de ${item.code}: a Engenharia precisa liberar a revisão antes da produção`)
+  }
+}
+
 export function pickOp(state: ErpState, opId: string, actor: string) {
   const op = getOp(state, opId)
   if (op.status !== 'Planejada') throw new DomainError('Só é possível separar OPs com todos os materiais reservados')
+  assertApprovedRevision(state, op)
   for (const line of op.materials) {
     const item = getItem(state, line.itemId)
     const lots = consumeStock(state, item, line.reserved)
@@ -756,15 +808,16 @@ export function shipOrder(state: ErpState, orderId: string, actor: string) {
   }
   order.shipment.status = 'Expedido'
   order.shipment.shippedAt = now()
-  log(state, 'Expedição', actor, 'Carga expedida. Solicitação de faturamento enviada ao Omie', order.id)
+  const withoutOmie = omieBlock(state, 'Faturamento')
+  log(state, 'Expedição', actor, withoutOmie ? 'Carga expedida. A nota fiscal é emitida fora do Thalamus' : 'Carga expedida. Solicitação de faturamento enviada ao Omie', order.id)
   return addSyncLog(state, { entity: 'Faturamento', reference: order.id, direction: 'Thalamus → Omie', status: 'pendente', message: 'Aguardando emissão da NF-e no Omie' })
 }
 
 export function invoiceOrder(state: ErpState, orderId: string, syncLogId?: string, invoice?: string) {
   const order = getOrder(state, orderId)
-  if (order.shipment?.status !== 'Expedido') return
+  if (order.shipment?.status !== 'Expedido' && order.shipment?.status !== 'Entregue') return
   state.counters.NF = (state.counters.NF ?? 18420) + 1
-  order.shipment.status = 'Faturado'
+  if (order.shipment.status === 'Expedido') order.shipment.status = 'Faturado'
   order.shipment.invoice = invoice ?? `NF-e ${state.counters.NF}`
   const pending = state.syncLogs.find(entry => entry.id === syncLogId)
   if (pending) {
@@ -772,6 +825,29 @@ export function invoiceOrder(state: ErpState, orderId: string, syncLogId?: strin
     pending.message = `${order.shipment.invoice} emitida e autorizada`
   }
   log(state, 'Faturamento', 'Integração Omie', `${order.shipment.invoice} emitida no Omie`, order.id)
+}
+
+/** Confirmação de entrega pelo cliente. Encerra o pedido e abre a garantia a partir desta data. */
+export function confirmDelivery(state: ErpState, orderId: string, receiver: string, actor: string) {
+  const order = getOrder(state, orderId)
+  if (order.shipment?.status !== 'Expedido' && order.shipment?.status !== 'Faturado') throw new DomainError('Só um pedido expedido tem entrega a confirmar')
+  if (!receiver.trim()) throw new DomainError('Informe quem recebeu')
+  order.shipment.status = 'Entregue'
+  order.shipment.deliveredAt = now()
+  order.shipment.deliveredTo = receiver.trim()
+  log(state, 'Expedição', actor, `Entrega confirmada: recebido por ${receiver.trim()}`, order.id)
+  return order
+}
+
+/** Situação do pedido na linguagem do Comercial. Derivada do fluxo, nunca digitada. */
+export function salesOrderStatus(_state: ErpState, order: SalesOrder): SalesOrderStatus {
+  if (order.cancelledAt) return 'Cancelado'
+  const shipment = order.shipment?.status
+  if (shipment === 'Entregue') return 'Concluído'
+  if (shipment === 'Expedido' || shipment === 'Faturado') return 'Expedido'
+  if (order.planned || shipment) return 'Em atendimento'
+  if (order.origin === 'Thalamus' && !order.confirmedAt) return 'Aguardando análise'
+  return 'Confirmado'
 }
 
 /* ---------- Manutenção e integração ---------- */
@@ -801,7 +877,7 @@ export function opsOf(state: ErpState, orderId: string) {
 }
 
 export function orderStage(state: ErpState, order: SalesOrder): FlowStage {
-  if (order.shipment?.status === 'Faturado') return 'Faturado'
+  if (order.shipment?.status === 'Faturado' || order.shipment?.status === 'Entregue') return 'Faturado'
   if (order.shipment) return 'Expedição'
   const ops = opsOf(state, order.id)
   if (!order.planned || !ops.length) return 'Entrada'
@@ -822,7 +898,7 @@ export function opProgress(op: ProductionOrder) {
 }
 
 export function orderProgress(state: ErpState, order: SalesOrder) {
-  if (order.shipment?.status === 'Faturado') return 100
+  if (order.shipment?.status === 'Faturado' || order.shipment?.status === 'Entregue') return 100
   if (order.shipment) return order.shipment.status === 'Expedido' ? 97 : 92
   const ops = opsOf(state, order.id)
   if (!ops.length) return 0

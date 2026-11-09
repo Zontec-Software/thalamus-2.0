@@ -29,20 +29,21 @@ Repositório `thalamus2-comercial`: API em `api/` (schema `t2_comercial`) e tela
 | --- | --- |
 | `modulo.crm.consultar` | Ler oportunidades, agenda, propostas, metas e painel |
 | `modulo.crm.gerir` | Criar e alterar oportunidades, atividades e propostas, e gravar a meta comercial do ano |
+| `crm.desconto.aprovar` | Aprovar ou devolver proposta Em aprovação (desconto acima do limite). Quem pediu não aprova |
 | `crm.consultar_consolidado` | Ler oportunidades, propostas e metas das empresas do grupo que a sessão pode ler. Só leitura |
 
 ## Regras
 
-1. Etapas: Prospecção (10%), Desenvolvimento (25%), Elaboração (40%), Proposta (55%), Conquista (100%), Perdida (0%). Mudar a etapa atualiza a probabilidade.
+1. Etapas: Novo contato, Qualificação, Levantamento, Proposta, Negociação, Ganho (100%), Perdido (0%). Mudar a etapa atualiza a probabilidade. Origem, motivo de perda e motivo de recusa vêm das listas de Cadastros gerais (Indicação, Site, Prospecção, Cliente existente, Outro; Preço, Prazo, Solução, Concorrente, Cancelamento, Outro; Preço, Prazo, Solução, Concorrente, Outro).
 2. Oportunidade nova exige título e cliente com papel Cliente ativo. Nasce em Prospecção, Frio, Venda.
-3. Oportunidade encerrada (Conquista ou Perdida) não é editada.
-4. Conquista só vem da proposta aceita. Perdida só com motivo; as propostas em rascunho ou enviadas viram recusadas com o mesmo motivo.
+3. Oportunidade encerrada (Ganho ou Perdido) não é editada.
+4. Ganho só vem da proposta aceita. Perdido só com motivo; as propostas em andamento são canceladas com o mesmo motivo.
 5. Atividade exige texto. A próxima ação da oportunidade é a primeira atividade pendente em ordem de data.
 6. Proposta só em oportunidade aberta. Criar proposta leva a oportunidade para Proposta, se estiver antes.
-7. Só rascunho é editado. Desconto de 0 a 15%. Quantidade maior que zero e preço não negativo. A linha de produto usa o produto liberado para venda na Engenharia; o preço padrão é o da Engenharia.
+7. Só rascunho é editado. Situações: Rascunho, Em aprovação, Enviada, Aceita, Recusada, Vencida, Cancelada, com número de versão. Desconto acima de 15% leva a proposta para Em aprovação; outra pessoa com `crm.desconto.aprovar` aprova (envia) ou devolve ao rascunho com motivo. Enviada passa a Vencida quando a validade termina. Nova versão sai de enviada, recusada ou vencida, nasce em rascunho e cancela a anterior. Cancelar exige motivo. Quantidade maior que zero e preço não negativo. A linha de produto usa o produto liberado para venda na Engenharia; o preço padrão é o da Engenharia.
 8. O valor da oportunidade acompanha o total da proposta em edição: soma de quantidade × preço, menos o desconto.
-9. Enviar exige ao menos uma linha. Aceitar exige ao menos um produto e leva a oportunidade para Conquista. O pedido aprovado é do Omie: a aceitação grava o evento `PropostaAceita` no outbox para o envio, e a tela mostra que o pedido aguarda o Omie.
-10. Recusar exige motivo e só vale para proposta enviada.
+9. Enviar exige ao menos uma linha. Aceitar exige ao menos um produto, proposta dentro da validade, e leva a oportunidade para Ganho. O aceite cria o **pedido de venda no Thalamus**, aguardando análise, com as linhas e a revisão liberada de cada produto. A confirmação do pedido o envia ao Omie quando a empresa usa o Omie e a fonte de Pedido de venda está decidida; sem Omie, o pedido fica só no Thalamus.
+10. Recusar exige motivo e vale para proposta enviada (vira Recusada) ou em aprovação (volta a Rascunho).
 11. Meta: doze valores não negativos; sem meses, o ano é dividido por igual e o último mês absorve o resto.
 
 ## Integrações da primeira entrega
@@ -54,6 +55,10 @@ Repositório `thalamus2-comercial`: API em `api/` (schema `t2_comercial`) e tela
 - **Status:** a oportunidade tem `status_note` (situação atual, texto livre). Sem status, sem ação pendente ou com previsão vencida, a tela mostra o sinal de atenção.
 
 - **Grupo:** `?group=1` usa `readableTenantIds('crm.consultar_consolidado')` da sessão. A linha de outra empresa vem com `tenant_id` e `own=false`, sem histórico. Toda escrita continua no tenant ativo; registro de outra empresa responde 404.
+
+## Pendente para o oficial
+
+Revisado no mockup em novembro de 2026 e ainda não levado ao `thalamus2-comercial`: novas etapas e listas, aprovação de desconto, vencimento, versão e cancelamento da proposta, pedido nascido no Thalamus (hoje o oficial grava `PropostaAceita` no outbox), e `crm.desconto.aprovar` no `FunctionalityCatalog.php` do core.
 
 ## Entrega oficial
 

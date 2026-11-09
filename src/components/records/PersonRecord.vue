@@ -2,6 +2,7 @@
 import { computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import RecordHeader from './RecordHeader.vue'
+import ShiftField from '../../views/people/ShiftField.vue'
 import RecordTimeline from './RecordTimeline.vue'
 import StatusBadge from '../StatusBadge.vue'
 import { sectorOf, tasksForRole } from '../../domain/enterprise'
@@ -20,7 +21,7 @@ const router = useRouter()
 const ROLES: Role[] = ['Administrador', 'Gestor', 'Comercial', 'Engenharia', 'PCP', 'Compras', 'Almoxarifado', 'Líder de produção', 'Operador', 'Qualidade', 'Expedição', 'Manutenção', 'Assistência', 'Financeiro']
 const isNew = computed(() => props.id === 'new')
 const person = computed(() => store.state.users.find(entry => entry.id === props.id))
-const form = reactive({ name: '', email: '', role: 'Operador' as Role, sector: props.context.sector ?? store.state.sectors[0]?.name ?? '', positionId: '', shift: 'Manhã' as User['shift'] })
+const form = reactive({ name: '', email: '', role: 'Operador' as Role, sector: props.context.sector ?? store.state.sectors[0]?.name ?? '', positionId: '', shift: '' as User['shift'] })
 const positionsOf = (sectorName: string) => {
   const sector = store.state.sectors.find(entry => entry.name === sectorName)
   return store.state.positions.filter(entry => entry.status === 'Ativo' && entry.sectorId === sector?.id)
@@ -88,7 +89,7 @@ function registerReview() {
         <div class="field"><label>Setor</label><select v-model="form.sector" @change="form.positionId = ''"><option v-for="entry in store.state.sectors" :key="entry.id">{{ entry.name }}</option></select></div>
         <div class="field"><label>Cargo</label><select v-model="form.positionId"><option value="">Sem cargo</option><option v-for="entry in positionsOf(form.sector)" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
         <div class="field"><label>Papel de acesso</label><select v-model="form.role"><option v-for="role in ROLES" :key="role">{{ role }}</option></select></div>
-        <div class="field"><label>Turno</label><select v-model="form.shift"><option>Manhã</option><option>Tarde</option><option>Administrativo</option></select></div>
+        <div class="field"><label>Turno</label><ShiftField v-model="form.shift" /></div>
       </div>
       <div class="drawer-actions">
         <button class="button" @click="create">Cadastrar</button>
@@ -115,7 +116,7 @@ function registerReview() {
         <div class="field"><label>Papel de acesso</label><select :value="person.role" @change="update({ role: ($event.target as HTMLSelectElement).value as Role })"><option v-for="role in ROLES" :key="role">{{ role }}</option></select></div>
         <div class="field"><label>Setor vigente</label><input :value="person.sector" disabled /></div>
         <div class="field"><label>Cargo vigente</label><input :value="position?.name ?? 'Sem cargo'" disabled /></div>
-        <div class="field"><label>Turno</label><select :value="person.shift" @change="update({ shift: ($event.target as HTMLSelectElement).value as User['shift'] })"><option>Manhã</option><option>Tarde</option><option>Administrativo</option></select></div>
+        <div class="field"><label>Turno</label><ShiftField :model-value="person.shift" @update:model-value="shift => update({ shift })" /></div>
       </div>
       <div class="drawer-actions">
         <button class="button secondary small" @click="update({ active: person.active === false })">{{ person.active === false ? 'Reativar acesso' : 'Desativar acesso' }}</button>

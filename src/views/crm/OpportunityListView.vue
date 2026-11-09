@@ -28,7 +28,7 @@ function touched(entry: Opportunity) {
 }
 function haystack(entry: Opportunity) {
   const flags = attentionOf(entry, today())
-  const life = entry.stage === 'Conquista' ? 'conquistada conquista' : entry.stage === 'Perdida' ? 'perdida' : 'em aberto aberta'
+  const life = entry.stage === 'Ganho' ? 'conquistada conquista' : entry.stage === 'Perdido' ? 'perdida' : 'em aberto aberta'
   return [
     entry.id, entry.title, entry.stage, entry.temperature, entry.source, entry.segment, entry.statusNote, entry.lossReason, entry.notes, entry.nextAction, entry.dealType,
     store.partnerName(entry.partnerId), partner(entry)?.document, partner(entry)?.vertical, store.userName(entry.ownerId), tenantName(entry.tenantId),
@@ -107,7 +107,7 @@ const arrow = (key: typeof opportunityList.sort) => opportunityList.sort === key
           <td v-if="shown('temperature')"><StatusBadge :value="entry.temperature ?? 'Morno'" /></td>
           <td v-if="shown('source')">{{ entry.source }}</td>
           <td v-if="shown('segment')">{{ partner(entry)?.vertical ?? entry.segment ?? '—' }}</td>
-          <td v-if="shown('close')" :class="{ 'risk-text': entry.stage !== 'Conquista' && entry.stage !== 'Perdida' && entry.expectedClose < today() }">{{ fmtDate(entry.expectedClose) }}</td>
+          <td v-if="shown('close')" :class="{ 'risk-text': entry.stage !== 'Ganho' && entry.stage !== 'Perdido' && entry.expectedClose < today() }">{{ fmtDate(entry.expectedClose) }}</td>
           <td v-if="shown('created')">{{ entry.createdAt ? fmtDate(entry.createdAt) : '—' }}</td>
           <td v-if="shown('tenant')">{{ tenantName(entry.tenantId) }}</td>
         </tr>

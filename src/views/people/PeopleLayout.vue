@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { sectorOf } from '../../domain/enterprise'
 import { peopleBoard } from '../../domain/people'
+import { trainingAlerts } from '../../domain/training'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 
@@ -13,7 +14,14 @@ const router = useRouter()
 const openedForTour = ref(false)
 const openedStructure = ref(false)
 
-const showNav = computed(() => route.path === '/pessoas' || route.path.startsWith('/pessoas/'))
+const seesModule = computed(() => store.can('modulo.pessoas.consultar'))
+const showNav = computed(() => seesModule.value && (route.path === '/pessoas' || route.path.startsWith('/pessoas/')))
+watch([() => route.path, seesModule], () => {
+  const path = route.path
+  if (!path.startsWith('/pessoas')) return
+  if (seesModule.value || /^\/pessoas\/pessoa\/[^/]+$/.test(path) || (path === '/pessoas/treinamentos' && store.can('modulo.treinamentos.consultar'))) return
+  router.replace('/')
+}, { immediate: true })
 const board = computed(() => peopleBoard(store.state, ui.activeTenantId))
 const vacant = computed(() => store.state.sectors.filter(entry => entry.tenantId === ui.activeTenantId && !entry.managerPositionId).length)
 const links = computed(() => [
@@ -22,6 +30,7 @@ const links = computed(() => [
   { to: '/pessoas/desligamento', label: 'Desligamento', count: board.value.offboardingOpen },
   { to: '/pessoas/organograma', label: 'Organograma', count: vacant.value },
   { to: '/pessoas/cargos', label: 'Cargos', count: 0 },
+  { to: '/pessoas/treinamentos', label: 'Treinamentos', count: trainingAlerts(store.state).length },
 ])
 
 function current(link: { to: string; exact?: boolean }) {

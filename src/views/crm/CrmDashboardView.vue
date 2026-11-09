@@ -32,8 +32,8 @@ const scoped = computed(() => opportunities.value.filter(entry => {
   return true
 }))
 const open = computed(() => scoped.value.filter(opportunityIsOpen))
-const won = computed(() => scoped.value.filter(entry => entry.stage === 'Conquista'))
-const lost = computed(() => scoped.value.filter(entry => entry.stage === 'Perdida'))
+const won = computed(() => scoped.value.filter(entry => entry.stage === 'Ganho'))
+const lost = computed(() => scoped.value.filter(entry => entry.stage === 'Perdido'))
 const wonInPeriod = computed(() => won.value.filter(entry => (entry.wonAt ?? entry.expectedClose).startsWith(period.value === 'month' ? CRM_MONTH : String(CRM_YEAR))))
 const goals = computed(() => store.state.salesGoals.filter(entry => tenantIds.value.includes(entry.tenantId) && entry.year === CRM_YEAR))
 const goal = computed(() => goals.value.reduce((sum, entry) => sum + entry.amount, 0))

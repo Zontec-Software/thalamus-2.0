@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { CheckCircle2 } from 'lucide-vue-next'
 import { hasFullAccess } from '../domain/access'
+import { missingProfile } from '../domain/organization'
 import { allocationOf } from '../domain/budget'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
@@ -28,6 +29,13 @@ const area = ref<'Todas' | Role>('Todas')
 const tasks = computed<Task[]>(() => {
   const list: Task[] = []
   const s = store.state
+  const account = s.users.find(entry => entry.id === ui.sessionUserId)
+  const person = s.persons.find(entry => entry.id === account?.personId && entry.tenantId === ui.activeTenantId)
+  const gaps = person ? missingProfile(person) : []
+  if (person && gaps.length) list.push({
+    id: 'cadastro', owner: ui.role, title: 'Complete seus dados cadastrais', detail: gaps.join(', '), urgent: true,
+    action: 'Abrir minha ficha', run: () => router.push(`/pessoas/pessoa/${person.id}?aba=dados`),
+  })
   for (const order of s.salesOrders.filter(entry => store.stage(entry) === 'Entrada')) {
     list.push({ id: `plan-${order.id}`, owner: 'PCP', title: `Planejar ${order.id}`, detail: `${store.customerName(order.customerId)} · ${order.quantity} ${store.itemLabel(order.itemId)} · entrega ${fmtDate(order.promisedDate)}`, urgent: order.priority !== 'Normal', action: 'Planejar', run: () => store.planOrder(order.id), open: () => { ui.orderDrawer = order.id } })
   }
@@ -59,7 +67,7 @@ const tasks = computed<Task[]>(() => {
   for (const maintenance of s.maintenanceOrders.filter(entry => entry.status !== 'Concluída')) {
     list.push({ id: maintenance.id, owner: 'Manutenção', title: `${maintenance.id} · ${maintenance.description}`, detail: `${s.assets.find(asset => asset.id === maintenance.assetId)?.name} · ${maintenance.type}`, urgent: maintenance.type === 'Corretiva', action: maintenance.status === 'Aberta' ? 'Iniciar' : 'Concluir', run: () => store.advanceMaintenance(maintenance.id) })
   }
-  for (const opportunity of s.opportunities.filter(entry => entry.stage !== 'Conquista' && entry.stage !== 'Perdida')) {
+  for (const opportunity of s.opportunities.filter(entry => entry.stage !== 'Ganho' && entry.stage !== 'Perdido')) {
     list.push({ id: opportunity.id, owner: 'Comercial', title: opportunity.nextAction, detail: `${store.partnerName(opportunity.partnerId)} · ${opportunity.title}`, action: 'Abrir oportunidade', run: () => router.push(`/crm/oportunidade/${opportunity.id}`) })
   }
   for (const demand of s.demands.filter(entry => entry.status === 'Aberta')) {

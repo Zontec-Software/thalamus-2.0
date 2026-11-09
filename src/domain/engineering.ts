@@ -368,7 +368,7 @@ export function createChange(state: ErpState, input: ChangeInput, actor: string,
 export function requestChangeForOpportunity(state: ErpState, opportunityId: string, actor: string) {
   const opportunity = state.opportunities.find(entry => entry.id === opportunityId)
   if (!opportunity) throw new DomainError('Oportunidade não encontrada')
-  if (opportunity.stage === 'Conquista' || opportunity.stage === 'Perdida') throw new DomainError('Oportunidade encerrada não pede mudança')
+  if (opportunity.stage === 'Ganho' || opportunity.stage === 'Perdido') throw new DomainError('Oportunidade encerrada não pede mudança')
   const itemIds = (opportunity.itemIds ?? []).filter(id => {
     const item = state.items.find(entry => entry.id === id)
     return !!item && (hasRouting(item) || isKitVirtual(item) || isTooling(item))

@@ -3,13 +3,14 @@ import { explodeKitLines } from './catalogExtensions'
 import { hasFullAccess } from './access'
 import * as budgetDomain from './budget'
 import type { ErpState } from './engine'
-import { addDays, addSyncLog, applyDueRevisions, assertUsable, availableQty, consumeStock, DomainError, getItem, getOp, log, nextId, now, receiveStock, today } from './engine'
+import { addDays, addSyncLog, applyDueRevisions, assertUsable, availableQty, consumeStock, DEFAULT_TENANT, DomainError, getItem, getOp, log, nextId, now, omieBlock, receiveStock, salesOrderStatus, today } from './engine'
 import { assertClientOpen, assertPurchaseAllowed, assertSupplierOpen } from './partners'
 import { fieldVisitService } from './services'
 import { assertResourceChoice } from './resources'
+import { warrantyCoverage } from './aftersales'
 import type {
   ActivityAttachment, ActivityGuest, Asset, Budget, CrmActivity, Demand, Item, NewActivityFile, NewActivityInput, Opportunity, Project, Proposal, ProposalLine,
-  PurchaseOrder, Role, TechnicalServiceOrder, User,
+  PurchaseOrder, Receipt, ReceiptCheck, Role, TechnicalServiceOrder, User,
 } from '../types/domain'
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -233,26 +234,92 @@ export function advancePurchaseOrder(state: ErpState, id: string, actor: string,
     order.budgetId = budget?.id
     addSyncLog(state, { entity: 'Pedido de compra', reference: order.id, direction: 'Thalamus → Omie', status: 'sincronizado', message: `Pedido aprovado e enviado a ${state.partners.find(entry => entry.id === order.supplierId)?.name}` })
   } else if (order.status === 'Aprovado' || order.status === 'Recebido parcial') {
-    const remaining = order.quantity - order.received
+    const remaining = openToReceive(state, order)
     const received = partial && remaining > 1 ? Math.max(1, Math.floor(remaining / 2)) : remaining
-    order.received += received
-    const lot = receiveStock(state, getItem(state, order.itemId), received, order.id)
-    state.movements.unshift({ id: nextId(state, 'MV'), itemId: order.itemId, type: 'Entrada', quantity: received, reference: order.id, at: now(), lots: lot })
-    order.status = order.received < order.quantity ? 'Recebido parcial' : 'Recebido'
-    if (order.status === 'Recebido') {
-      for (const demandId of order.demandIds) {
-        const demand = state.demands.find(entry => entry.id === demandId)
-        if (!demand) continue
-        demand.status = 'Atendida'
-        demand.resolution = `Recebido pelo ${order.id}`
-        log(state, 'Almoxarifado', actor, `${demand.id} atendida pelo recebimento de ${order.id}`, undefined, demand.id)
-      }
-      const amount = order.quantity * order.unitPrice
-      realize(state, budget, amount, actor, order.id)
-    }
+    receivePurchase(state, order.id, { received, accepted: received, check: 'Conforme' }, actor)
+    return order
   } else throw new DomainError('Este pedido não pode avançar')
   log(state, 'Compras', actor, `${order.id}: ${order.status}`, undefined, order.id)
   return order
+}
+
+/* ---------- Recebimento ---------- */
+
+export const RECEIPT_CHECKS: ReceiptCheck[] = ['Conforme', 'Divergência', 'Avaria', 'Incompleto']
+
+/** Quantidade do pedido que ainda pode entrar: o aceito já entrou e o bloqueado espera decisão. */
+export function openToReceive(state: ErpState, order: PurchaseOrder) {
+  const blocked = state.receipts.filter(entry => entry.purchaseOrderId === order.id && entry.status === 'Bloqueado').reduce((sum, entry) => sum + entry.received - entry.accepted, 0)
+  return Math.max(0, order.quantity - order.received - blocked)
+}
+
+/** Entrada no saldo pela quantidade aceita. É o único caminho do recebimento até o estoque. */
+function acceptIntoStock(state: ErpState, order: PurchaseOrder, quantity: number, actor: string, reference: string) {
+  if (quantity <= 0) return
+  order.received += quantity
+  const lot = receiveStock(state, getItem(state, order.itemId), quantity, order.id)
+  state.movements.unshift({ id: nextId(state, 'MV'), itemId: order.itemId, type: 'Entrada', quantity, reference, at: now(), lots: lot })
+  order.status = order.received < order.quantity ? 'Recebido parcial' : 'Recebido'
+  if (order.status !== 'Recebido') return
+  for (const demandId of order.demandIds) {
+    const demand = state.demands.find(entry => entry.id === demandId)
+    if (!demand) continue
+    demand.status = 'Atendida'
+    demand.resolution = `Recebido pelo ${order.id}`
+    log(state, 'Almoxarifado', actor, `${demand.id} atendida pelo recebimento de ${order.id}`, undefined, demand.id)
+  }
+  realize(state, budgetFor(state, { budgetId: order.budgetId, projectId: order.projectId, category: 'Material' }), order.quantity * order.unitPrice, actor, order.id)
+}
+
+/**
+ * Conferência do que chegou. Só o aceito entra no saldo.
+ * Divergência, avaria ou falta deixam o restante bloqueado até alguém decidir.
+ */
+export function receivePurchase(state: ErpState, purchaseOrderId: string, input: { received: number; accepted: number; check: ReceiptCheck; note?: string }, actor: string) {
+  const order = find(state.purchaseOrders, purchaseOrderId, 'Pedido de compra')
+  if (order.status !== 'Aprovado' && order.status !== 'Recebido parcial') throw new DomainError('Só pedido de compra aprovado recebe mercadoria')
+  const open = openToReceive(state, order)
+  const received = Number(input.received)
+  const accepted = Number(input.accepted)
+  if (!(received > 0)) throw new DomainError('Informe a quantidade que chegou')
+  if (!(accepted >= 0) || accepted > received) throw new DomainError('A quantidade aceita vai de zero ao que chegou')
+  if (accepted > open) throw new DomainError(`Aceito acima do pedido em aberto (${open}). O excedente é divergência`)
+  if (input.check === 'Conforme' && (accepted !== received || received > open)) throw new DomainError('Conferência conforme aceita tudo o que chegou, dentro do pedido')
+  if (input.check !== 'Conforme' && !input.note?.trim()) throw new DomainError('Descreva o que foi encontrado na conferência')
+  const blocked = received - accepted
+  const receipt: Receipt = {
+    id: nextId(state, 'RB'), tenantId: DEFAULT_TENANT, purchaseOrderId: order.id, supplierId: order.supplierId, itemId: order.itemId,
+    expected: open, received, accepted, check: input.check, note: input.note?.trim() || undefined, receivedBy: actor, receivedAt: now(),
+    status: blocked > 0 ? 'Bloqueado' : 'Concluído',
+  }
+  state.receipts.unshift(receipt)
+  acceptIntoStock(state, order, accepted, actor, receipt.id)
+  const unit = getItem(state, order.itemId).unit
+  log(state, 'Almoxarifado', actor, `${receipt.id}: ${input.check.toLowerCase()} · ${accepted} ${unit} aceitos${blocked ? `, ${blocked} bloqueados` : ''}`, undefined, order.id)
+  addSyncLog(state, { entity: 'Recebimento', reference: order.id, direction: 'Omie → Thalamus', status: 'sincronizado', message: `NF-e de entrada conferida: ${accepted} ${unit} aceitos` })
+  return receipt
+}
+
+/** Decisão sobre o bloqueado. Quem recebeu não decide; aceitar leva ao saldo, devolver mantém o pedido em aberto. */
+export function decideReceipt(state: ErpState, receiptId: string, decision: 'Aceitar' | 'Devolver', note: string, actor: string) {
+  const receipt = find(state.receipts, receiptId, 'Recebimento')
+  if (receipt.status !== 'Bloqueado') throw new DomainError('Este recebimento não está bloqueado')
+  if (receipt.receivedBy === actor) throw new DomainError('Quem conferiu não decide o bloqueio: a decisão é de outra pessoa')
+  if (!note.trim()) throw new DomainError('Registre o motivo da decisão')
+  const order = find(state.purchaseOrders, receipt.purchaseOrderId, 'Pedido de compra')
+  const blocked = receipt.received - receipt.accepted
+  receipt.status = 'Concluído'
+  receipt.decision = decision
+  receipt.decidedBy = actor
+  receipt.decidedAt = now()
+  receipt.decisionNote = note.trim()
+  if (decision === 'Aceitar') {
+    const quantity = Math.min(blocked, openToReceive(state, order))
+    receipt.accepted += quantity
+    acceptIntoStock(state, order, quantity, actor, receipt.id)
+  }
+  log(state, 'Compras', actor, `${receipt.id}: bloqueio ${decision === 'Aceitar' ? 'aceito com ressalva' : 'devolvido ao fornecedor'} (${note.trim()})`, undefined, order.id)
+  return receipt
 }
 
 export function cancelPurchaseOrder(state: ErpState, id: string, actor: string) {
@@ -293,11 +360,11 @@ export function undoPick(state: ErpState, opId: string, actor: string) {
 
 /* ---------- CRM ---------- */
 
-export const CRM_STAGES: Opportunity['stage'][] = ['Prospecção', 'Desenvolvimento', 'Elaboração', 'Proposta', 'Conquista']
+export const CRM_STAGES: Opportunity['stage'][] = ['Novo contato', 'Qualificação', 'Levantamento', 'Proposta', 'Negociação', 'Ganho']
 export const CRM_TEMPERATURES: NonNullable<Opportunity['temperature']>[] = ['Quente', 'Morno', 'Frio']
-const STAGE_PROBABILITY: Record<Opportunity['stage'], number> = { Prospecção: 10, Desenvolvimento: 25, Elaboração: 40, Proposta: 55, Conquista: 100, Perdida: 0 }
+const STAGE_PROBABILITY: Record<Opportunity['stage'], number> = { 'Novo contato': 10, Qualificação: 20, Levantamento: 35, Proposta: 55, Negociação: 75, Ganho: 100, Perdido: 0 }
 
-export const opportunityIsOpen = (entry: Pick<Opportunity, 'stage'>) => entry.stage !== 'Conquista' && entry.stage !== 'Perdida'
+export const opportunityIsOpen = (entry: Pick<Opportunity, 'stage'>) => entry.stage !== 'Ganho' && entry.stage !== 'Perdido'
 
 type OpportunityInput = Pick<Opportunity, 'partnerId' | 'title' | 'ownerId' | 'value' | 'expectedClose' | 'source' | 'nextAction'>
   & Partial<Pick<Opportunity, 'contact' | 'segment' | 'itemIds' | 'quantity' | 'notes' | 'observation' | 'tenantId' | 'mrr' | 'temperature' | 'statusNote' | 'phone' | 'email' | 'dealType'>>
@@ -307,7 +374,7 @@ export function createOpportunity(state: ErpState, input: OpportunityInput, acto
   if (!input.partnerId) throw new DomainError('Escolha o cliente')
   assertClientOpen(state, input.partnerId)
   const opportunity: Opportunity = {
-    id: `OPP-${String(state.counters.OPP = (state.counters.OPP ?? 26043) + 1)}`, stage: 'Prospecção', probability: 10, temperature: 'Frio', mrr: 0, dealType: 'Venda', activities: [], createdAt: now(), ...input,
+    id: `OPP-${String(state.counters.OPP = (state.counters.OPP ?? 26043) + 1)}`, stage: 'Novo contato', probability: 10, temperature: 'Frio', mrr: 0, dealType: 'Venda', activities: [], createdAt: now(), ...input,
   }
   state.opportunities.unshift(opportunity)
   log(state, 'CRM', actor, `Oportunidade criada: ${opportunity.title} (${money(opportunity.value)})`, undefined, opportunity.id)
@@ -325,8 +392,8 @@ export function updateOpportunity(state: ErpState, id: string, patch: Partial<Op
 export function moveOpportunity(state: ErpState, id: string, stage: Opportunity['stage'], actor: string) {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
   if (!opportunityIsOpen(opportunity)) throw new DomainError('Oportunidade já encerrada')
-  if (stage === 'Conquista') throw new DomainError('A oportunidade é conquistada ao aceitar uma proposta')
-  if (stage === 'Perdida') throw new DomainError('Use "Marcar como perdida" e informe o motivo')
+  if (stage === 'Ganho') throw new DomainError('A oportunidade é ganha ao aceitar uma proposta')
+  if (stage === 'Perdido') throw new DomainError('Use "Marcar como perdida" e informe o motivo')
   opportunity.stage = stage
   opportunity.probability = STAGE_PROBABILITY[stage]
   log(state, 'CRM', actor, `Etapa alterada para ${stage}`, undefined, id)
@@ -336,20 +403,21 @@ export function moveOpportunity(state: ErpState, id: string, stage: Opportunity[
 export function advanceOpportunity(state: ErpState, id: string, actor: string) {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
   const next = CRM_STAGES[CRM_STAGES.indexOf(opportunity.stage) + 1]
-  if (!next || next === 'Conquista') throw new DomainError('Para conquistar, aceite a proposta do cliente')
+  if (!next || next === 'Ganho') throw new DomainError('Para ganhar, aceite a proposta do cliente')
   return moveOpportunity(state, id, next, actor)
 }
 
 export function loseOpportunity(state: ErpState, id: string, reason: string, actor: string) {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
   if (!reason.trim()) throw new DomainError('Informe o motivo da perda')
-  if (opportunity.stage === 'Conquista') throw new DomainError('Oportunidade conquistada não pode ser perdida')
-  opportunity.stage = 'Perdida'
+  if (opportunity.stage === 'Ganho') throw new DomainError('Oportunidade ganha não pode ser perdida')
+  if (opportunity.stage === 'Perdido') throw new DomainError('Oportunidade já perdida')
+  opportunity.stage = 'Perdido'
   opportunity.probability = 0
   opportunity.lossReason = reason
-  for (const proposal of state.proposals.filter(entry => entry.opportunityId === id && (entry.status === 'Rascunho' || entry.status === 'Enviada'))) {
-    proposal.status = 'Recusada'
-    proposal.rejectionReason = reason
+  for (const proposal of state.proposals.filter(entry => entry.opportunityId === id && proposalIsLive(entry))) {
+    proposal.status = 'Cancelada'
+    proposal.cancelReason = `Oportunidade perdida: ${reason}`
   }
   log(state, 'CRM', actor, `Oportunidade perdida: ${reason}`, undefined, id)
   return opportunity
@@ -467,6 +535,20 @@ export function toggleActivity(state: ErpState, id: string, activityId: string, 
 export const proposalTotal = (proposal: Proposal) =>
   proposal.lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0) * (1 - proposal.discount / 100)
 
+/** Acima disto o desconto passa por aprovação de outra pessoa. A política de descontos ainda não foi aprovada. */
+export const DISCOUNT_APPROVAL_LIMIT = 15
+
+/** Proposta que ainda pode virar pedido ou ser trabalhada. */
+export const proposalIsLive = (proposal: Pick<Proposal, 'status'>) => proposal.status === 'Rascunho' || proposal.status === 'Em aprovação' || proposal.status === 'Enviada'
+
+/** Enviada com validade passada vira Vencida. Roda ao abrir o sistema e antes de aceitar. */
+export function expireProposals(state: ErpState) {
+  for (const proposal of state.proposals.filter(entry => entry.status === 'Enviada' && entry.validUntil < today())) {
+    proposal.status = 'Vencida'
+    log(state, 'Comercial', 'Sistema', `${proposal.id} vencida em ${proposal.validUntil.split('-').reverse().join('/')}`, undefined, proposal.id)
+  }
+}
+
 /** Preço vigente da tabela padrão; sem ele, a margem de referência sobre o custo. */
 function listPrice(item: Item) {
   return currentPrice(item)?.value ?? Math.round(item.cost * 2.4)
@@ -493,6 +575,7 @@ export function createProposal(state: ErpState, opportunityId: string, actor: st
   const proposal: Proposal = {
     id: `PROP-${String(state.counters.PROP = (state.counters.PROP ?? 26019) + 1)}`, opportunityId, partnerId: opportunity.partnerId, lines,
     discount: 0, validUntil: addDays(today(), 15), suggestedDate: addDays(today(), leadDays + 7), status: 'Rascunho', createdAt: now(), paymentTerms: '28 dias',
+    version: 1, createdBy: actor,
   }
   state.proposals.unshift(proposal)
   if (CRM_STAGES.indexOf(opportunity.stage) < CRM_STAGES.indexOf('Proposta')) {
@@ -512,7 +595,7 @@ function editableProposal(state: ErpState, id: string) {
 
 export function updateProposal(state: ErpState, id: string, patch: Partial<Pick<Proposal, 'discount' | 'validUntil' | 'suggestedDate' | 'paymentTerms'>>, actor: string) {
   const proposal = editableProposal(state, id)
-  if (patch.discount !== undefined && (patch.discount < 0 || patch.discount > 15)) throw new DomainError('Desconto acima de 15% exige aprovação da diretoria')
+  if (patch.discount !== undefined && (patch.discount < 0 || patch.discount >= 100)) throw new DomainError('Desconto inválido')
   Object.assign(proposal, patch)
   syncOpportunityValue(state, proposal)
   log(state, 'Comercial', actor, 'Condições da proposta atualizadas', undefined, id)
@@ -558,30 +641,56 @@ export function removeProposalLine(state: ErpState, id: string, index: number, a
 
 function syncOpportunityValue(state: ErpState, proposal: Proposal) {
   const opportunity = state.opportunities.find(entry => entry.id === proposal.opportunityId)
-  if (opportunity && opportunity.stage !== 'Conquista' && opportunity.stage !== 'Perdida') opportunity.value = Math.round(proposalTotal(proposal))
+  if (opportunity && opportunityIsOpen(opportunity)) opportunity.value = Math.round(proposalTotal(proposal))
 }
 
+function sendProposal(state: ErpState, proposal: Proposal, actor: string) {
+  proposal.status = 'Enviada'
+  const opportunity = state.opportunities.find(entry => entry.id === proposal.opportunityId)
+  if (opportunity && CRM_STAGES.indexOf(opportunity.stage) < CRM_STAGES.indexOf('Proposta')) {
+    opportunity.stage = 'Proposta'
+    opportunity.probability = STAGE_PROBABILITY.Proposta
+  }
+  log(state, 'Comercial', actor, `${proposal.id} enviada ao cliente (${money(proposalTotal(proposal))})`, undefined, proposal.opportunityId)
+}
+
+/**
+ * Rascunho segue para o cliente; com desconto acima do limite, passa antes por aprovação de outra pessoa.
+ * Enviada e aceita pelo cliente vira pedido no Thalamus.
+ */
 export function advanceProposal(state: ErpState, id: string, actor: string) {
   const proposal = find(state.proposals, id, 'Proposta')
   if (proposal.status === 'Rascunho') {
     if (!proposal.lines.length) throw new DomainError('Adicione ao menos uma linha antes de enviar')
-    proposal.status = 'Enviada'
-    const opportunity = state.opportunities.find(entry => entry.id === proposal.opportunityId)
-    if (opportunity && CRM_STAGES.indexOf(opportunity.stage) < CRM_STAGES.indexOf('Proposta')) {
-      opportunity.stage = 'Proposta'
-      opportunity.probability = STAGE_PROBABILITY.Proposta
-    }
-    log(state, 'Comercial', actor, `${proposal.id} enviada ao cliente (${money(proposalTotal(proposal))})`, undefined, proposal.opportunityId)
-  } else if (proposal.status === 'Enviada') acceptProposal(state, proposal, actor)
-  else throw new DomainError('A proposta não pode avançar')
+    if (proposal.discount > DISCOUNT_APPROVAL_LIMIT) {
+      proposal.status = 'Em aprovação'
+      proposal.approvalRequestedBy = actor
+      log(state, 'Comercial', actor, `${proposal.id} com ${proposal.discount}% de desconto: aguardando aprovação`, undefined, proposal.opportunityId)
+    } else sendProposal(state, proposal, actor)
+  } else if (proposal.status === 'Em aprovação') {
+    if (proposal.approvalRequestedBy === actor) throw new DomainError('Quem pediu o desconto não aprova a própria proposta')
+    proposal.approvedBy = actor
+    proposal.approvedAt = now()
+    sendProposal(state, proposal, actor)
+  } else if (proposal.status === 'Enviada') {
+    expireProposals(state)
+    if (proposal.status !== 'Enviada') throw new DomainError('A proposta venceu. Gere uma nova versão com a validade atualizada')
+    acceptProposal(state, proposal, actor)
+  } else throw new DomainError('A proposta não pode avançar')
   log(state, 'Comercial', actor, `${proposal.id}: ${proposal.status}`, undefined, proposal.id)
   return proposal
 }
 
+/** Recusa do cliente (proposta enviada) ou do aprovador (desconto devolvido ao rascunho). */
 export function rejectProposal(state: ErpState, id: string, reason: string, actor: string) {
   const proposal = find(state.proposals, id, 'Proposta')
-  if (proposal.status !== 'Enviada') throw new DomainError('Somente propostas enviadas podem ser recusadas')
   if (!reason.trim()) throw new DomainError('Informe o motivo da recusa')
+  if (proposal.status === 'Em aprovação') {
+    proposal.status = 'Rascunho'
+    log(state, 'Comercial', actor, `Desconto não aprovado: ${reason}`, undefined, proposal.id)
+    return proposal
+  }
+  if (proposal.status !== 'Enviada') throw new DomainError('Somente propostas enviadas podem ser recusadas')
   proposal.status = 'Recusada'
   proposal.rejectionReason = reason
   log(state, 'Comercial', actor, `${proposal.id} recusada: ${reason}`, undefined, proposal.opportunityId)
@@ -589,16 +698,55 @@ export function rejectProposal(state: ErpState, id: string, reason: string, acto
   return proposal
 }
 
+export function cancelProposal(state: ErpState, id: string, reason: string, actor: string) {
+  const proposal = find(state.proposals, id, 'Proposta')
+  if (!proposalIsLive(proposal)) throw new DomainError('Só proposta em andamento pode ser cancelada')
+  if (!reason.trim()) throw new DomainError('Informe o motivo do cancelamento')
+  proposal.status = 'Cancelada'
+  proposal.cancelReason = reason
+  log(state, 'Comercial', actor, `${proposal.id} cancelada: ${reason}`, undefined, proposal.opportunityId)
+  return proposal
+}
+
+/** Nova versão em rascunho, com as mesmas linhas e condições. A enviada anterior é cancelada. */
+export function reviseProposal(state: ErpState, id: string, actor: string) {
+  const previous = find(state.proposals, id, 'Proposta')
+  if (!['Enviada', 'Recusada', 'Vencida'].includes(previous.status)) throw new DomainError('Nova versão sai de proposta enviada, recusada ou vencida')
+  const opportunity = find(state.opportunities, previous.opportunityId, 'Oportunidade')
+  if (!opportunityIsOpen(opportunity)) throw new DomainError('Oportunidade encerrada')
+  const rootId = previous.rootId ?? previous.id
+  const version = Math.max(...state.proposals.filter(entry => (entry.rootId ?? entry.id) === rootId).map(entry => entry.version ?? 1)) + 1
+  const proposal: Proposal = {
+    ...previous, id: `${rootId}-v${version}`, rootId, version, status: 'Rascunho', createdAt: now(), createdBy: actor,
+    lines: previous.lines.map(line => ({ ...line })), validUntil: addDays(today(), 15),
+    salesOrderId: undefined, rejectionReason: undefined, approvalRequestedBy: undefined, approvedBy: undefined, approvedAt: undefined, cancelReason: undefined,
+  }
+  if (previous.status === 'Enviada') {
+    previous.status = 'Cancelada'
+    previous.cancelReason = `Substituída pela versão ${version}`
+  }
+  state.proposals.unshift(proposal)
+  log(state, 'Comercial', actor, `${proposal.id}: versão ${version} aberta a partir de ${previous.id}`, undefined, opportunity.id)
+  return proposal
+}
+
 function ensureCustomer(state: ErpState, partnerId: string) {
   const existing = state.customers.find(entry => entry.id === partnerId)
   if (existing) return existing
   const partner = find(state.partners, partnerId, 'Parceiro')
-  const customer = { id: partner.id, name: partner.name, city: partner.city, omieCode: `CL-${String(state.counters.CL = (state.counters.CL ?? 1400) + 1)}` }
+  const sends = !omieBlock(state, 'Cliente')
+  const customer = { id: partner.id, name: partner.name, city: partner.city, omieCode: sends ? `CL-${String(state.counters.CL = (state.counters.CL ?? 1400) + 1)}` : '' }
   state.customers.push(customer)
-  addSyncLog(state, { entity: 'Cliente', reference: customer.omieCode, direction: 'Thalamus → Omie', status: 'sincronizado', message: `${partner.name} cadastrado no Omie a partir do CRM` })
+  addSyncLog(state, { entity: 'Cliente', reference: customer.omieCode || partner.name, direction: 'Thalamus → Omie', status: 'sincronizado', message: `${partner.name} cadastrado no Omie a partir do CRM` })
   return customer
 }
 
+function releasedRevision(state: ErpState, itemId: string) {
+  const item = getItem(state, itemId)
+  return state.productRevisions.find(entry => entry.id === item.currentRevisionId)?.code ?? item.revision
+}
+
+/** O pedido nasce no Thalamus aguardando análise. Com o Omie ligado e a fonte decidida, segue também para lá. */
 function acceptProposal(state: ErpState, proposal: Proposal, actor: string) {
   const productLines = proposal.lines.filter(line => line.itemId)
   if (!productLines.length) throw new DomainError('A proposta precisa de ao menos um produto')
@@ -610,23 +758,76 @@ function acceptProposal(state: ErpState, proposal: Proposal, actor: string) {
   const opportunity = state.opportunities.find(entry => entry.id === proposal.opportunityId)
   const total = proposalTotal(proposal)
   if (opportunity) {
-    opportunity.stage = 'Conquista'
+    opportunity.stage = 'Ganho'
     opportunity.probability = 100
     opportunity.value = Math.round(total)
     opportunity.wonAt = today()
   }
   const first = orderLines.find(line => ['03', '04', '06'].includes(getItem(state, line.itemId).type)) ?? orderLines[0]
   const orderId = `PV-2026-${String(state.counters.PV = (state.counters.PV ?? 1056) + 1)}`
-  const omieId = `OM-${String(state.counters.OM = (state.counters.OM ?? 98510) + 1)}`
   state.salesOrders.unshift({
-    id: orderId, omieId, customerId: customer.id, itemId: first.itemId, quantity: first.quantity,
-    lines: orderLines,
+    id: orderId, customerId: customer.id, itemId: first.itemId, quantity: first.quantity,
+    lines: orderLines.map(line => ({ ...line, revision: releasedRevision(state, line.itemId) })),
     promisedDate: proposal.suggestedDate, priority: 'Normal', value: total, receivedAt: now(), planned: false,
+    origin: 'Thalamus', proposalId: proposal.id, opportunityId: proposal.opportunityId, paymentTerms: proposal.paymentTerms,
   })
   proposal.salesOrderId = orderId
-  addSyncLog(state, { entity: 'Pedido de venda', reference: orderId, direction: 'Thalamus → Omie', status: 'sincronizado', message: `${proposal.id} convertida em pedido ${omieId}` })
-  log(state, 'Comercial', actor, `${proposal.id} aceita; pedido ${orderId} aprovado no Omie`, orderId)
-  if (opportunity) log(state, 'CRM', actor, `Conquistada: pedido ${orderId} gerado (${money(total)})`, undefined, opportunity.id)
+  log(state, 'Comercial', actor, `${proposal.id} aceita; pedido ${orderId} criado aguardando análise`, orderId)
+  if (opportunity) log(state, 'CRM', actor, `Ganha: pedido ${orderId} gerado (${money(total)})`, undefined, opportunity.id)
+}
+
+/* ---------- Pedidos de venda ---------- */
+
+/**
+ * Fecha a análise técnica e comercial. Só o pedido confirmado é planejado.
+ * Com o Omie ligado e a fonte decidida, o pedido segue para lá; sem Omie, fica só no Thalamus.
+ */
+export function confirmSalesOrder(state: ErpState, id: string, actor: string) {
+  const order = find(state.salesOrders, id, 'Pedido')
+  if (salesOrderStatus(state, order) !== 'Aguardando análise') throw new DomainError('O pedido não está aguardando análise')
+  for (const line of order.lines ?? []) assertUsable(getItem(state, line.itemId), 'venda')
+  order.confirmedAt = now()
+  order.confirmedBy = actor
+  if (!omieBlock(state, 'Pedido de venda')) order.omieId ??= `OM-${String(state.counters.OM = (state.counters.OM ?? 98510) + 1)}`
+  addSyncLog(state, { entity: 'Pedido de venda', reference: order.id, direction: 'Thalamus → Omie', status: 'sincronizado', message: `Pedido confirmado enviado ao Omie${order.omieId ? ` como ${order.omieId}` : ''}` })
+  log(state, 'Comercial', actor, `${order.id} confirmado para atendimento`, order.id)
+  return order
+}
+
+/** Quantidade e preço derivam da proposta; mudar exige motivo e fica registrado. Só antes do planejamento. */
+export function changeSalesOrderLine(state: ErpState, id: string, index: number, patch: { quantity?: number; unitPrice?: number }, reason: string, actor: string) {
+  const order = find(state.salesOrders, id, 'Pedido')
+  if (order.planned || order.cancelledAt || order.shipment) throw new DomainError('Pedido planejado, expedido ou cancelado não muda por aqui')
+  if (!reason.trim()) throw new DomainError('Informe o motivo da alteração')
+  const line = order.lines?.[index]
+  if (!line) throw new DomainError('Linha não encontrada')
+  order.changes ??= []
+  const gross = (order.lines ?? []).reduce((sum, entry) => sum + entry.quantity * entry.unitPrice, 0)
+  const net = gross ? order.value / gross : 1
+  for (const field of ['quantity', 'unitPrice'] as const) {
+    const value = patch[field]
+    if (value === undefined || value === line[field]) continue
+    if (field === 'quantity' ? !(value > 0) : !(value >= 0)) throw new DomainError('Valor inválido')
+    order.changes.push({ at: now(), actor, line: index, field, from: line[field], to: value, reason: reason.trim() })
+    line[field] = value
+  }
+  const lines = order.lines ?? []
+  order.value = Math.round(lines.reduce((sum, entry) => sum + entry.quantity * entry.unitPrice, 0) * net * 100) / 100
+  const main = lines.find(entry => entry.itemId === order.itemId)
+  if (main) order.quantity = main.quantity
+  log(state, 'Comercial', actor, `${order.id}: linha ${index + 1} alterada (${reason.trim()})`, order.id)
+  return order
+}
+
+export function cancelSalesOrder(state: ErpState, id: string, reason: string, actor: string) {
+  const order = find(state.salesOrders, id, 'Pedido')
+  if (order.cancelledAt) throw new DomainError('Pedido já cancelado')
+  if (order.planned || order.shipment) throw new DomainError('Pedido já planejado: o cancelamento passa pelo PCP')
+  if (!reason.trim()) throw new DomainError('Informe o motivo do cancelamento')
+  order.cancelledAt = now()
+  order.cancelReason = reason.trim()
+  log(state, 'Comercial', actor, `${order.id} cancelado: ${reason.trim()}`, order.id)
+  return order
 }
 
 /* ---------- Assistência técnica ---------- */
@@ -639,8 +840,8 @@ export function createTechnicalOrder(
   if (!input.description.trim()) throw new DomainError('Descreva o problema relatado')
   const order = state.salesOrders.find(entry => entry.id === input.salesOrderId)
   if (!order) throw new DomainError('Escolha o pedido de origem')
-  const reference = order.shipment?.shippedAt ?? order.receivedAt
-  const warranty = !!reference && addDays(reference.slice(0, 10), 365) >= today()
+  const coverage = warrantyCoverage(state, order)
+  const warranty = coverage.covered
   const op = state.productionOrders.find(entry => entry.salesOrderId === order.id && entry.kind === 'Montagem')
   const technical: TechnicalServiceOrder = {
     id: `AT-${String(state.counters.AT = (state.counters.AT ?? 26018) + 1)}`, partnerId: order.customerId, productionOrderId: op?.id,
@@ -653,7 +854,7 @@ export function createTechnicalOrder(
     technical.nonConformityId = nc.id
     log(state, 'Qualidade', actor, `${nc.id} aberta por reclamação de campo (${technical.id})`, order.id)
   }
-  log(state, 'Assistência', actor, `${technical.id} aberto${warranty ? ' em garantia' : ' cobrável'} para ${order.id}`, order.id, technical.id)
+  log(state, 'Assistência', actor, `${technical.id} aberto${warranty ? ' em garantia' : ' cobrável'} para ${order.id} (${coverage.reason})`, order.id, technical.id)
   return technical
 }
 
@@ -754,7 +955,7 @@ const MILESTONE_TEMPLATES: Record<Project['kind'], string[]> = {
 
 export function createProject(
   state: ErpState,
-  input: Pick<Project, 'name' | 'kind' | 'ownerId' | 'startDate' | 'endDate'> & Partial<Pick<Project, 'partnerId' | 'description' | 'itemId' | 'opportunityId'>> & { budget?: number },
+  input: Pick<Project, 'name' | 'kind' | 'ownerId' | 'startDate' | 'endDate'> & Partial<Pick<Project, 'partnerId' | 'description' | 'itemId' | 'opportunityId' | 'scope' | 'priority'>> & { budget?: number },
   actor: string,
 ) {
   if (!input.name.trim()) throw new DomainError('Dê um nome ao projeto')
@@ -819,6 +1020,15 @@ export function setProjectStatus(state: ErpState, id: string, status: Project['s
   return project
 }
 
+/** Resultado e entregáveis do projeto. No P&D, é o que a Engenharia decidiu sobre o item avaliado. */
+export function recordProjectResult(state: ErpState, id: string, result: string, actor: string) {
+  const project = find(state.projects, id, 'Projeto')
+  if (!result.trim()) throw new DomainError('Descreva o resultado')
+  project.result = result.trim()
+  log(state, 'Projetos', actor, `Resultado registrado: ${result.trim()}`, undefined, id)
+  return project
+}
+
 export function addProjectRisk(state: ErpState, id: string, risk: string, actor: string) {
   const project = find(state.projects, id, 'Projeto')
   if (!risk.trim()) throw new DomainError('Descreva o risco')
@@ -840,10 +1050,17 @@ export function sectorOf(state: ErpState, user: Pick<User, 'sector'>) {
   return state.sectors.find(entry => entry.name === name)
 }
 
+function knownShift(state: ErpState, name: string) {
+  if (!name.trim()) return ''
+  const found = state.shifts.find(entry => entry.name.trim().toLocaleLowerCase('pt-BR') === name.trim().toLocaleLowerCase('pt-BR'))
+  if (!found) throw new DomainError('Cadastre o turno antes de usar')
+  return found.name
+}
+
 export function createUser(state: ErpState, input: Pick<User, 'name' | 'role' | 'sector' | 'shift'> & Partial<Pick<User, 'email' | 'positionId'>>, actor: string) {
   if (!input.name.trim()) throw new DomainError('Informe o nome')
   if (input.email && state.users.some(entry => entry.email === input.email)) throw new DomainError('E-mail já utilizado')
-  const user: User = { id: `u${String(state.counters.U = (state.counters.U ?? 15) + 1)}`, pin: String(1000 + (state.counters.U * 37) % 9000), active: true, ...input }
+  const user: User = { id: `u${String(state.counters.U = (state.counters.U ?? 15) + 1)}`, pin: String(1000 + (state.counters.U * 37) % 9000), active: true, ...input, shift: knownShift(state, input.shift) }
   state.users.push(user)
   log(state, 'Pessoas', actor, `${user.name} cadastrado como ${user.role}`, undefined, user.id)
   return user
@@ -851,6 +1068,7 @@ export function createUser(state: ErpState, input: Pick<User, 'name' | 'role' | 
 
 export function updateUser(state: ErpState, id: string, patch: Partial<Pick<User, 'role' | 'sector' | 'shift' | 'positionId' | 'email' | 'active'>>, actor: string) {
   const user = find(state.users, id, 'Pessoa')
+  if (patch.shift !== undefined) patch = { ...patch, shift: knownShift(state, patch.shift) }
   const changes = Object.entries(patch).filter(([key, value]) => user[key as keyof User] !== value).map(([key]) => key)
   Object.assign(user, patch)
   if (changes.length) log(state, 'Pessoas', actor, `Cadastro atualizado (${changes.join(', ')})`, undefined, id)
@@ -869,6 +1087,10 @@ export function createAsset(state: ErpState, input: Omit<Asset, 'id' | 'shots'>,
 export function updateAsset(state: ErpState, id: string, patch: Partial<Omit<Asset, 'id'>>, actor: string) {
   const asset = find(state.assets, id, 'Ativo')
   if (patch.resourceId && patch.resourceId !== asset.resourceId) assertResourceChoice(state, patch.resourceId)
+  if (patch.facilityId !== undefined && patch.facilityId !== asset.facilityId) throw new DomainError('A localização muda só por movimentação concluída')
+  if (patch.status && patch.status !== asset.status && (['Locado', 'Baixado'].includes(patch.status) || ['Locado', 'Baixado'].includes(asset.status ?? ''))) {
+    throw new DomainError('Locado e Baixado mudam pelo contrato de locação ou pela movimentação de baixa')
+  }
   Object.assign(asset, patch)
   log(state, 'Ativos', actor, 'Cadastro do ativo atualizado', undefined, id)
   return asset
@@ -880,6 +1102,7 @@ export function updateAsset(state: ErpState, id: string, patch: Partial<Omit<Ass
 export function releaseRevision(state: ErpState, revisionId: string, actor: string, validFrom = today()) {
   const revision = find(state.productRevisions, revisionId, 'Revisão')
   if (revision.status !== 'Rascunho') throw new DomainError('Só uma versão em rascunho pode ser liberada')
+  if (revision.createdBy && revision.createdBy === actor) throw new DomainError('Quem elaborou a revisão não aprova: a liberação é de outra pessoa')
   if (revision.checklist.some(entry => !entry.done)) throw new DomainError('Complete o checklist antes de liberar')
   if (revision.lines && !revision.lines.length) throw new DomainError('A versão precisa ter ao menos um componente')
   const owner = state.items.find(entry => entry.id === revision.itemId)
@@ -906,6 +1129,22 @@ export function releaseRevision(state: ErpState, revisionId: string, actor: stri
   return revision
 }
 
+/** Rejeição é decisão registrada: a revisão sai de circulação e a vigente continua valendo. */
+export function rejectRevision(state: ErpState, revisionId: string, reason: string, actor: string) {
+  const revision = find(state.productRevisions, revisionId, 'Revisão')
+  if (revision.status !== 'Rascunho') throw new DomainError('Só uma versão em rascunho pode ser rejeitada')
+  if (!reason.trim()) throw new DomainError('Informe o motivo da rejeição')
+  if (revision.createdBy && revision.createdBy === actor) throw new DomainError('Quem elaborou a revisão não decide sobre ela. Descarte o rascunho se quiser desistir')
+  revision.status = 'Rejeitada'
+  revision.rejectedAt = now()
+  revision.rejectedBy = actor
+  revision.rejectionReason = reason.trim()
+  const item = getItem(state, revision.itemId)
+  item.catalog?.audit.unshift({ at: now(), actor, text: `Revisão ${revision.code} rejeitada: ${reason.trim()}`, version: item.catalog.version, field: 'Estrutura', from: `Versão ${revision.code} em rascunho`, to: 'Rejeitada' })
+  log(state, 'Engenharia', actor, `${item.code}: revisão ${revision.code} rejeitada (${reason.trim()})`, undefined, item.id)
+  return revision
+}
+
 /* ---------- Tarefas ---------- */
 
 export interface DerivedTask { id: string; title: string; detail: string; to: string; record?: { kind: string; id: string } }
@@ -920,20 +1159,29 @@ export function tasksForRole(state: ErpState, role: Role, userId = '') {
     for (const entry of state.proposals.filter(item => item.status === 'Enviada' && item.validUntil <= addDays(today(), 3))) {
       tasks.push({ id: entry.id, title: `${entry.id} vence em breve`, detail: 'Cobrar retorno do cliente', to: '/crm/propostas', record: { kind: 'proposal', id: entry.id } })
     }
+    for (const entry of state.salesOrders.filter(item => salesOrderStatus(state, item) === 'Aguardando análise')) {
+      tasks.push({ id: `${entry.id}-analise`, title: `Confirmar ${entry.id}`, detail: 'Pedido do Thalamus aguardando análise técnica e comercial', to: '/pedidos' })
+    }
+  }
+  if (hasFullAccess(role)) {
+    for (const entry of state.proposals.filter(item => item.status === 'Em aprovação')) {
+      tasks.push({ id: `${entry.id}-desconto`, title: `Aprovar desconto de ${entry.id}`, detail: `${entry.discount}% pedido por ${entry.approvalRequestedBy ?? '—'}`, to: '/crm/propostas', record: { kind: 'proposal', id: entry.id } })
+    }
   }
   if (is('Compras')) {
     for (const entry of state.demands.filter(item => item.status === 'Aberta' && item.assigneeRole === 'Compras')) tasks.push({ id: entry.id, title: `Atender ${entry.id}`, detail: entry.description, to: '/demandas', record: { kind: 'demand', id: entry.id } })
     for (const entry of state.purchaseOrders.filter(item => item.status === 'Aguardando aprovação')) tasks.push({ id: entry.id, title: `Aprovar ${entry.id}`, detail: 'Pedido aguardando alçada', to: '/compras', record: { kind: 'purchase', id: entry.id } })
+    for (const entry of state.receipts.filter(item => item.status === 'Bloqueado')) tasks.push({ id: entry.id, title: `Decidir ${entry.id} bloqueado`, detail: `${entry.check}: ${entry.received - entry.accepted} ${getItem(state, entry.itemId).unit} de ${getItem(state, entry.itemId).name} · ${entry.purchaseOrderId}`, to: '/recebimento' })
   }
   if (is('Almoxarifado')) {
     for (const entry of state.demands.filter(item => item.status === 'Aberta' && item.assigneeRole === 'Almoxarifado')) tasks.push({ id: entry.id, title: `Separar ${entry.id}`, detail: entry.description, to: '/demandas', record: { kind: 'demand', id: entry.id } })
-    for (const entry of state.purchaseOrders.filter(item => item.status === 'Aprovado' || item.status === 'Recebido parcial')) tasks.push({ id: `${entry.id}-rec`, title: `Receber ${entry.id}`, detail: `${entry.quantity - entry.received} ${getItem(state, entry.itemId).unit} de ${getItem(state, entry.itemId).name}`, to: '/compras', record: { kind: 'purchase', id: entry.id } })
+    for (const entry of state.purchaseOrders.filter(item => (item.status === 'Aprovado' || item.status === 'Recebido parcial') && openToReceive(state, item) > 0)) tasks.push({ id: `${entry.id}-rec`, title: `Receber ${entry.id}`, detail: `${openToReceive(state, entry)} ${getItem(state, entry.itemId).unit} de ${getItem(state, entry.itemId).name}`, to: '/recebimento' })
   }
   if (is('Assistência')) {
     for (const entry of state.technicalServiceOrders.filter(item => !['Concluída', 'Cancelada'].includes(item.status))) tasks.push({ id: entry.id, title: `${entry.id} · ${entry.status}`, detail: entry.description, to: '/assistencia', record: { kind: 'technical', id: entry.id } })
   }
   if (is('Engenharia')) {
-    for (const entry of state.productRevisions.filter(item => item.status === 'Rascunho')) tasks.push({ id: entry.id, title: `Liberar revisão ${entry.code}`, detail: getItem(state, entry.itemId).name, to: `/produtos/item/${entry.itemId}` })
+    for (const entry of state.productRevisions.filter(item => item.status === 'Rascunho')) tasks.push({ id: entry.id, title: `Decidir revisão ${entry.code}`, detail: `${getItem(state, entry.itemId).name} · elaborada por ${entry.createdBy ?? '—'}`, to: '/revisoes' })
   }
   const approvalRoles = APPROVER[role] ?? []
   for (const item of state.items.filter(entry => entry.catalog?.lifecycle === 'Em homologação' && !entry.catalog.deletedAt)) {

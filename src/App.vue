@@ -10,6 +10,7 @@ import RecordDrawer from './components/records/RecordDrawer.vue'
 import ToastHost from './components/ToastHost.vue'
 import TourGuide from './components/TourGuide.vue'
 import { allocationOf } from './domain/budget'
+import { missingProfile } from './domain/organization'
 import { AREAS, areaDestination, areaOf, moduleFeature, moduleOf, navTarget, owns, type NavItem } from './navigation'
 import { useErpStore } from './stores/erp'
 import { useUiStore } from './stores/ui'
@@ -51,9 +52,11 @@ const budgetNotices = computed(() => store.state.budgetAlerts.filter(entry => {
   if (entry.kind === 'Bloqueio' && budgetDecisions.value.some(item => item.sourceId === entry.sourceId)) return false
   return true
 }))
-const noticeCount = computed(() => openAlerts.value.length + budgetDecisions.value.length + budgetNotices.value.length)
 const sessionAccount = computed(() => store.state.users.find(entry => entry.id === ui.sessionUserId))
-const sessionPhoto = computed(() => store.state.persons.find(entry => entry.id === sessionAccount.value?.personId)?.photo)
+const sessionPerson = computed(() => store.state.persons.find(entry => entry.id === sessionAccount.value?.personId && entry.tenantId === ui.activeTenantId))
+const profileMissing = computed(() => sessionPerson.value ? missingProfile(sessionPerson.value) : [])
+const noticeCount = computed(() => openAlerts.value.length + budgetDecisions.value.length + budgetNotices.value.length + (profileMissing.value.length ? 1 : 0))
+const sessionPhoto = computed(() => sessionPerson.value?.photo)
 const sessionInitials = computed(() => {
   const parts = (sessionAccount.value?.name ?? '').split(' ').filter(Boolean)
   return parts.map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'US'
@@ -86,7 +89,7 @@ const results = computed(() => {
   if (term.length < 2) return []
   const has = (...values: string[]) => values.some(value => value.toLowerCase().includes(term))
   return [
-    ...store.state.salesOrders.filter(order => has(order.id, order.omieId, store.customerName(order.customerId))).map(order => ({ key: order.id, type: 'Pedido', title: order.id, text: `${store.customerName(order.customerId)} · ${store.stage(order)}`, open: () => { ui.orderDrawer = order.id } })),
+    ...store.state.salesOrders.filter(order => has(order.id, order.omieId ?? '', store.customerName(order.customerId))).map(order => ({ key: order.id, type: 'Pedido', title: order.id, text: `${store.customerName(order.customerId)} · ${store.stage(order)}`, open: () => { ui.orderDrawer = order.id } })),
     ...store.state.productionOrders.filter(op => has(op.id, store.itemLabel(op.itemId))).map(op => ({ key: op.id, type: 'OP', title: op.id, text: `${store.itemLabel(op.itemId)} · ${op.status}`, open: () => { ui.opDrawer = op.id } })),
     ...store.state.items.filter(item => has(item.code, item.name)).map(item => ({ key: item.id, type: 'Produto', title: item.code, text: store.itemLabel(item.id), open: () => router.push(`/produtos/item/${item.id}`) })),
     ...store.state.requisitions.filter(req => has(req.id, req.omiePo ?? '')).map(req => ({ key: req.id, type: 'Compra', title: req.id, text: `${store.itemLabel(req.itemId)} · ${req.status}`, open: () => router.push('/compras') })),
@@ -115,7 +118,9 @@ function changeProfile(profileId: string) {
   store.previewProfile(profileId || null)
   const profile = profileId ? store.state.accessProfiles.find(entry => entry.id === profileId) : undefined
   ui.notify('info', profile ? `Visualizando como ${profile.name}` : 'Visualização administrativa restaurada', profile ? 'Isto não altera os acessos reais do usuário' : undefined)
-  if (!allowed(moduleOf(route.path))) router.push('/')
+  const module = moduleOf(route.path)
+  if (module === 'Pessoas' && /^\/pessoas\/pessoa\/[^/]+$/.test(route.path)) return
+  if (!allowed(module)) router.push('/')
 }
 
 function pageTour() {
@@ -241,6 +246,13 @@ watch(() => ui.tourSteps.length, length => { if (length === 0) maybeStartTour() 
                   </div>
                 </div>
               </template>
+              <template v-if="profileMissing.length && sessionPerson">
+                <p class="dropdown-title">Dados cadastrais</p>
+                <RouterLink class="decision-item" :to="`/pessoas/pessoa/${sessionPerson.id}?aba=dados`" @click="bellOpen = false">
+                  <strong>Complete seus dados cadastrais</strong>
+                  <small>{{ profileMissing.join(', ') }}</small>
+                </RouterLink>
+              </template>
               <p class="dropdown-title">Chamados do chão de fábrica</p>
               <p v-if="!openAlerts.length" class="empty-note">Nenhum chamado aberto</p>
               <div v-for="alert in openAlerts" :key="alert.id" class="alert-item">
@@ -277,6 +289,10 @@ watch(() => ui.tourSteps.length, length => { if (length === 0) maybeStartTour() 
           <i></i><span>Omie {{ syncErrors ? `· ${syncErrors} falha(s)` : 'conectado' }}</span>
         </RouterLink>
       </nav>
+      <p v-if="profileMissing.length && sessionPerson" class="notice warning" style="margin:12px 16px 0">
+        Seus dados cadastrais estão incompletos: {{ profileMissing.join(', ') }}.
+        <RouterLink :to="`/pessoas/pessoa/${sessionPerson.id}?aba=dados`">Abrir minha ficha</RouterLink>
+      </p>
       <div class="page-content" @click="helpOpen = false; bellOpen = false; areaOpen = false"><RouterView /></div>
     </main>
   </div>

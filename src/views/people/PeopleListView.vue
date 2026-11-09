@@ -5,6 +5,7 @@ import { Search } from 'lucide-vue-next'
 import BaseModal from '../../components/BaseModal.vue'
 import DirectoryAlert from './DirectoryAlert.vue'
 import PersonPhoto from './PersonPhoto.vue'
+import ShiftField from './ShiftField.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import { sectorOf } from '../../domain/enterprise'
 import { directManager, groupDirectory, occupantsAt } from '../../domain/organization'
@@ -24,7 +25,7 @@ const sector = ref('')
 const query = ref('')
 const target = ref<ReturnType<typeof groupDirectory>[number] | null>(null)
 const mode = ref<Mode>('projeto')
-const form = reactive({ projectId: '', projectRole: '', profileId: '', sector: '', positionId: '', contractType: 'CLT', startedOn: today(), shift: 'Manhã' as User['shift'] })
+const form = reactive({ projectId: '', projectRole: '', profileId: '', sector: '', positionId: '', contractType: 'CLT', startedOn: today(), shift: '' as User['shift'] })
 
 const companySectors = computed(() => store.state.sectors.filter(entry => entry.tenantId === ui.activeTenantId))
 const staff = computed(() => store.state.users.filter(entry => !entry.platformMaster && entry.homeTenantId === ui.activeTenantId))
@@ -62,7 +63,7 @@ function open(entry: ReturnType<typeof groupDirectory>[number]) {
   target.value = entry
   mode.value = 'projeto'
   const profileId = profiles.value.find(entry => entry.simulatedRole === 'Operador')?.id ?? profiles.value[0]?.id ?? ''
-  Object.assign(form, { projectId: projects.value[0]?.id ?? '', projectRole: '', profileId, sector: companySectors.value[0]?.name ?? '', positionId: '', contractType: 'CLT', startedOn: today(), shift: 'Manhã' })
+  Object.assign(form, { projectId: projects.value[0]?.id ?? '', projectRole: '', profileId, sector: companySectors.value[0]?.name ?? '', positionId: '', contractType: 'CLT', startedOn: today(), shift: '' })
 }
 function confirm() {
   const entry = target.value
@@ -145,7 +146,7 @@ function confirm() {
 
     <template v-else-if="mode === 'acesso'">
       <p class="hint">A conta dela passa a entrar em {{ tenantName }} com o perfil escolhido. Não vira colaboradora daqui.</p>
-      <div v-if="targetAccount" class="field"><label>Perfil em {{ tenantName }}</label><select v-model="form.profileId"><option value="" disabled>Escolha o perfil</option><option v-for="entry in profiles" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+      <div v-if="targetAccount" class="field"><label>Perfil em {{ tenantName }}</label><select v-model="form.profileId"><option v-for="entry in profiles" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
       <p v-else class="empty-note">Esta pessoa não tem conta no Thalamus. Peça para a empresa de origem criar a conta primeiro.</p>
     </template>
 
@@ -156,7 +157,7 @@ function confirm() {
         <div class="field"><label>Posição</label><select v-model="form.positionId"><option value="">Sem posição por enquanto</option><option v-for="entry in freePositions" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>A pessoa ocupa esta vaga. O cargo é o da vaga.<template v-if="!freePositions.length"> Nenhuma está livre neste setor.</template></small></div>
         <div class="field"><label>Contrato</label><select v-model="form.contractType"><option>CLT</option><option>Estágio</option><option>PJ</option><option>Temporário</option></select></div>
         <div class="field"><label>Início</label><input v-model="form.startedOn" type="date" /></div>
-        <div class="field"><label>Turno</label><select v-model="form.shift"><option>Manhã</option><option>Tarde</option><option>Administrativo</option></select></div>
+        <div class="field"><label>Turno</label><ShiftField v-model="form.shift" /></div>
         <div class="field"><label>Perfil em {{ tenantName }}</label><select v-model="form.profileId"><option v-for="entry in profiles" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>O mesmo catálogo da Gestão de acesso.</small></div>
       </div>
     </template>

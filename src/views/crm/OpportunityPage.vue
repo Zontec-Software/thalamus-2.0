@@ -14,7 +14,7 @@ import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import type { CrmActivity, Opportunity } from '../../types/domain'
 import { fmtCurrency, fmtDate, fmtDateTime } from '../../utils/format'
-import { CRM_SOURCES, CRM_VERTICALS, DEAL_TYPES, LOSS_REASONS, attentionOf, proposalSituation, useCrmScope } from './shared'
+import { CRM_VERTICALS, DEAL_TYPES, LOSS_REASONS, attentionOf, useCrmLists, useCrmScope } from './shared'
 
 type Tab = 'dados' | 'historico'
 type ActionKind = 'Tarefa' | 'Reunião' | 'E-mail' | 'Ligação' | 'Demanda' | 'PAP' | 'Produto'
@@ -103,6 +103,7 @@ function move(stage: Opportunity['stage']) {
 }
 
 const losing = ref(false)
+const { sources, lossReasons } = useCrmLists()
 const loss = reactive({ reason: LOSS_REASONS[0], detail: '' })
 function lose() {
   if (opportunity.value && store.loseOpportunity(opportunity.value.id, loss.detail ? `${loss.reason}: ${loss.detail}` : loss.reason)) losing.value = false
@@ -201,9 +202,9 @@ function newProposal() {
         </div>
       </div>
 
-      <div v-if="opportunity.stage === 'Perdida'" class="notice danger">Perdida: {{ opportunity.lossReason }}</div>
+      <div v-if="opportunity.stage === 'Perdido'" class="notice danger">Perdida: {{ opportunity.lossReason }}</div>
       <div v-else class="stage-stepper" data-tour="opp-stages">
-        <button v-for="(stage, index) in CRM_STAGES" :key="stage" class="stage-step as-button" :class="{ done: index < CRM_STAGES.indexOf(opportunity.stage), current: stage === opportunity.stage }" :disabled="closed || stage === 'Conquista'" :title="stage === 'Conquista' ? 'Conquistada ao aceitar a proposta' : `Mover para ${stage}`" @click="move(stage)">
+        <button v-for="(stage, index) in CRM_STAGES" :key="stage" class="stage-step as-button" :class="{ done: index < CRM_STAGES.indexOf(opportunity.stage), current: stage === opportunity.stage }" :disabled="closed || stage === 'Ganho'" :title="stage === 'Ganho' ? 'Conquistada ao aceitar a proposta' : `Mover para ${stage}`" @click="move(stage)">
           <i></i><span>{{ stage }}</span>
         </button>
       </div>
@@ -244,7 +245,7 @@ function newProposal() {
             <div class="field"><label>E-mail</label><input :value="form.email || '—'" disabled /></div>
             <div class="field"><label>Vendedor</label><select v-model="form.ownerId" :disabled="closed"><option v-for="seller in sellers" :key="seller.id" :value="seller.id">{{ seller.name }}</option></select></div>
             <div class="field"><label>Tipo</label><select v-model="form.dealType" :disabled="closed"><option v-for="type in DEAL_TYPES" :key="type">{{ type }}</option></select></div>
-            <div class="field"><label>Origem</label><select v-model="form.source" :disabled="closed"><option v-for="source in CRM_SOURCES" :key="source">{{ source }}</option></select></div>
+            <div class="field"><label>Origem</label><select v-model="form.source" :disabled="closed"><option v-for="source in sources" :key="source">{{ source }}</option></select></div>
             <div class="field"><label>Vertical</label><select v-model="form.vertical" :disabled="closed"><option value="">Não informada</option><option v-for="vertical in CRM_VERTICALS" :key="vertical">{{ vertical }}</option></select><small>Grava no cadastro do cliente.</small></div>
           </div>
         </section>
@@ -267,7 +268,7 @@ function newProposal() {
               <tr v-for="proposal in proposals" :key="proposal.id" class="clickable" @click="ui.openRecord('proposal', proposal.id)">
                 <td><span class="cell-main code">{{ proposal.id }}</span></td>
                 <td>{{ fmtCurrency(proposalTotal(proposal)) }}</td>
-                <td><StatusBadge :value="proposalSituation(proposal.status)" /></td>
+                <td><StatusBadge :value="proposal.status" /></td>
               </tr>
             </tbody>
           </table>
@@ -335,7 +336,7 @@ function newProposal() {
     </article>
 
     <BaseModal :open="losing" title="Marcar como perdida" :subtitle="`${opportunity.id} · as propostas em aberto serão recusadas`" width="460px" @close="losing = false">
-      <div class="field"><label>Motivo</label><select v-model="loss.reason"><option v-for="reason in LOSS_REASONS" :key="reason">{{ reason }}</option></select></div>
+      <div class="field"><label>Motivo</label><select v-model="loss.reason"><option v-for="reason in lossReasons" :key="reason">{{ reason }}</option></select></div>
       <div class="field"><label>Detalhe</label><input v-model="loss.detail" placeholder="Opcional" /></div>
       <template #footer>
         <button class="button secondary" @click="losing = false">Cancelar</button>

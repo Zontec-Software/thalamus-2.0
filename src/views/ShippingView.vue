@@ -12,8 +12,10 @@ const store = useErpStore()
 const ui = useUiStore()
 const carriers = computed(() => carrierChoices(store.state))
 const forms = reactive<Record<string, { volumes: number; carrier: string }>>({})
+const receivers = reactive<Record<string, string>>({})
+const done = (status: string) => status === 'Faturado' || status === 'Entregue'
 
-const shipments = computed(() => store.state.salesOrders.filter(order => order.shipment).sort((a, b) => Number(a.shipment!.status === 'Faturado') - Number(b.shipment!.status === 'Faturado')))
+const shipments = computed(() => store.state.salesOrders.filter(order => order.shipment).sort((a, b) => Number(a.shipment!.status === 'Entregue') - Number(b.shipment!.status === 'Entregue') || Number(done(a.shipment!.status)) - Number(done(b.shipment!.status))))
 const form = (orderId: string, quantity: number) => (forms[orderId] ??= { volumes: Math.ceil(quantity / 12), carrier: carriers.value[0] ?? '' })
 const count = (status: string) => shipments.value.filter(order => order.shipment!.status === status).length
 
@@ -23,13 +25,14 @@ const cargo = (order: typeof store.state.salesOrders[number]) =>
 </script>
 
 <template>
-  <div class="toolbar"><p>Conferência, carga e faturamento. A NF-e é emitida no Omie e retorna automaticamente para o pedido.</p></div>
+  <div class="toolbar"><p>Conferência, carga, faturamento e entrega. A NF-e é emitida no Omie e retorna para o pedido. A entrega confirmada abre a garantia.</p></div>
 
   <section class="metrics">
     <MetricCard label="Aguardando conferência" :value="count('Aguardando conferência')" detail="Aprovados pela qualidade" :icon="PackageCheck" />
     <MetricCard label="Conferidos" :value="count('Conferido')" detail="Prontos para carregar" :icon="PackageCheck" />
     <MetricCard label="Aguardando NF-e" :value="count('Expedido')" detail="Processando no Omie" :icon="Truck" />
-    <MetricCard label="Faturados" :value="count('Faturado')" detail="NF-e emitida" :icon="Truck" trend="positive" />
+    <MetricCard label="Entrega a confirmar" :value="count('Faturado') + count('Expedido')" detail="No caminho do cliente" :icon="Truck" />
+    <MetricCard label="Entregues" :value="count('Entregue')" detail="Garantia aberta" :icon="PackageCheck" trend="positive" />
   </section>
 
   <article class="card flush" data-tour="shipping-list">
@@ -60,8 +63,12 @@ const cargo = (order: typeof store.state.salesOrders[number]) =>
           <td>
             <button v-if="order.shipment!.status === 'Aguardando conferência'" class="button small" @click="store.confirmShipment(order.id, form(order.id, order.quantity).volumes, form(order.id, order.quantity).carrier)">Confirmar conferência</button>
             <button v-else-if="order.shipment!.status === 'Conferido'" class="button small" @click="store.shipOrder(order.id)"><Truck :size="13" /> Expedir e faturar</button>
-            <span v-else-if="order.shipment!.status === 'Expedido'" class="cell-sub">Aguardando NF-e do Omie…</span>
-            <span v-else class="cell-sub">Concluído</span>
+            <div v-else-if="order.shipment!.status === 'Expedido' || order.shipment!.status === 'Faturado'" class="filter-row">
+              <span v-if="order.shipment!.status === 'Expedido'" class="cell-sub">Aguardando NF-e do Omie…</span>
+              <input v-model="receivers[order.id]" class="filter" placeholder="Quem recebeu" />
+              <button class="button small" :disabled="!receivers[order.id]?.trim()" @click="store.confirmDelivery(order.id, receivers[order.id])">Confirmar entrega</button>
+            </div>
+            <span v-else class="cell-sub">Entregue a {{ order.shipment!.deliveredTo ?? '—' }}</span>
           </td>
         </tr>
       </tbody>

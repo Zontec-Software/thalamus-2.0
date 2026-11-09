@@ -4,14 +4,27 @@ import { CheckCircle2, CloudDownload, RotateCcw, TriangleAlert } from 'lucide-vu
 import MetricCard from '../components/MetricCard.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { OWNERSHIP } from '../services/omie/gateway'
+import { OMIE_ENTITIES } from '../domain/registry'
 import { useErpStore } from '../stores/erp'
+import { useUiStore } from '../stores/ui'
+import type { OmieEntity, OmieEntitySource } from '../types/domain'
 import { fmtDateTime } from '../utils/format'
 
 const store = useErpStore()
+const ui = useUiStore()
 const syncing = ref(false)
-const filter = ref<'todos' | 'erro' | 'pendente'>('todos')
+const filter = ref<'todos' | 'erro' | 'pendente' | 'ignorado'>('todos')
 
 const logs = computed(() => store.state.syncLogs.filter(log => filter.value === 'todos' || log.status === filter.value))
+type SourceValue = OmieEntitySource['source']
+type DirectionValue = OmieEntitySource['direction']
+const connection = computed(() => store.state.omieConnections.find(entry => entry.tenantId === ui.activeTenantId))
+const canDecide = computed(() => store.can('integracao.fonte.decidir'))
+const sourceOf = (entity: OmieEntity) => store.state.omieSources.find(entry => entry.tenantId === ui.activeTenantId && entry.entity === entity)
+function decide(entity: OmieEntity, source: SourceValue, direction?: DirectionValue) {
+  const fitting: DirectionValue = source === 'Thalamus' && direction === 'Receber' ? 'Enviar' : source === 'Omie' && direction === 'Enviar' ? 'Receber' : direction ?? 'Bidirecional'
+  store.setOmieSource(entity, source, fitting)
+}
 const count = (status: string) => store.state.syncLogs.filter(log => log.status === status).length
 
 async function sync() {
@@ -27,7 +40,7 @@ function reset() {
 
 <template>
   <div class="toolbar">
-    <p>Uma única camada de integração (backend) com fila e reprocessamento. Cada dado tem um dono: nada é digitado duas vezes.</p>
+    <p>Uma única camada de integração (backend) com fila e reprocessamento. Cada dado tem uma fonte oficial: nada é digitado duas vezes. Sem Omie, o Thalamus funciona sozinho.</p>
     <div class="filter-row">
       <button class="button secondary" @click="reset"><RotateCcw :size="14" /> Restaurar demonstração</button>
       <button class="button" :disabled="syncing" @click="sync"><CloudDownload :size="15" /> {{ syncing ? 'Consultando…' : 'Sincronizar agora' }}</button>
@@ -45,7 +58,7 @@ function reset() {
     <div class="section-head">
       <div><h2>Transações com o Omie</h2><p>Erros ficam visíveis e podem ser reprocessados após a correção</p></div>
       <div class="filter-row">
-        <button v-for="option in (['todos', 'erro', 'pendente'] as const)" :key="option" class="chip" :class="{ active: filter === option }" @click="filter = option">{{ option }}</button>
+        <button v-for="option in (['todos', 'erro', 'pendente', 'ignorado'] as const)" :key="option" class="chip" :class="{ active: filter === option }" @click="filter = option">{{ option }}</button>
       </div>
     </div>
     <table>
@@ -59,6 +72,33 @@ function reset() {
       </tbody>
     </table>
     <p v-if="!logs.length" class="empty-note">Nenhuma transação neste filtro.</p>
+  </article>
+
+  <article class="card flush" data-tour="integration-sources">
+    <div class="section-head">
+      <div><h2>Fonte oficial por entidade</h2><p>{{ connection?.status === 'Não configurada' || !connection ? 'Empresa sem Omie: tudo fica só no Thalamus.' : 'Pendente desliga a sincronização daquela entidade até alguém decidir.' }}</p></div>
+      <StatusBadge :value="connection?.status ?? 'Não configurada'" />
+    </div>
+    <table>
+      <thead><tr><th>Entidade</th><th>Fonte</th><th>Sentido</th><th>Decidido por</th></tr></thead>
+      <tbody>
+        <tr v-for="entity in OMIE_ENTITIES" :key="entity">
+          <td><span class="cell-main">{{ entity }}</span></td>
+          <td>
+            <select class="filter" :value="sourceOf(entity)?.source ?? 'Pendente'" :disabled="!canDecide" @change="decide(entity, ($event.target as HTMLSelectElement).value as SourceValue, sourceOf(entity)?.direction)">
+              <option>Thalamus</option><option>Omie</option><option>Pendente</option>
+            </select>
+          </td>
+          <td>
+            <select class="filter" :value="sourceOf(entity)?.direction ?? 'Bidirecional'" :disabled="!canDecide || (sourceOf(entity)?.source ?? 'Pendente') === 'Pendente'" @change="decide(entity, sourceOf(entity)?.source ?? 'Pendente', ($event.target as HTMLSelectElement).value as DirectionValue)">
+              <option>Enviar</option><option>Receber</option><option>Bidirecional</option>
+            </select>
+          </td>
+          <td>{{ sourceOf(entity)?.decidedBy ? `${sourceOf(entity)!.decidedBy} · ${fmtDateTime(sourceOf(entity)!.decidedAt!)}` : '—' }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p v-if="!canDecide" class="empty-note">Seu perfil consulta. A decisão é de quem tem "Decidir fonte oficial".</p>
   </article>
 
   <article class="card flush" data-tour="integration-rules">

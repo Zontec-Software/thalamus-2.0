@@ -1,7 +1,8 @@
 import type { ErpState } from './engine'
 import { DomainError, log, nextId, now, today } from './engine'
 import { sectorOf } from './enterprise'
-import type { Employment, IdentityLink, JobCatalog, JobPosition, Person, ProjectParticipation, Role, Sector, User } from '../types/domain'
+import { CNH_CATEGORIES, EDUCATION, GENDER, MARITAL_STATUS, PCD, RACE, SEX, SHIRT_SIZES, SHOE_SIZES, STATES } from './personCatalog'
+import type { Employment, IdentityLink, JobCatalog, JobLevel, JobPosition, Person, ProjectParticipation, Role, Sector, User, WorkShift } from '../types/domain'
 
 /** Campos que não saem da empresa, nem no projeto nem no diretório. */
 export const SENSITIVE_PERSON_KEYS = ['cpf', 'rg', 'cnh', 'birthDate', 'race', 'pcd', 'drugAllergy', 'foodAllergy', 'controlledMedicine', 'address', 'banks', 'family', 'salary'] as const
@@ -66,8 +67,65 @@ export function setPersonPhoto(state: ErpState, personId: string, photo: string 
   return person
 }
 
+export function maskCpf(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+  let masked = digits.slice(0, 3)
+  if (digits.length > 3) masked += `.${digits.slice(3, 6)}`
+  if (digits.length > 6) masked += `.${digits.slice(6, 9)}`
+  if (digits.length > 9) masked += `-${digits.slice(9, 11)}`
+  return masked
+}
+
+/** Telefone com DDD: fixo (4-4) até 10 dígitos, celular (5-4) com 11. */
+export function maskPhone(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 11)
+  if (digits.length <= 2) return digits ? `(${digits}` : ''
+  const split = digits.length > 10 ? 7 : 6
+  let masked = `(${digits.slice(0, 2)}) ${digits.slice(2, split)}`
+  if (digits.length > split) masked += `-${digits.slice(split)}`
+  return masked
+}
+
+/** Mesma conta da API de Pessoas: 11 dígitos, sem repetir um único algarismo, com os dois verificadores. */
+export function validCpf(value: string) {
+  const cpf = value.replace(/\D/g, '')
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false
+  for (let length = 9; length < 11; length += 1) {
+    let sum = 0
+    for (let index = 0; index < length; index += 1) sum += Number(cpf[index]) * (length + 1 - index)
+    const digit = ((10 * sum) % 11) % 10
+    if (Number(cpf[length]) !== digit) return false
+  }
+  return true
+}
+
+/** Vazio é aceito. Número incompleto ou com verificador errado não. */
+export function cpfError(value: string) {
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return ''
+  if (digits.length !== 11) return 'O CPF tem 11 dígitos.'
+  return validCpf(digits) ? '' : 'CPF inválido.'
+}
+
+const PERSON_CHOICES: Record<string, readonly [readonly string[], string]> = {
+  sex: [SEX, 'o sexo'], gender: [GENDER, 'o gênero'], maritalStatus: [MARITAL_STATUS, 'o estado civil'],
+  educationLevel: [EDUCATION, 'a escolaridade'], cnhCategory: [CNH_CATEGORIES, 'a categoria da CNH'],
+  race: [RACE, 'a cor ou raça'], pcd: [PCD, 'o PCD'], shirtSize: [SHIRT_SIZES, 'o tamanho da camisa'], shoeSize: [SHOE_SIZES, 'o tamanho do calçado'],
+}
+
 export function updatePerson(state: ErpState, personId: string, patch: Partial<Omit<Person, 'id' | 'tenantId' | 'education' | 'family' | 'emergencies' | 'banks' | 'photo'>>, actor: string) {
+  for (const [field, [options, label]] of Object.entries(PERSON_CHOICES)) {
+    const value = patch[field as keyof typeof patch]
+    if (typeof value === 'string' && value !== '' && !options.includes(value)) throw new DomainError(`Escolha ${label} na lista`)
+  }
+  if (patch.address?.state && !STATES.includes(patch.address.state.toUpperCase())) throw new DomainError('Escolha o estado na lista')
   const person = find(state.persons, personId, 'Pessoa')
+  if (patch.cpf !== undefined) {
+    const problem = cpfError(patch.cpf)
+    if (problem) throw new DomainError(problem)
+    const digits = patch.cpf.replace(/\D/g, '')
+    patch.cpf = digits ? maskCpf(digits) : undefined
+  }
   Object.assign(person, patch)
   const account = state.users.find(entry => entry.personId === person.id && entry.homeTenantId === person.tenantId)
   if (account && patch.fullName) account.name = patch.fullName
@@ -76,9 +134,10 @@ export function updatePerson(state: ErpState, personId: string, patch: Partial<O
   return person
 }
 
-export function updateEmployment(state: ErpState, employmentId: string, patch: Partial<Pick<Employment, 'contractType' | 'workplace' | 'cbo' | 'startedOn'>>, actor: string) {
+export function updateEmployment(state: ErpState, employmentId: string, patch: Partial<Pick<Employment, 'contractType' | 'workplace' | 'startedOn'>>, actor: string) {
   const employment = find(state.employments, employmentId, 'Vínculo')
   if (employment.status !== 'Ativo') throw new DomainError('O vínculo encerrado permanece como histórico')
+  if (patch.startedOn !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(patch.startedOn)) throw new DomainError('Informe a data de admissão')
   Object.assign(employment, patch)
   log(state, 'Pessoas', actor, 'Vínculo atualizado', undefined, employment.personId)
   return employment
@@ -111,10 +170,37 @@ function readSalary(salary?: number) {
   return salary
 }
 
+function sameText(left: string, right: string) {
+  return left.trim().toLocaleLowerCase('pt-BR') === right.trim().toLocaleLowerCase('pt-BR')
+}
+
+/** Todo cargo tem um nível da lista da empresa, e guarda o nome cadastrado. */
+function canonicalLevel(state: ErpState, tenantId: string, level: string) {
+  const trimmed = level.trim()
+  if (!trimmed) throw new DomainError('Informe o nível do cargo')
+  const found = state.jobLevels.find(entry => entry.tenantId === tenantId && sameText(entry.name, trimmed))
+  if (!found) throw new DomainError('Cadastre o nível antes de usar no cargo')
+  return found.name
+}
+
+function jobIdentity(name: string, level: string) {
+  return `${name.trim().toLocaleLowerCase('pt-BR')}\u0000${level.trim().toLocaleLowerCase('pt-BR')}`
+}
+
+function assertJobUnique(state: ErpState, tenantId: string, name: string, level: string, exceptId?: string) {
+  const key = jobIdentity(name, level)
+  const taken = state.jobs.some(entry => entry.tenantId === tenantId && entry.id !== exceptId && jobIdentity(entry.name, entry.level) === key)
+  if (!taken) return
+  const levelText = level.trim() ? ` no nível ${level.trim()}` : ''
+  throw new DomainError(`Já existe o cargo ${name.trim()}${levelText} nesta empresa`)
+}
+
 export function createJob(state: ErpState, tenantId: string, input: { name: string; level: string; cbo: string; mission: string; requirements: string[]; salary?: number }, actor: string) {
   if (!input.name.trim() || !input.mission.trim()) throw new DomainError('Informe o nome e a missão do cargo')
+  const level = canonicalLevel(state, tenantId, input.level)
+  assertJobUnique(state, tenantId, input.name, level, undefined)
   const job: JobCatalog = {
-    id: nextId(state, 'CRG'), tenantId, name: input.name.trim(), level: input.level.trim(), cbo: input.cbo.trim(),
+    id: nextId(state, 'CRG'), tenantId, name: input.name.trim(), level, cbo: input.cbo.trim(),
     mission: input.mission.trim(), requirements: input.requirements.map(entry => entry.trim()).filter(Boolean),
     salary: readSalary(input.salary), status: 'Ativo',
   }
@@ -128,13 +214,106 @@ export function updateJob(state: ErpState, id: string, patch: Partial<Pick<JobCa
   if (patch.name !== undefined && !patch.name.trim()) throw new DomainError('Informe o nome do cargo')
   if (patch.mission !== undefined && !patch.mission.trim()) throw new DomainError('Informe a missão do cargo')
   if (patch.name !== undefined) job.name = patch.name.trim()
-  if (patch.level !== undefined) job.level = patch.level.trim()
+  if (patch.level !== undefined) job.level = canonicalLevel(state, job.tenantId, patch.level)
+  if (patch.name !== undefined || patch.level !== undefined) assertJobUnique(state, job.tenantId, job.name, job.level, job.id)
   if (patch.cbo !== undefined) job.cbo = patch.cbo.trim()
   if (patch.mission !== undefined) job.mission = patch.mission.trim()
   if (patch.requirements) job.requirements = patch.requirements.map(entry => entry.trim()).filter(Boolean)
   if ('salary' in patch) job.salary = readSalary(patch.salary)
   log(state, 'Pessoas', actor, `Cargo ${job.name} atualizado`, undefined, job.id)
   return job
+}
+
+export function createJobLevel(state: ErpState, tenantId: string, name: string, actor: string) {
+  const trimmed = name.trim()
+  if (!trimmed) throw new DomainError('Informe o nome do nível')
+  if (state.jobLevels.some(entry => entry.tenantId === tenantId && sameText(entry.name, trimmed))) throw new DomainError('Já existe este nível nesta empresa')
+  const ranks = state.jobLevels.filter(entry => entry.tenantId === tenantId).map(entry => entry.rank)
+  const level: JobLevel = { id: nextId(state, 'NVL'), tenantId, name: trimmed, rank: (ranks.length ? Math.max(...ranks) : 0) + 1 }
+  state.jobLevels.push(level)
+  log(state, 'Pessoas', actor, `Nível ${level.name} no catálogo`, undefined, level.id)
+  return level
+}
+
+export function renameJobLevel(state: ErpState, id: string, name: string, actor: string) {
+  const level = find(state.jobLevels, id, 'Nível')
+  const trimmed = name.trim()
+  if (!trimmed) throw new DomainError('Informe o nome do nível')
+  if (state.jobLevels.some(entry => entry.tenantId === level.tenantId && entry.id !== level.id && sameText(entry.name, trimmed))) throw new DomainError('Já existe este nível nesta empresa')
+  const previous = level.name
+  level.name = trimmed
+  for (const job of state.jobs) {
+    if (job.tenantId === level.tenantId && sameText(job.level, previous)) job.level = trimmed
+  }
+  log(state, 'Pessoas', actor, `Nível ${previous} passou a ${trimmed}`, undefined, level.id)
+  return level
+}
+
+/** Subir aproxima do topo. A ordem da lista é a hierarquia. */
+export function moveJobLevel(state: ErpState, id: string, direction: 'up' | 'down', actor: string) {
+  const level = find(state.jobLevels, id, 'Nível')
+  const siblings = state.jobLevels.filter(entry => entry.tenantId === level.tenantId).sort((left, right) => left.rank - right.rank)
+  const index = siblings.findIndex(entry => entry.id === level.id)
+  const target = siblings[index + (direction === 'up' ? -1 : 1)]
+  if (!target) return level
+  const rank = level.rank
+  level.rank = target.rank
+  target.rank = rank
+  log(state, 'Pessoas', actor, `Nível ${level.name} ${direction === 'up' ? 'subiu' : 'desceu'} na hierarquia`, undefined, level.id)
+  return level
+}
+
+export function removeJobLevel(state: ErpState, id: string, actor: string) {
+  const level = find(state.jobLevels, id, 'Nível')
+  if (state.jobs.some(job => job.tenantId === level.tenantId && sameText(job.level, level.name))) throw new DomainError('Há cargo neste nível. Troque o nível desses cargos antes de remover.')
+  state.jobLevels.splice(state.jobLevels.findIndex(entry => entry.id === level.id), 1)
+  log(state, 'Pessoas', actor, `Nível ${level.name} removido`, undefined, level.id)
+  return level
+}
+
+function homeOf(user: User) {
+  return user.homeTenantId ?? 'tenant-roboflex'
+}
+
+export function createShift(state: ErpState, tenantId: string, name: string, actor: string) {
+  const trimmed = name.trim()
+  if (!trimmed) throw new DomainError('Informe o nome do turno')
+  if (state.shifts.some(entry => entry.tenantId === tenantId && sameText(entry.name, trimmed))) throw new DomainError('Já existe este turno nesta empresa')
+  const shift: WorkShift = { id: nextId(state, 'TRN'), tenantId, name: trimmed }
+  state.shifts.push(shift)
+  log(state, 'Pessoas', actor, `Turno ${shift.name} no catálogo`, undefined, shift.id)
+  return shift
+}
+
+export function renameShift(state: ErpState, id: string, name: string, actor: string) {
+  const shift = find(state.shifts, id, 'Turno')
+  const trimmed = name.trim()
+  if (!trimmed) throw new DomainError('Informe o nome do turno')
+  if (state.shifts.some(entry => entry.tenantId === shift.tenantId && entry.id !== shift.id && sameText(entry.name, trimmed))) throw new DomainError('Já existe este turno nesta empresa')
+  const previous = shift.name
+  shift.name = trimmed
+  for (const user of state.users) {
+    if (homeOf(user) === shift.tenantId && sameText(user.shift, previous)) user.shift = trimmed
+  }
+  log(state, 'Pessoas', actor, `Turno ${previous} passou a ${trimmed}`, undefined, shift.id)
+  return shift
+}
+
+export function removeShift(state: ErpState, id: string, actor: string) {
+  const shift = find(state.shifts, id, 'Turno')
+  if (state.users.some(user => homeOf(user) === shift.tenantId && sameText(user.shift, shift.name))) throw new DomainError('Há pessoa neste turno. Troque o turno dessas pessoas antes de remover.')
+  state.shifts.splice(state.shifts.findIndex(entry => entry.id === shift.id), 1)
+  log(state, 'Pessoas', actor, `Turno ${shift.name} removido`, undefined, shift.id)
+  return shift
+}
+
+/** Turno sai da lista da empresa. Vazio é permitido: a pessoa nasce sem turno até escolher um. */
+function canonicalShift(state: ErpState, tenantId: string, name: string) {
+  const trimmed = name.trim()
+  if (!trimmed) return ''
+  const found = state.shifts.find(entry => entry.tenantId === tenantId && sameText(entry.name, trimmed))
+  if (!found) throw new DomainError('Cadastre o turno antes de usar')
+  return found.name
 }
 
 /** Sobe a cadeia de chefia. Serve para impedir que uma vaga responda a quem já está abaixo dela. */
@@ -306,6 +485,18 @@ export function canSeePersonBlock(view: PersonView, block: PersonBlock) {
   return block === 'profissional'
 }
 
+/** O que a própria pessoa completa em Dados pessoais. Saúde pode ficar em branco. */
+export function missingProfile(person: Person): string[] {
+  const missing: string[] = []
+  if (!person.birthDate) missing.push('Nascimento')
+  if (!person.sex?.trim()) missing.push('Sexo')
+  if (!person.cpf?.trim()) missing.push('CPF')
+  if (!person.phone?.trim()) missing.push('Celular')
+  const address = person.address
+  if (!address || [address.zip, address.street, address.number, address.district, address.city, address.state].some(value => !value?.trim())) missing.push('Endereço')
+  return missing
+}
+
 /** RH vê a ficha; financeiro vê salário e banco; gestor e as demais pessoas veem o profissional. A própria pessoa vê a sua ficha. */
 export function personView(role: Role, sessionUserId: string, person: Person, accountId?: string, managesTeam = false): PersonView {
   if (accountId === sessionUserId && person.id) return 'completa'
@@ -445,7 +636,7 @@ export function openLinkedEmployment(state: ErpState, sourcePersonId: string, te
   state.employments.push(employment)
   const user: User = {
     id: `u${String(state.counters.U = (state.counters.U ?? 15) + 1)}`,
-    name: person.fullName, role: profile.simulatedRole ?? 'Operador', sector: input.sector.trim(), shift: input.shift, pin: String(1000 + (state.counters.U * 37) % 9000),
+    name: person.fullName, role: profile.simulatedRole ?? 'Operador', sector: input.sector.trim(), shift: canonicalShift(state, tenantId, input.shift), pin: String(1000 + (state.counters.U * 37) % 9000),
     email: undefined, positionId: input.positionId, personId: person.id, homeTenantId: tenantId, active: true,
   }
   state.users.push(user)

@@ -16,9 +16,11 @@ describe('mapa da área', () => {
     expect(areaDestination(area('comercial'), () => false)).toBeUndefined()
   })
 
-  it('entra direto no módulo que só tem uma tela pronta', () => {
-    expect(areaDestination(area('patrimonio'), () => true)).toBe('/ativos')
-    expect(areaDestination(area('servicos'), () => true)).toBe('/assistencia')
+  it('patrimônio e serviços abrem o mapa com as telas novas e entram direto quando o perfil só tem uma', () => {
+    expect(areaDestination(area('patrimonio'), () => true)).toBe('/area/patrimonio')
+    expect(areaDestination(area('servicos'), () => true)).toBe('/area/servicos')
+    expect(areaDestination(area('patrimonio'), module => module === 'Ativos')).toBe('/ativos')
+    expect(areaDestination(area('servicos'), module => module === 'Assistência Técnica')).toBe('/assistencia')
   })
 
   it('mantém a porta de quem abriu o cadastro de parceiros', () => {

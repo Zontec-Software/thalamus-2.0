@@ -405,6 +405,30 @@ export const MANUAL: ManualChapter[] = [
         related: ['planejar-pedido', 'ordens-producao', 'ferramental', 'mudancas-engenharia', 'postos'],
       },
       {
+        id: 'revisoes', title: 'Revisões de produto',
+        summary: 'Fila das versões em rascunho para liberar ou rejeitar.',
+        roles: ['Engenharia', 'Gestor'],
+        screens: [{ label: 'Revisões', to: '/revisoes' }],
+        tour: '/revisoes',
+        blocks: [
+          { kind: 'p', text: 'A tela junta as versões de estrutura e roteiro em rascunho de todos os itens. Cada linha mostra quem elaborou, o checklist e o projeto de origem.' },
+          { kind: 'rules', items: ['Quem elaborou a revisão não libera nem rejeita: a decisão é de outra pessoa com **Liberar revisão**.', 'Rejeitar exige motivo, que fica na versão.', 'Checklist incompleto não libera.', 'O pedido de venda guarda a revisão liberada de cada produto no momento do aceite.'] },
+        ],
+        related: ['estrutura-versoes', 'projetos-pd'],
+      },
+      {
+        id: 'projetos-pd', title: 'Projetos de P&D',
+        summary: 'Desenvolvimento de produto com item provisório.',
+        roles: ['Engenharia', 'Gestor'],
+        screens: [{ label: 'Projetos de P&D', to: '/pd' }],
+        tour: '/pd',
+        blocks: [
+          { kind: 'p', text: 'Os projetos de P&D ficam na Engenharia; os corporativos, em Gestão. Cada projeto tem escopo, prioridade, marcos, resultado e entregáveis. O item novo nasce com **código provisório**, em criação, e fica bloqueado para venda até a estrutura ser liberada e o item homologado.' },
+          { kind: 'p', text: 'Ao fim, registre o **resultado e os entregáveis** na ficha do projeto.' },
+        ],
+        related: ['projetos', 'revisoes', 'ciclo-vida'],
+      },
+      {
         id: 'ferramental', title: 'Ferramental: moldes, gabaritos e dispositivos',
         summary: 'Produto de engenharia usado no roteiro. O ativo de manutenção é outro cadastro e o vínculo é opcional.',
         roles: ['Engenharia', 'PCP', 'Manutenção', 'Gestor'],
@@ -926,7 +950,7 @@ export const MANUAL: ManualChapter[] = [
               'Na aba **Cadastro**, ajuste os dados gerais e os papéis Cliente, Fornecedor e Transportadora. **Inativar** pede o motivo, que fica no histórico. Transportadora inativa deixa de aparecer na expedição.',
               'Na aba **Cliente**, a vertical do cliente é escolhida. A oportunidade lê esse valor e não o edita.',
               'Na aba **Contatos e endereços**, inclua um contato ou endereço pelos botões **+**. O primeiro contato é o principal.',
-              '**Novo parceiro** abre um formulário. Se o documento já existir, a tela oferece abrir o cadastro existente.',
+              '**Novo parceiro** começa pela origem. No Brasil, o CNPJ é opcional e, quando completo, a consulta da Receita preenche razão social, nome fantasia, estado e cidade. O estado é uma lista e a cidade, outra. Parceiro estrangeiro informa o país e não precisa de CNPJ. Se o documento já existir, a tela oferece abrir o cadastro existente.',
             ],
           },
           { kind: 'p', text: 'O perfil do cliente mostra os pedidos de Vendas, o período e a origem. A fórmula do ticket médio ainda não foi definida, então o valor não é publicado. A classe ABC vigente só muda com aprovação do Coordenador Comercial. Os limites A, B e C também não foram definidos: o alerta anual registra o faturamento e não sugere letra. A classe, sozinha, não libera crédito, desconto nem condição.' },
@@ -948,9 +972,9 @@ export const MANUAL: ManualChapter[] = [
         blocks: [
           { kind: 'p', text: 'A faixa do topo tem cinco abas. Três cuidam das pessoas: **Colaboradores** lista quem trabalha na empresa ativa, **Admissão** cuida das vagas e candidaturas e **Desligamento** encerra o vínculo e bloqueia a conta sem apagar o histórico. Duas cuidam da estrutura: **Organograma** mostra os setores e as posições de cada um, e **Cargos** é o catálogo do trabalho.' },
           { kind: 'p', text: 'Em Colaboradores, os filtros mostram quem está **sem posição**, **em desligamento** ou com a **conta bloqueada**. A coluna Gestor direto vem da posição superior; sem ela, do líder do setor, subindo até achar alguém.' },
-          { kind: 'p', text: 'A pessoa ocupa uma **posição**. O **cargo** é o dessa vaga, não um campo da ficha. O cargo é o catálogo do trabalho: nome, missão, nível, CBO, requisitos e salário. Ele não tem chefe nem vaga. A posição fica num setor, usa um cargo, pode responder a outra posição e tem um número de vagas. Várias posições podem usar o mesmo cargo. Trocar quem ocupa não muda o cargo nem o perfil de acesso.' },
+          { kind: 'p', text: 'A pessoa ocupa uma **posição**. O **cargo** é o dessa vaga, não um campo da ficha. O cargo é o catálogo do trabalho: nome, missão, nível, CBO, requisitos e salário. O CBO do contrato é o desse cargo. O nível não é texto livre e não pode ficar vazio: é uma lista da empresa, e o número 1 é o mais alto. A opção **Criar e editar níveis**, no próprio campo, abre essa lista. O turno da pessoa segue a mesma ideia, sem número: **Criar e editar turnos**. O ícone ao lado do campo cadastra, renomeia e reordena esses níveis. O cargo não tem chefe nem vaga. A posição fica num setor, usa um cargo, pode responder a outra posição e tem um número de vagas. Várias posições podem usar o mesmo cargo. Trocar quem ocupa não muda o cargo nem o perfil de acesso.' },
           { kind: 'p', text: 'No Organograma, os setores ficam à esquerda. Clique num deles para escolher onde ele fica, qual posição lidera, criar um setor abaixo ou uma posição nova. A tabela mostra a ocupação de cada posição e quem está nela. **Editar** muda o cargo da vaga, o setor, a quem ela responde e o número de lugares. A chefia é outra vaga e pode ficar em outro setor. **Remover** tira a vaga vazia. Com alguém nela, primeiro mude o vínculo da pessoa. Se a vaga já teve ocupante, ela sai do organograma e o nome continua no histórico.' },
-          { kind: 'p', text: 'A página da pessoa tem as abas **Dados pessoais**, **Vínculo e trajetória**, **Saúde e benefícios**, **Avaliações**, **Acesso**, **Equipe** (só para quem lidera) e **Histórico**. Cada aba tem um botão de salvar. No topo fica a foto: sem arquivo aparecem as iniciais, e adicionar, trocar ou remover acontece nesse retrato. A mesma imagem aparece na lista e, para quem está logado, no lugar das iniciais do cabeçalho. Nesta demonstração o arquivo fica no navegador, até 439 KB. O RH vê tudo; o financeiro vê o salário do cargo e a conta para pagamento; o gestor e os demais veem a parte profissional; a pessoa vê os próprios dados. O salário não é um campo da pessoa: é o do cargo da posição que ela ocupa, e quem está no mesmo cargo recebe o mesmo valor. No mockup isso é só a tela. O navegador não protege o campo: a API fará isso.' },
+          { kind: 'p', text: 'A página da pessoa tem as abas **Dados pessoais**, **Vínculo e trajetória**, **Saúde e benefícios**, **Avaliações**, **Acesso**, **Equipe** (só para quem lidera) e **Histórico**. Sexo, gênero, estado civil, escolaridade, categoria da CNH, estado, cor ou raça, PCD, camisa, calçado e parentesco são listas. O CEP preenche logradouro, bairro, cidade e estado, que ficam só leitura; número e complemento continuam editáveis. Se o CEP não trouxer o logradouro, o que ficou em branco continua aberto. A data de admissão do contrato ativo se altera em Vínculo e trajetória. Sair da aba ou da página com a ficha ou o contrato alterado e ainda não salvo pede confirmação. Nascimento, sexo, CPF, celular ou endereço em branco deixam um aviso no topo, no sino e em Minhas tarefas, com o link da própria ficha. Quem não gere a estrutura nem consulta dados sensíveis abre só Dados pessoais e Saúde do próprio cadastro, e pode gravar essas duas abas. Cada aba tem um botão de salvar. No topo fica a foto: sem arquivo aparecem as iniciais, e adicionar, trocar ou remover acontece nesse retrato. A mesma imagem aparece na lista e, para quem está logado, no lugar das iniciais do cabeçalho. Nesta demonstração o arquivo fica no navegador, até 439 KB. O RH vê tudo; o financeiro vê o salário do cargo e a conta para pagamento; o gestor e os demais veem a parte profissional; a pessoa vê os próprios dados. O salário não é um campo da pessoa: é o do cargo da posição que ela ocupa, e quem está no mesmo cargo recebe o mesmo valor. No mockup isso é só a tela. O navegador não protege o campo: a API fará isso.' },
           { kind: 'p', text: 'O filtro **Outras empresas do grupo** abre o diretório. O botão **Trazer** oferece três caminhos: **Participar de um projeto** registra nome, cargo, contato e papel, sem dado sensível. **Acesso sem vínculo** põe um perfil escolhido na conta e não cria cadastro nem vaga. **Contratar aqui também** abre outro cadastro na empresa, com setor, posição e contrato, ligado ao de origem por confirmação humana. CPF ou e-mail apenas sugerem.' },
           {
             kind: 'steps', title: 'Cadastrar uma pessoa',
@@ -968,6 +992,18 @@ export const MANUAL: ManualChapter[] = [
           },
         ],
         related: ['perfis', 'organizacao', 'tablet'],
+      },
+      {
+        id: 'treinamentos', title: 'Treinamentos',
+        summary: 'Registro, validade e alerta de reciclagem.',
+        roles: ['Gestor'],
+        screens: [{ label: 'Treinamentos', to: '/pessoas/treinamentos' }],
+        blocks: [
+          { kind: 'flow', items: ['Pendente', 'Válido', 'Vencido'] },
+          { kind: 'p', text: 'Cada treinamento tem pessoa, nome, tipo (segurança, operação, qualidade, sistema), realização, validade, resultado e o nome do certificado. Sem realização, fica Pendente. A situação é calculada pela data: passou da validade, vira Vencido; faltam 30 dias, aparece como A vencer.' },
+          { kind: 'note', tone: 'info', text: 'Por enquanto o treinamento não bloqueia a operação. Vencido e a vencer aparecem na aba e nas tarefas do gestor. Bloquear posto por treinamento obrigatório depende da regra por função, ainda não aprovada.' },
+        ],
+        related: ['pessoas'],
       },
       {
         id: 'organizacao', title: 'Gestão de acesso',
@@ -1020,6 +1056,40 @@ export const MANUAL: ManualChapter[] = [
         ],
         related: ['manutencao', 'postos', 'ferramental'],
       },
+      {
+        id: 'patrimonio', title: 'Patrimônio: instalações, movimentações e inventário',
+        summary: 'Onde cada bem está, quem mudou e o que a contagem encontrou.',
+        roles: ['Engenharia', 'Manutenção', 'Gestor'],
+        screens: [{ label: 'Movimentações', to: '/patrimonio/movimentacoes' }, { label: 'Inventário', to: '/patrimonio/inventario' }, { label: 'Instalações e depreciação', to: '/patrimonio/instalacoes' }],
+        blocks: [
+          { kind: 'p', text: 'Cada bem tem código patrimonial, instalação, condição e centro de custo. A **instalação** é o lugar físico (injeção, montagem, ferramentaria, showroom). A localização do bem não é editada na ficha: ela só muda pela **movimentação concluída**.' },
+          { kind: 'flow', title: 'Movimentação', items: ['Solicitada', 'Aprovada', 'Concluída ou Cancelada'] },
+          {
+            kind: 'rules',
+            items: [
+              'Quem solicita não aprova. A aprovação é de quem tem **Aprovar movimentação de patrimônio**.',
+              'Um bem tem no máximo uma movimentação em aberto.',
+              '**Baixa** e **Outro** exigem motivo. A baixa concluída tira o bem da instalação e o marca Baixado.',
+              'Instalação com bens não é inativada.',
+            ],
+          },
+          { kind: 'flow', title: 'Inventário', items: ['Em contagem', 'Pendente (com divergência)', 'Conciliado'] },
+          { kind: 'p', text: 'O inventário é aberto por instalação com os bens que deveriam estar lá. Cada bem é contado como encontrado (com a condição) ou não encontrado. Sem divergência, o inventário concilia na hora; com divergência, fica Pendente até cada bem divergente receber um tratamento descrito.' },
+          { kind: 'note', tone: 'info', text: '**Depreciação** é só cadastro: valor de aquisição, vida útil, residual e método linear. A cota mensal aparece como referência; o cálculo contábil fica fora do Thalamus.' },
+        ],
+        related: ['ativos', 'locacao'],
+      },
+      {
+        id: 'cadastros-gerais', title: 'Cadastros gerais',
+        summary: 'Listas compartilhadas: unidades, moedas, condições de pagamento, origens e motivos.',
+        roles: ['Gestor'],
+        screens: [{ label: 'Cadastros gerais', to: '/cadastros' }],
+        blocks: [
+          { kind: 'p', text: 'As listas que vários módulos usam ficam num lugar só: **Unidade**, **Moeda**, **Condição de pagamento**, **Origem de oportunidade**, **Motivo de perda** e **Motivo de recusa**. O CRM, a proposta e a locação leem daqui.' },
+          { kind: 'rules', items: ['Código e descrição não se repetem no mesmo tipo, sem diferenciar acento e maiúscula.', 'Inativar tira a opção da escolha sem apagar o histórico. Cada lista mantém ao menos uma opção ativa.'] },
+        ],
+        related: ['crm', 'propostas'],
+      },
     ],
   },
 
@@ -1037,7 +1107,8 @@ export const MANUAL: ManualChapter[] = [
         ],
         tour: '/crm',
         blocks: [
-          { kind: 'flow', title: 'Etapas da oportunidade', items: ['Prospecção', 'Desenvolvimento', 'Elaboração', 'Proposta', 'Conquista'] },
+          { kind: 'flow', title: 'Etapas da oportunidade', items: ['Novo contato', 'Qualificação', 'Levantamento', 'Proposta', 'Negociação', 'Ganho'] },
+          { kind: 'p', text: 'Origem, motivo de perda e motivo de recusa vêm de Cadastros gerais. Perder a oportunidade exige motivo e cancela as propostas em andamento.' },
           { kind: 'p', text: 'O CRM tem duas áreas: painel e oportunidades. A meta anual é da empresa, rateada por mês, e cada mês pode ser alterado. Quem pode consultar o grupo vê a soma, sem gravar a meta no grupo. O funil e a pizza ficam no painel. A temperatura filtra o painel sem abrir a lista.' },
           {
             kind: 'table', title: 'O que cada número significa',
@@ -1047,7 +1118,7 @@ export const MANUAL: ManualChapter[] = [
               ['MRR', 'Receita mensal recorrente. É o valor que entra todo mês se o negócio fechar, e é o que conta para a meta.'],
               ['Ponderado', 'MRR das oportunidades em aberto multiplicado pela probabilidade da fase.'],
               ['Temperatura', 'Quente, Morno ou Frio. Julgamento do vendedor, independente da fase.'],
-              ['Probabilidade', 'Vem da fase: 10% em Prospecção, 25% em Desenvolvimento, 40% em Elaboração, 55% em Proposta, 100% em Conquista e 0% em Perdida.'],
+              ['Probabilidade', 'Vem da fase: 10% em Novo contato, 20% em Qualificação, 35% em Levantamento, 55% em Proposta, 75% em Negociação, 100% em Ganho e 0% em Perdido.'],
               ['Fechamento', 'Data prevista para o aceite. Em vermelho quando já passou e a oportunidade segue aberta.'],
               ['Win rate', 'Conquistadas dividido pelas oportunidades já encerradas, conquistadas e perdidas.'],
               ['CAC', 'Soma do custo estimado das demandas ligadas à oportunidade.'],
@@ -1092,7 +1163,7 @@ export const MANUAL: ManualChapter[] = [
         screens: [{ label: 'Propostas', to: '/crm/propostas' }],
         tour: '/crm/propostas',
         blocks: [
-          { kind: 'flow', items: ['Rascunho', 'Enviada', 'Aceita, Recusada ou Expirada'] },
+          { kind: 'flow', items: ['Rascunho', 'Em aprovação (desconto acima do limite)', 'Enviada', 'Aceita, Recusada, Vencida ou Cancelada'] },
           { kind: 'p', text: 'A proposta nasce em rascunho com os produtos da oportunidade, o preço vigente da tabela padrão de cada item e uma data sugerida que considera o prazo de fabricação e o lead time de compra dos componentes. Produtos, kits e serviços podem estar na mesma proposta. Validade padrão de 15 dias e pagamento em 28 dias.' },
           {
             kind: 'rules',
@@ -1100,12 +1171,15 @@ export const MANUAL: ManualChapter[] = [
               'Em rascunho, quantidade, preço e condições são editáveis.',
               'Abaixo do preço de cada linha aparece o preço da tabela padrão e quanto a negociação se afastou dele, para porcentagem mais ou menos.',
               'Kit virtual entra como uma linha só e é explodido nos componentes quando o cliente aceita.',
-              'O desconto vai até **15%**.',
+              'Desconto até **15%** vai direto ao cliente. Acima disso, **Enviar** vira **Pedir aprovação do desconto**: a proposta fica Em aprovação e outra pessoa, com **Aprovar desconto**, aprova e envia ou devolve ao rascunho com o motivo. Quem pediu não aprova.',
+              'Passada a validade sem resposta, a proposta enviada vira **Vencida** e não pode mais ser aceita.',
+              '**Nova versão** sai de proposta enviada, recusada ou vencida: nasce em rascunho com as mesmas linhas, o número da versão sobe e a anterior é cancelada.',
+              '**Cancelar** encerra proposta em andamento e exige motivo. Perder a oportunidade cancela as propostas dela.',
               'Só item **ativo** entra numa proposta. Item bloqueado, obsoleto, em criação ou imobilizado é recusado com o motivo.',
               '**Enviar** mantém a oportunidade em Proposta.',
-              '**Cliente aceitou** confere de novo os itens, aprova o pedido no Omie com todas as linhas e marca a oportunidade como Conquista.',
+              '**Cliente aceitou** confere de novo os itens e a validade, cria o **pedido de venda no Thalamus**, aguardando análise, com todas as linhas e a revisão de cada produto, e marca a oportunidade como Ganho.',
               'No desenvolvimento, **Criação de PAP** abre a mudança de engenharia ligada à oportunidade. **Nova demanda** abre a demanda de material que já existe, com origem nesta oportunidade.',
-              '**Recusar** pede o motivo e devolve a oportunidade para a etapa Proposta.',
+              '**Recusar** pede o motivo da lista de Cadastros gerais (preço, prazo, solução, concorrente, outro) e devolve a oportunidade para a etapa Proposta.',
             ],
           },
         ],
@@ -1113,12 +1187,23 @@ export const MANUAL: ManualChapter[] = [
       },
       {
         id: 'pedidos-venda', title: 'Pedidos de venda',
-        summary: 'Pedidos aprovados no Omie e o painel do pedido.',
+        summary: 'O pedido nasce da proposta aceita, é confirmado e vai ao Omie.',
         roles: ['Comercial', 'PCP', 'Expedição', 'Gestor'],
         screens: [{ label: 'Vendas', to: '/pedidos' }],
         tour: '/pedidos',
         blocks: [
-          { kind: 'p', text: 'Pedidos aprovados no Omie (ou pelo aceite de uma proposta) chegam ao Thalamus com cliente, produto, quantidade, valor e prazo. A tela Vendas lista os pedidos com a etapa atual e os riscos.' },
+          { kind: 'flow', items: ['Aguardando análise', 'Confirmado', 'Em atendimento', 'Expedido', 'Concluído'] },
+          { kind: 'p', text: 'O pedido de venda **nasce no Thalamus** quando o cliente aceita a proposta, com cliente, linhas, preço, prazo e condição de pagamento. Nasce **Aguardando análise**: o comercial confere e clica **Confirmar pedido**. Na confirmação, se a empresa usa o Omie e a fonte de Pedido de venda está decidida, o pedido vai ao Omie. Sem Omie, o Thalamus funciona sozinho. Pedido digitado direto no Omie ainda chega já confirmado.' },
+          {
+            kind: 'rules',
+            items: [
+              'Só pedido confirmado é planejado.',
+              'Antes do planejamento, quantidade e preço de cada linha mudam com **motivo**, e a mudança fica registrada no pedido.',
+              'Cancelar exige motivo. Pedido já planejado não é cancelado aqui: o cancelamento passa pelo PCP, para nenhuma OP ficar órfã.',
+              'A situação é calculada pelo fluxo; ninguém digita.',
+            ],
+          },
+          { kind: 'p', text: 'A tela Vendas lista os pedidos com a situação, a etapa atual e os riscos.' },
           { kind: 'p', text: 'Clicar num pedido abre o **painel do pedido**: a faixa de etapas, as OPs de injeção (grupo azul: a peça plástica feita na injetora) e a OP de montagem (grupo verde: o case do cliente), materiais, compras ligadas e a linha do tempo.' },
           { kind: 'note', tone: 'info', text: 'OP de injeção e OP de montagem são ordens diferentes, em postos diferentes. A injeção produz peças para o estoque; a montagem junta essas peças com componentes comprados.' },
         ],
@@ -1131,7 +1216,7 @@ export const MANUAL: ManualChapter[] = [
         screens: [{ label: 'Expedição', to: '/expedicao' }],
         tour: '/expedicao',
         blocks: [
-          { kind: 'flow', items: ['Aguardando conferência', 'Conferido', 'Expedido', 'Faturado'] },
+          { kind: 'flow', items: ['Aguardando conferência', 'Conferido', 'Expedido', 'Faturado', 'Entregue'] },
           {
             kind: 'steps',
             items: [
@@ -1139,6 +1224,7 @@ export const MANUAL: ManualChapter[] = [
               'Confira e informe os volumes. A transportadora é um parceiro com esse papel ativo. **Retirada pelo cliente** continua disponível e não é um cadastro.',
               'Clique em **Expedir**: o produto sai do estoque e o sistema pede a NF-e ao Omie.',
               'Quando o Omie autoriza a nota, o pedido vira **Faturado**, o número da NF-e aparece no pedido. A conta a receber fica no Omie.',
+              'Quando o cliente recebe, informe quem recebeu e clique **Confirmar entrega**. O pedido vira **Entregue** e a garantia começa nesta data.',
             ],
           },
           { kind: 'rules', items: ['Sem volumes e transportadora não há conferência.', 'Sem conferência não há expedição.', 'A expedição respeita a regra de saldo negativo e os lotes do produto.'] },
@@ -1399,6 +1485,27 @@ export const MANUAL: ManualChapter[] = [
         related: ['orcamentos'],
       },
       {
+        id: 'recebimento', title: 'Recebimento e conferência',
+        summary: 'O que chegou, o que entra no saldo e o que fica bloqueado.',
+        roles: ['Almoxarifado', 'Compras', 'Gestor'],
+        screens: [{ label: 'Recebimento', to: '/recebimento' }],
+        tour: '/recebimento',
+        blocks: [
+          { kind: 'steps', items: ['Escolha o pedido de compra aprovado e clique **Conferir**. O sistema propõe a quantidade em aberto.', 'Informe quanto chegou e o resultado: **Conforme**, **Divergência**, **Avaria** ou **Incompleto**.', 'Fora de Conforme, informe quanto foi aceito e descreva o que encontrou.'] },
+          {
+            kind: 'rules',
+            items: [
+              'Só a quantidade **aceita** entra no saldo e atende as demandas do pedido.',
+              'O restante fica **Bloqueado**, fora do saldo, até outra pessoa decidir **Aceitar** (entra no saldo) ou **Devolver** (volta a ficar em aberto no pedido), sempre com observação.',
+              'Quem recebeu não decide o bloqueio. A decisão é de quem tem **Decidir bloqueio de recebimento**.',
+              'Não se recebe mais do que o pedido tem em aberto.',
+            ],
+          },
+          { kind: 'note', tone: 'info', text: 'A NF-e de entrada continua do Omie. A conferência física é do Thalamus.' },
+        ],
+        related: ['compras', 'almoxarifado'],
+      },
+      {
         id: 'almoxarifado', title: 'Almoxarifado: saldos e inventário',
         summary: 'Saldo físico, reservado, disponível e ajustes.',
         roles: ['Almoxarifado'],
@@ -1441,7 +1548,7 @@ export const MANUAL: ManualChapter[] = [
           {
             kind: 'steps',
             items: [
-              'Clique em **Novo chamado** e escolha o pedido do cliente. A garantia é calculada pela data de expedição.',
+              'Clique em **Novo chamado** e escolha o pedido do cliente. A cobertura vem da garantia aberta na entrega; sem registro, é calculada pela data de expedição.',
               'Dentro da garantia, a Qualidade recebe uma não conformidade da OP que produziu o lote.',
               'Agende o técnico e inicie o atendimento.',
               'Use peças: com saldo, a peça sai do estoque; sem saldo, abre-se uma demanda para Compras e o chamado fica **Aguardando peça**.',
@@ -1451,6 +1558,49 @@ export const MANUAL: ManualChapter[] = [
           { kind: 'p', text: 'O bloco de rastreio liga pedido, OP, versão da estrutura, número de série, não conformidade e demandas de peça.' },
         ],
         related: ['qualidade', 'demandas'],
+      },
+      {
+        id: 'garantia', title: 'Garantia',
+        summary: 'Nasce na entrega e responde se o chamado é coberto.',
+        roles: ['Assistência', 'Comercial', 'Gestor'],
+        screens: [{ label: 'Garantia', to: '/garantia' }],
+        tour: '/garantia',
+        blocks: [
+          { kind: 'flow', items: ['Pendente (regra não aprovada)', 'Ativa', 'Vencida, Suspensa ou Encerrada'] },
+          { kind: 'p', text: 'A empresa define a **regra de garantia**: prazo em meses e o que cobre. Enquanto a regra não for aprovada, a garantia nasce **Pendente** e a cobertura do chamado é só sugerida. Aprovar a regra ativa as garantias pendentes com o prazo dela.' },
+          {
+            kind: 'rules',
+            items: [
+              'A garantia nasce quando a entrega é confirmada na expedição e começa nessa data.',
+              'Mudar a regra desfaz a aprovação. A aprovação é de quem tem **Aprovar regra de garantia**.',
+              'Suspender e encerrar exigem motivo. Vencida é calculada pela data.',
+              'Ao abrir um chamado, a assistência vê a cobertura proposta; a decisão final é do técnico.',
+            ],
+          },
+        ],
+        related: ['assistencia', 'expedicao'],
+      },
+      {
+        id: 'locacao', title: 'Contratos de locação',
+        summary: 'Da proposta ao retorno do bem, com a condição registrada.',
+        roles: ['Comercial', 'Gestor'],
+        screens: [{ label: 'Contratos de locação', to: '/locacao' }],
+        tour: '/locacao',
+        blocks: [
+          { kind: 'flow', items: ['Proposta', 'Ativo', 'Atrasado (calculado)', 'Encerrado ou Cancelado'] },
+          {
+            kind: 'rules',
+            items: [
+              'A locação nasce como proposta, com cliente e período. Bem, valor, cobrança e condição de pagamento podem vir depois.',
+              'Só fica ativa com bem **locável**, operando e fora de outro contrato ativo, com valor, cobrança e condição de pagamento.',
+              'Quem propôs não aprova. A aprovação é de quem tem **Aprovar contrato de locação**. Ativar marca o bem como Locado.',
+              'O retorno registra a condição. Com avaria, exige descrição e o bem fica Parado até a manutenção.',
+              'Proposta cancelada exige motivo; contrato ativo encerra pelo retorno.',
+            ],
+          },
+          { kind: 'note', tone: 'warning', text: 'A cobrança mensal ainda não gera título: o faturamento da locação depende de Finanças e do Omie.' },
+        ],
+        related: ['patrimonio', 'crm'],
       },
     ],
   },
@@ -1512,8 +1662,9 @@ export const MANUAL: ManualChapter[] = [
         tour: '/integracao',
         blocks: [
           { kind: 'p', text: 'Cada troca com o Omie fica registrada com entidade, referência, direção (Omie → Thalamus ou Thalamus → Omie), situação e mensagem. O indicador na barra de módulos mostra quantas falhas estão abertas.' },
-          { kind: 'table', head: ['Situação', 'Significado'], rows: [['Sincronizado', 'O outro sistema confirmou'], ['Pendente', 'Enviado, aguardando resposta (por exemplo, a NF-e)'], ['Erro', 'Recusado; a mensagem diz o motivo']] },
+          { kind: 'table', head: ['Situação', 'Significado'], rows: [['Sincronizado', 'O outro sistema confirmou'], ['Pendente', 'Enviado, aguardando resposta (por exemplo, a NF-e)'], ['Erro', 'Recusado; a mensagem diz o motivo'], ['Ignorado', 'Não enviado: empresa sem Omie ou fonte oficial pendente']] },
           { kind: 'steps', title: 'Tratar uma falha', items: ['Leia a mensagem (por exemplo, "produto sem NCM").', 'Corrija a origem no Thalamus (no exemplo, a camada fiscal do item).', 'Clique em **Reprocessar**.'] },
+          { kind: 'p', text: 'Em **Fonte oficial por entidade**, quem tem **Decidir fonte oficial** escolhe, para cliente, fornecedor, pedido de venda, pedido de compra, produto, categoria financeira, centro de custo e faturamento, se a fonte é o Thalamus ou o Omie e o sentido. Enquanto a fonte estiver **Pendente**, nada daquela entidade sincroniza: a troca aparece como **Ignorado**, com o motivo. Empresa sem Omie usa o Thalamus sozinho.' },
           { kind: 'p', text: 'A tabela **Quem é dono de cada dado** é a regra que evita cadastro em dobro. No fiscal ela é dividida: o **cadastro** do item nasce aqui e vai para o Omie na ativação e a cada vigência que entra; a **apuração** da nota é do Omie. Divergência entre as duas matrizes aparece como erro nesta tela.' },
           { kind: 'p', text: 'O cadastro fiscal do item sincroniza em **mão dupla**: o que o Financeiro muda no Omie volta para o Thalamus, e mudança dos dois lados ao mesmo tempo vira **conflito** a decidir na seção Fiscal da ficha do item. Cada envio e cada retorno ficam registrados aqui.' },
         ],

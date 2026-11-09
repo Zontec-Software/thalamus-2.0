@@ -2,7 +2,7 @@
 
 O cadastro mestre de parceiro vive no Thalamus e segue para o Omie. No Omie, cliente e fornecedor são o mesmo registro; aqui são papéis desse registro. O schema é o `t2_comercial`, no `thalamus2-comercial/api`, junto com o CRM. Suprimentos, quando for oficial, lê fornecedores por `GET /api/partners?role=Fornecedor`. O que abaixo está aprovado na especificação:
 
-1. Um parceiro tem um documento fiscal e pode ter o papel Cliente, o papel Fornecedor ou os dois, sem duplicar os dados gerais.
+1. Um parceiro pode ter o papel Cliente, o papel Fornecedor ou os dois, sem duplicar os dados gerais. No Brasil o CPF ou o CNPJ é opcional: com o CNPJ completo, a tela consulta a Receita e preenche nome, estado e cidade. Parceiro estrangeiro não tem CNPJ; o país é obrigatório e o documento fica em branco ou leva a identificação daquele país.
 2. Contatos e endereços são registros do parceiro, com finalidade no endereço.
 3. Cada papel tem situação própria. Inativar um não inativa o outro. Operação já em andamento segue até o fim. Solicitação nova do papel inativo é recusada.
 4. O perfil do cliente lê vendas. O ticket médio não é gravado no cadastro. A fórmula ainda não está definida, então a API não devolve um número de ticket como se a regra existisse. Devolve a base: quantidade, soma, primeira e última data, e a origem Vendas.
@@ -17,7 +17,7 @@ O cadastro mestre de parceiro vive no Thalamus e segue para o Omie. No Omie, cli
 - `POST /api/partners/{id}/contacts`, `POST /api/partners/{id}/addresses`
 - `POST /api/partners/{id}/roles` e `POST /api/partners/{id}/roles/{role}/inactivate` (motivo obrigatório)
 
-Regras já implementadas: razão social com 2 ou mais letras; CPF/CNPJ com 11 ou 14 dígitos; documento repetido na empresa é recusado sem `force_duplicate`; papéis `Cliente`, `Fornecedor`, `Transportadora` com situação própria; fase `Em cadastro`, `Ativo` ou `Inativo` derivada dos papéis; vertical só no papel Cliente, alterada no cadastro ou pela oportunidade, com auditoria de antes e depois. Permissões: `modulo.parceiros.consultar` e `modulo.parceiros.gerir`.
+Regras já implementadas: razão social com 2 ou mais letras; documento vazio é aceito; no Brasil, se houver documento, são 11 (CPF) ou 14 (CNPJ) dígitos; fora do Brasil o documento é livre; documento repetido na empresa é recusado sem `force_duplicate` (vazio não conta como repetido); país `Brasil` por omissão; `GET /api/brazil/states`, `GET /api/brazil/states/{uf}/cities` e `GET /api/brazil/cnpj/{cnpj}` para quem gere parceiros, consultando IBGE e BrasilAPI; papéis `Cliente`, `Fornecedor`, `Transportadora` com situação própria; fase `Em cadastro`, `Ativo` ou `Inativo` derivada dos papéis; vertical só no papel Cliente, alterada no cadastro ou pela oportunidade, com auditoria de antes e depois. Permissões: `modulo.parceiros.consultar` e `modulo.parceiros.gerir`.
 
 ## Entrega oficial
 

@@ -5,7 +5,7 @@ import {
 } from '../domain/engine'
 import { defaultCatalog, ensureClassPath, seedPath, withCheckDigit } from '../domain/catalog'
 import { FUNCTIONALITIES, moduleFeature, profileCode, seededProfiles } from '../domain/access'
-import type { BusinessPartner, Item, PartnerRoleName, RouteStep, SalesOrder } from '../types/domain'
+import type { BusinessPartner, Item, PartnerRoleName, RegistryEntry, RegistryKind, RouteStep, SalesOrder } from '../types/domain'
 
 const mp = (id: string, code: string, name: string, stock: number, minimum: number, cost: number, supplier: string, leadTimeDays: number): Item =>
   ({ id, code, name, type: '01', unit: 'kg', stock, minimum, cost, supplier, leadTimeDays, location: 'Silo / A-01' })
@@ -40,6 +40,12 @@ function bp(input: Pick<BusinessPartner, 'id' | 'name' | 'document' | 'roles' | 
   }
 }
 
+const reg = (kind: RegistryKind, index: number, entry: string): RegistryEntry => {
+  const [code, description] = entry.includes(' · ') ? entry.split(' · ') : [String(index + 1).padStart(2, '0'), entry]
+  const prefix: Record<RegistryKind, string> = { Unidade: 'UN', Moeda: 'MO', 'Condição de pagamento': 'CP', 'Origem de oportunidade': 'OR', 'Motivo de perda': 'MP', 'Motivo de recusa': 'MR' }
+  return { id: `CG-${prefix[kind]}-${index + 1}`, tenantId: 'tenant-roboflex', kind, code, description, status: 'Ativo' }
+}
+
 function baseState(): ErpState {
   return {
     itemClasses: [],
@@ -50,6 +56,7 @@ function baseState(): ErpState {
       { id: 'c4', name: 'Hotel Serra Azul', city: 'Gramado, RS', omieCode: 'CL-1412' },
       { id: 'c5', name: 'Porto Leste', city: 'Vitória, ES', omieCode: 'CL-1455' },
       { id: 'c6', name: 'Rede Varejo Prime', city: 'São Paulo, SP', omieCode: 'CL-1501' },
+      { id: 'c7', name: 'Metalúrgica Horizonte', city: 'Betim, MG', omieCode: '' },
     ],
     resources: [
       { id: 'inj1', tenantId: 'tenant-roboflex', name: 'Injetora 01 · 180 t', kind: 'Injetora', status: 'Ativo', dailyMinutes: 960, hourlyRate: 95 },
@@ -74,6 +81,7 @@ function baseState(): ErpState {
       { id: 'mold-s9t', name: 'Molde M-122 · Tampa S9 FE', kind: 'Molde', resourceId: 'inj1', shots: 39700, nextPreventive: '2026-12-01' },
       { id: 'mold-lite', name: 'Molde M-090 · Base Mesa Lite', kind: 'Molde', resourceId: 'inj1', shots: 228000, preventiveLimit: 228020, nextPreventive: '2026-10-18', acquisitionValue: 98000, usefulLifeYears: 5 },
       { id: 'a-teste', name: 'Bancada de teste de estanqueidade', kind: 'Equipamento', resourceId: 'elet', nextPreventive: '2026-11-30', acquisitionValue: 45000, usefulLifeYears: 10 },
+      { id: 'a-demo-a11', name: 'Unidade de demonstração · Case Impact A11 com tablet', kind: 'Equipamento', serial: 'DEMO-A11-03', nextPreventive: '2026-12-15', acquisitionValue: 3800, usefulLifeYears: 3, rentable: true, manufacturer: 'Roboflex' },
     ],
     items: [
       mp('mp-abs', 'MP-ABS-01', 'ABS preto UV', 420, 150, 18.5, 'Polímeros Minas', 5),
@@ -151,6 +159,16 @@ function baseState(): ErpState {
         routing: [step('kit', 'Montagem do kit', 'mont2', 2, ['Conferir 5 cases Impact', 'Embalar na caixa master', 'Etiquetar kit'])],
       },
       { id: 'im-rack', code: 'RF-10005', name: 'Rack de carga portuário', type: '08', unit: 'un', stock: 1, minimum: 0, cost: 2400, location: 'Expedição' },
+      {
+        id: 'cst040435', code: 'CST040435', name: 'Case Impact Parafusada', variant: 'Samsung Tab A11 SM-X133', family: 'Hard', revision: 'A', type: '04', unit: 'un', stock: 0, minimum: 0, cost: 118, location: 'Expedição E-01',
+        bom: [{ itemId: 'se-mold-a11', quantity: 1 }, { itemId: 'se-tampa-a11', quantity: 1 }, { itemId: 'se-bump-a11', quantity: 1 }, { itemId: 'cp-pelic', quantity: 1 }, { itemId: 'cp-paraf', quantity: 8 }, { itemId: 'em-hard', quantity: 1 }],
+        routing: [
+          step('mec', 'Montagem mecânica', 'mont2', 4.5, ['Encaixar bumper na tampa traseira', 'Fixar moldura com 8 parafusos (torque 0,4 N·m)', 'Aplicar película']),
+          step('emb', 'Embalagem', 'mont2', 1, ['Etiquetar caixa com lote da OP']),
+        ],
+      },
+      cp('bse040021', 'BSE040021', 'Base Adesiva Tamanho C', 30, 10, 34, 'Pack BH', 6, '00'),
+      { id: 'mh-pd-001', code: 'MH-PD-001', name: 'Case personalizada', variant: 'Tablet industrial MH-IND-10', family: 'Hard', type: '04', unit: 'un', stock: 0, minimum: 0, cost: 0, location: '—' },
     ],
     jobOpenings: [],
     candidates: [],
@@ -202,6 +220,21 @@ function baseState(): ErpState {
       { id: 'sec-z-dir', tenantId: 'tenant-roboflex-sul', name: 'Diretoria Zontec' },
       { id: 'sec-z-eng', tenantId: 'tenant-roboflex-sul', name: 'Engenharia Zontec', managerPositionId: 'pos-z-eng', managerId: 'u18', parentId: 'sec-z-dir' },
     ],
+    shifts: [
+      { id: 'sh-man', tenantId: 'tenant-roboflex', name: 'Manhã' },
+      { id: 'sh-tar', tenantId: 'tenant-roboflex', name: 'Tarde' },
+      { id: 'sh-adm', tenantId: 'tenant-roboflex', name: 'Administrativo' },
+      { id: 'sh-z-man', tenantId: 'tenant-roboflex-sul', name: 'Manhã' },
+      { id: 'sh-z-tar', tenantId: 'tenant-roboflex-sul', name: 'Tarde' },
+      { id: 'sh-z-adm', tenantId: 'tenant-roboflex-sul', name: 'Administrativo' },
+    ],
+    jobLevels: [
+      { id: 'lvl-dir', tenantId: 'tenant-roboflex', name: 'Diretoria', rank: 1 },
+      { id: 'lvl-lid', tenantId: 'tenant-roboflex', name: 'Liderança', rank: 2 },
+      { id: 'lvl-ple', tenantId: 'tenant-roboflex', name: 'Pleno', rank: 3 },
+      { id: 'lvl-ope', tenantId: 'tenant-roboflex', name: 'Operacional', rank: 4 },
+      { id: 'lvl-z-ple', tenantId: 'tenant-roboflex-sul', name: 'Pleno', rank: 1 },
+    ],
     jobs: [
       { id: 'job-com', tenantId: 'tenant-roboflex', name: 'Executiva comercial', level: 'Pleno', cbo: '2532-25', mission: 'CRM, propostas e carteira de clientes', requirements: ['Proposta comercial'], status: 'Ativo' },
       { id: 'job-eng', tenantId: 'tenant-roboflex', name: 'Engenheiro de produto', level: 'Pleno', cbo: '2144-05', mission: 'Produto, estrutura, roteiro e revisão', requirements: ['Desenho técnico'], status: 'Ativo' },
@@ -235,6 +268,11 @@ function baseState(): ErpState {
       bp({ id: 'c3', name: 'Agro Vale Verde', document: '34.567.890/0001-30', roles: ['Cliente'], city: 'Rio Verde, GO', contact: 'Rui Prado', email: 'rui@agrovale.com.br', vertical: 'Agro' }),
       bp({ id: 'c4', name: 'Hotel Serra Azul', document: '45.678.901/0001-40', roles: ['Cliente'], city: 'Gramado, RS', contact: 'Lívia Costa', email: 'livia@serraazul.com.br', vertical: 'Varejo' }),
       bp({ id: 'c5', name: 'Porto Leste', document: '56.789.012/0001-50', roles: ['Cliente'], city: 'Vitória, ES', contact: 'Fábio Luz', email: 'fabio@portoleste.com.br', vertical: 'Logística' }),
+      bp({
+        id: 'c7', name: 'Metalúrgica Horizonte', legalName: 'Metalúrgica Horizonte Ltda', document: '41.205.318/0001-07', roles: ['Cliente'], city: 'Betim, MG', contact: 'Renata Moura', email: 'renata.moura@metalurgicahorizonte.com.br', vertical: 'Indústria',
+        contacts: [{ name: 'Renata Moura', duty: 'Engenharia industrial', phone: '(31) 3591-2200', email: 'renata.moura@metalurgicahorizonte.com.br' }, { name: 'Otávio Lins', duty: 'Compras', phone: '(31) 3591-2210', email: 'compras@metalurgicahorizonte.com.br' }],
+        addresses: [{ purpose: 'Sede', line: 'Av. das Indústrias, 1800', city: 'Betim', state: 'MG' }, { purpose: 'Entrega', line: 'Av. das Indústrias, 1800 · Portaria 2', city: 'Betim', state: 'MG' }],
+      }),
       bp({ id: 'c6', name: 'Rede Varejo Prime', document: '67.890.123/0001-60', roles: ['Cliente'], city: 'São Paulo, SP', contact: 'Nina Lopes', email: 'nina@varejoprime.com.br', vertical: 'Varejo' }),
       bp({ id: 'f1', name: 'Polímeros Minas', document: '71.111.111/0001-11', roles: ['Fornecedor'], city: 'Betim, MG', contact: 'César Mota', email: 'vendas@polimerosminas.com.br' }),
       bp({ id: 'f2', name: 'TecnoPoli', document: '72.222.222/0001-22', roles: ['Fornecedor'], city: 'Campinas, SP', contact: 'Bia Lima', email: 'bia@tecnopoli.com.br' }),
@@ -270,12 +308,15 @@ function baseState(): ErpState {
     ],
     opportunities: [
       { id: 'OPP-26042', tenantId: 'tenant-roboflex', partnerId: 'c1', title: 'Renovação tablets mina Norte', ownerId: 'u12', stage: 'Proposta', temperature: 'Quente', value: 102194, mrr: 8500, probability: 55, statusNote: 'Proposta enviada, cliente revisa a entrega antes da parada.', nextAction: 'Alinhar a entrega antes da parada', expectedClose: '2026-10-22', source: 'Indicação', contact: 'Marcelo Dias', phone: '(31) 98800-1200', email: 'marcelo.dias@cliente.com', segment: 'Mineração', dealType: 'Venda', itemIds: ['pa-s9-min', 'pa-a11-ext'], quantity: 144, createdAt: '2026-09-22T10:00:00.000Z', notes: 'Troca de 120 tablets na mina Norte e 24 na usina. Cliente exige IP68 e entrega antes da parada de dezembro.', observation: '<p>Cliente quer a troca antes da parada de dezembro. O concorrente ofereceu prazo maior, sem o IP68.</p><ul><li>120 tablets na mina Norte</li><li>24 na usina</li></ul>', activities: [{ id: 'act-meet', at: '2026-11-04T14:00:00.000Z', type: 'Reunião', text: 'Alinhar a entrega antes da parada', details: 'Confirmar o lote da mina Norte e a data que cabe antes de dezembro.', done: false, createdBy: 'Lucas Lima', calendar: { ownerUserId: 'u16', ownerName: 'Lucas Lima', externalId: 'gcal-sim-act-meet', guests: [{ name: 'Marcelo Dias', email: 'marcelo.dias@cliente.com', role: 'contato' }, { name: 'Camila Nunes', email: 'camila@roboflex.com.br', role: 'vendedor' }] } }, { id: 'act-1', at: '2026-10-15T09:00:00.000Z', type: 'Reunião', text: 'Validação técnica com operação', details: 'Operação confirmou o IP68 e a troca na parada.', done: true, createdBy: 'Camila Nunes', calendar: { ownerUserId: 'u12', ownerName: 'Camila Nunes', externalId: 'gcal-sim-act-1', guests: [{ name: 'Marcelo Dias', email: 'marcelo.dias@cliente.com', role: 'contato' }] }, attachments: [{ id: 'anx-1', name: 'Transcrição do Google Meet.txt', kind: 'transcrição', source: 'google', mime: 'text/plain', size: 96, at: '2026-10-15T10:00:00.000Z', dataUrl: 'data:text/plain;charset=utf-8,Transcri%C3%A7%C3%A3o%20simulada%20do%20Google%20Meet.' }, { id: 'anx-2', name: 'Gravação do Google Meet.mp4', kind: 'gravação', source: 'google', mime: 'video/mp4', size: 0, at: '2026-10-15T10:00:00.000Z' }] }] },
-      { id: 'OPP-26043', tenantId: 'tenant-roboflex', partnerId: 'c5', title: 'Cases para coletores do pátio', ownerId: 'u12', stage: 'Elaboração', temperature: 'Morno', value: 62400, mrr: 4200, probability: 40, nextAction: 'Apresentar protótipo', expectedClose: '2026-10-29', source: 'Site', contact: 'Fábio Luz', segment: 'Logística', dealType: 'Venda', itemIds: ['pa-a11-ext'], quantity: 60, createdAt: '2026-10-06T15:00:00.000Z', activities: [{ id: 'act-2', at: '2026-10-16T13:00:00.000Z', type: 'Tarefa', text: 'Enviar desenho da fixação', details: 'O pátio precisa do furo de fixação alinhado ao coletor atual.', done: false }] },
-      { id: 'OPP-26044', tenantId: 'tenant-roboflex', partnerId: 'c2', title: 'Prospecção frota leve', ownerId: 'u12', stage: 'Prospecção', temperature: 'Frio', value: 28000, mrr: 1800, probability: 10, nextAction: 'Retornar ligação', expectedClose: '2026-12-15', source: 'Prospecção Passiva', contact: 'Bianca Alves', segment: 'Logística', dealType: 'Venda', itemIds: ['pa-lite-ipad'], quantity: 40, createdAt: '2026-10-20T11:00:00.000Z', activities: [] },
-      { id: 'OPP-26045', tenantId: 'tenant-roboflex', partnerId: 'c1', title: 'Novo case para coletor portuário', ownerId: 'u12', stage: 'Desenvolvimento', temperature: 'Quente', value: 180000, mrr: 12000, probability: 25, statusNote: 'Cliente pediu vedação nova. PAP com a engenharia.', nextAction: 'Acompanhar a mudança de engenharia', expectedClose: '2026-11-30', source: 'Feira e Eventos', contact: 'Marcelo Dias', segment: 'Mineração', dealType: 'Venda', quantity: 200, createdAt: '2026-10-08T09:00:00.000Z', notes: 'Produto ainda não existe. A engenharia abre a estrutura depois do PAP.', activities: [] },
-      { id: 'OPP-26040', tenantId: 'tenant-roboflex', partnerId: 'c2', title: 'Padronização frota 2027', ownerId: 'u12', stage: 'Conquista', temperature: 'Quente', value: 49600, mrr: 3100, probability: 100, nextAction: 'Acompanhar primeiro lote', expectedClose: '2026-10-10', wonAt: '2026-10-10', source: 'Carteira', contact: 'Bianca Alves', segment: 'Logística', dealType: 'Venda', itemIds: ['pa-a11-ext'], quantity: 80, createdAt: '2026-09-10T09:00:00.000Z', activities: [] },
-      { id: 'OPP-26039', tenantId: 'tenant-roboflex', partnerId: 'c5', title: 'Cases da safra anterior', ownerId: 'u12', stage: 'Perdida', temperature: 'Frio', value: 22000, mrr: 0, probability: 0, lossReason: 'Preço', nextAction: '—', expectedClose: '2026-09-30', source: 'Indicação', contact: 'Fábio Luz', segment: 'Logística', dealType: 'Venda', createdAt: '2026-08-12T09:00:00.000Z', activities: [] },
-      { id: 'OPP-26046', tenantId: 'tenant-roboflex-sul', partnerId: 'c2', title: 'Zontec · mesas para a linha leve', ownerId: 'u18', stage: 'Prospecção', temperature: 'Morno', value: 36000, mrr: 2400, probability: 10, nextAction: 'Visita na planta', expectedClose: '2026-11-20', source: 'Prospecção Ativa', contact: 'Helena Duarte', segment: 'Indústria', dealType: 'Venda', itemIds: ['pa-lite-ipad'], quantity: 30, createdAt: '2026-10-18T14:00:00.000Z', activities: [] },
+      { id: 'OPP-26043', tenantId: 'tenant-roboflex', partnerId: 'c5', title: 'Cases para coletores do pátio', ownerId: 'u12', stage: 'Levantamento', temperature: 'Morno', value: 62400, mrr: 4200, probability: 35, nextAction: 'Apresentar protótipo', expectedClose: '2026-10-29', source: 'Site', contact: 'Fábio Luz', segment: 'Logística', dealType: 'Venda', itemIds: ['pa-a11-ext'], quantity: 60, createdAt: '2026-10-06T15:00:00.000Z', activities: [{ id: 'act-2', at: '2026-10-16T13:00:00.000Z', type: 'Tarefa', text: 'Enviar desenho da fixação', details: 'O pátio precisa do furo de fixação alinhado ao coletor atual.', done: false }] },
+      { id: 'OPP-26044', tenantId: 'tenant-roboflex', partnerId: 'c2', title: 'Prospecção frota leve', ownerId: 'u12', stage: 'Novo contato', temperature: 'Frio', value: 28000, mrr: 1800, probability: 10, nextAction: 'Retornar ligação', expectedClose: '2026-12-15', source: 'Prospecção', contact: 'Bianca Alves', segment: 'Logística', dealType: 'Venda', itemIds: ['pa-lite-ipad'], quantity: 40, createdAt: '2026-10-20T11:00:00.000Z', activities: [] },
+      { id: 'OPP-26045', tenantId: 'tenant-roboflex', partnerId: 'c1', title: 'Novo case para coletor portuário', ownerId: 'u12', stage: 'Qualificação', temperature: 'Quente', value: 180000, mrr: 12000, probability: 20, statusNote: 'Cliente pediu vedação nova. PAP com a engenharia.', nextAction: 'Acompanhar a mudança de engenharia', expectedClose: '2026-11-30', source: 'Outro', contact: 'Marcelo Dias', segment: 'Mineração', dealType: 'Venda', quantity: 200, createdAt: '2026-10-08T09:00:00.000Z', notes: 'Produto ainda não existe. A engenharia abre a estrutura depois do PAP.', activities: [] },
+      { id: 'OPP-26040', tenantId: 'tenant-roboflex', partnerId: 'c2', title: 'Padronização frota 2027', ownerId: 'u12', stage: 'Ganho', temperature: 'Quente', value: 49600, mrr: 3100, probability: 100, nextAction: 'Acompanhar primeiro lote', expectedClose: '2026-10-10', wonAt: '2026-10-10', source: 'Cliente existente', contact: 'Bianca Alves', segment: 'Logística', dealType: 'Venda', itemIds: ['pa-a11-ext'], quantity: 80, createdAt: '2026-09-10T09:00:00.000Z', activities: [] },
+      { id: 'OPP-26039', tenantId: 'tenant-roboflex', partnerId: 'c5', title: 'Cases da safra anterior', ownerId: 'u12', stage: 'Perdido', temperature: 'Frio', value: 22000, mrr: 0, probability: 0, lossReason: 'Preço', nextAction: '—', expectedClose: '2026-09-30', source: 'Indicação', contact: 'Fábio Luz', segment: 'Logística', dealType: 'Venda', createdAt: '2026-08-12T09:00:00.000Z', activities: [] },
+      { id: 'OPP-26046', tenantId: 'tenant-roboflex-sul', partnerId: 'c2', title: 'Zontec · mesas para a linha leve', ownerId: 'u18', stage: 'Qualificação', temperature: 'Morno', value: 36000, mrr: 2400, probability: 20, nextAction: 'Visita na planta', expectedClose: '2026-11-20', source: 'Prospecção', contact: 'Helena Duarte', segment: 'Indústria', dealType: 'Venda', itemIds: ['pa-lite-ipad'], quantity: 30, createdAt: '2026-10-18T14:00:00.000Z', activities: [] },
+      { id: 'OPP-26047', tenantId: 'tenant-roboflex', partnerId: 'c7', title: 'Tablets na produção · cases e bases', ownerId: 'u12', stage: 'Proposta', temperature: 'Quente', value: 4704, mrr: 392, probability: 55, statusNote: 'Achou a Roboflex pelo site. Proposta com 18% de desconto aguarda aprovação do gestor.', nextAction: 'Confirmar compatibilidade com o SM-X133 e o ambiente com óleo', expectedClose: '2026-11-28', source: 'Site', contact: 'Renata Moura', email: 'renata.moura@metalurgicahorizonte.com.br', segment: 'Indústria', dealType: 'Venda', itemIds: ['cst040435', 'bse040021'], quantity: 24, createdAt: '2026-10-21T10:00:00.000Z', notes: '12 cases Impact parafusadas para Tab A11 SM-X133 e 12 bases adesivas tamanho C, sujeitas à confirmação técnica de compatibilidade com os tablets e o ambiente.', activities: [{ id: 'act-mh-1', at: '2026-11-12T10:00:00.000Z', type: 'Tarefa', text: 'Validar compatibilidade técnica', details: 'Engenharia confirma o encaixe do SM-X133 e a fixação da base adesiva em chapa pintada.', done: false }] },
+      { id: 'OPP-26048', tenantId: 'tenant-roboflex', partnerId: 'c7', title: 'Case personalizada para o MH-IND-10', ownerId: 'u12', stage: 'Levantamento', temperature: 'Morno', value: 48000, mrr: 0, probability: 35, statusNote: 'Produto inexistente. P&D avalia a viabilidade no PRJ-26-021.', nextAction: 'Aguardar parecer de viabilidade do P&D', expectedClose: '2027-02-15', source: 'Site', contact: 'Renata Moura', segment: 'Indústria', dealType: 'Venda', itemIds: ['mh-pd-001'], quantity: 40, createdAt: '2026-10-21T10:30:00.000Z', notes: 'Tablet industrial próprio do cliente, fora do catálogo. Depende de análise e possível desenvolvimento.', activities: [] },
+      { id: 'OPP-26049', tenantId: 'tenant-roboflex', partnerId: 'c7', title: 'Locação de unidade de demonstração', ownerId: 'u12', stage: 'Qualificação', temperature: 'Morno', value: 900, mrr: 450, probability: 20, statusNote: 'Quer testar uma unidade antes da compra. Depende de disponibilidade e condições.', nextAction: 'Aprovar o contrato LC-1', expectedClose: '2026-11-18', source: 'Site', contact: 'Renata Moura', segment: 'Indústria', dealType: 'Locação', createdAt: '2026-10-21T11:00:00.000Z', activities: [] },
     ],
     salesGoals: [
       { tenantId: 'tenant-roboflex', year: 2026, amount: 40000000 },
@@ -285,14 +326,16 @@ function baseState(): ErpState {
     proposals: [
       { id: 'PROP-26018', opportunityId: 'OPP-26042', partnerId: 'c1', lines: [{ itemId: 'pa-s9-min', description: 'Case Mining · Galaxy Tab S9 FE', quantity: 120, unitPrice: 745 }, { itemId: 'pa-a11-ext', description: 'Case Extreme · Samsung Tab A11', quantity: 24, unitPrice: 520 }, { serviceId: 'sv-campo', description: 'Implantação em campo', quantity: 2, unitPrice: 1200 }], discount: 2, paymentTerms: '28/56 dias', validUntil: '2026-10-25', suggestedDate: '2026-11-28', status: 'Enviada', createdAt: '2026-10-13T14:00:00.000Z' },
       { id: 'PROP-26019', opportunityId: 'OPP-26043', partnerId: 'c5', lines: [{ itemId: 'pa-a11-ext', description: 'Case Extreme · Samsung Tab A11', quantity: 60, unitPrice: 520 }], discount: 0, paymentTerms: '28 dias', validUntil: '2026-11-02', suggestedDate: '2026-11-20', status: 'Rascunho', createdAt: '2026-10-15T10:00:00.000Z' },
+      { id: 'PROP-26020', opportunityId: 'OPP-26047', partnerId: 'c7', lines: [{ itemId: 'cst040435', description: 'Case Impact Parafusada · Samsung Tab A11 SM-X133', quantity: 12, unitPrice: 389 }, { itemId: 'bse040021', description: 'Base Adesiva Tamanho C', quantity: 12, unitPrice: 89 }], discount: 18, paymentTerms: '28/56 dias', validUntil: '2026-12-15', suggestedDate: '2026-12-10', status: 'Em aprovação', version: 1, createdBy: 'Camila Nunes', approvalRequestedBy: 'Camila Nunes', createdAt: '2026-10-22T15:00:00.000Z' },
     ],
     technicalServiceOrders: [
       { id: 'AT-26018', partnerId: 'c2', salesOrderId: 'PV-2026-1033', productionOrderId: 'OP-24031', assetSerial: 'RF26-001842', description: 'Conector de carga intermitente em duas unidades', warranty: true, chargeable: false, technicianId: 'u15', scheduledFor: '2026-10-16', status: 'Agendada', usedItemIds: [], channel: 'Telefone', contact: 'Bianca Alves', diagnosis: 'Placa do conector com solda fria; trocar a placa nas duas unidades.', parts: [{ itemId: 'cp-placa', quantity: 2, consumed: false }], demandIds: ['DM-102'], createdAt: '2026-10-15T08:00:00.000Z' },
       { id: 'AT-26017', partnerId: 'c4', salesOrderId: 'PV-2026-1041', description: 'Avaliar suporte com folga após queda', warranty: false, chargeable: true, status: 'Aberta', usedItemIds: [], channel: 'E-mail', contact: 'Lívia Costa', parts: [], createdAt: '2026-10-14T16:20:00.000Z' },
     ],
     projects: [
-      { id: 'PRJ-26-014', name: 'Case Mining Galaxy Tab S10', kind: 'Produto novo', ownerId: 'u13', partnerId: 'c1', status: 'Em andamento', startDate: '2026-09-15', endDate: '2026-12-18', budgetId: 'ORC-PD-10', itemId: 'pa-s9-min', opportunityId: 'OPP-26042', memberIds: ['u13', 'u12', 'u5'], description: 'Nova versão do case Mining para o Galaxy Tab S10, puxada pela renovação da mina Norte. Reaproveita a borda do S9 e muda o encaixe da câmera.', risks: ['Ensaio IP65 depende de laboratório externo', 'Molde da tampa precisa de ajuste de 0,3 mm'], milestones: [{ id: 'm1', title: 'Requisitos aprovados', dueDate: '2026-09-30', done: true, doneAt: '2026-09-29' }, { id: 'm2', title: 'Protótipo funcional', dueDate: '2026-10-25', done: false }, { id: 'm3', title: 'Validação em campo', dueDate: '2026-11-20', done: false }] },
-      { id: 'PRJ-26-011', name: 'Redução de setup molde A11', kind: 'Melhoria', ownerId: 'u5', memberIds: ['u5', 'u11'], description: 'Reduzir de 55 para 30 minutos a troca do molde do Tab A11 na Injetora 02.', status: 'Planejado', startDate: '2026-10-20', endDate: '2026-11-28', milestones: [{ id: 'm4', title: 'Medição do setup atual', dueDate: '2026-10-22', done: false }, { id: 'm5', title: 'Novo carrinho de troca', dueDate: '2026-11-10', done: false }] },
+      { id: 'PRJ-26-021', name: 'Case personalizada MH-IND-10', kind: 'Produto novo', scope: 'P&D', priority: 'Alta', ownerId: 'u13', partnerId: 'c7', status: 'Em andamento', startDate: '2026-10-21', endDate: '2027-01-29', itemId: 'mh-pd-001', opportunityId: 'OPP-26048', memberIds: ['u13', 'u12'], description: 'Avaliar se é viável um case para o tablet industrial MH-IND-10 da Metalúrgica Horizonte, que não existe no catálogo. O item MH-PD-001 tem código provisório e fica bloqueado para venda até a Engenharia liberar a estrutura.', risks: ['Cliente ainda não enviou a unidade do tablet para medição', 'Pode exigir molde novo'], milestones: [{ id: 'm6', title: 'Receber tablet para medição', dueDate: '2026-11-06', done: true, doneAt: '2026-11-05' }, { id: 'm7', title: 'Parecer de viabilidade', dueDate: '2026-11-20', done: false }, { id: 'm8', title: 'Protótipo aprovado pelo cliente', dueDate: '2027-01-15', done: false }] },
+      { id: 'PRJ-26-014', name: 'Case Mining Galaxy Tab S10', kind: 'Produto novo', scope: 'P&D', priority: 'Normal', ownerId: 'u13', partnerId: 'c1', status: 'Em andamento', startDate: '2026-09-15', endDate: '2026-12-18', budgetId: 'ORC-PD-10', itemId: 'pa-s9-min', opportunityId: 'OPP-26042', memberIds: ['u13', 'u12', 'u5'], description: 'Nova versão do case Mining para o Galaxy Tab S10, puxada pela renovação da mina Norte. Reaproveita a borda do S9 e muda o encaixe da câmera.', risks: ['Ensaio IP65 depende de laboratório externo', 'Molde da tampa precisa de ajuste de 0,3 mm'], milestones: [{ id: 'm1', title: 'Requisitos aprovados', dueDate: '2026-09-30', done: true, doneAt: '2026-09-29' }, { id: 'm2', title: 'Protótipo funcional', dueDate: '2026-10-25', done: false }, { id: 'm3', title: 'Validação em campo', dueDate: '2026-11-20', done: false }] },
+      { id: 'PRJ-26-011', name: 'Redução de setup molde A11', kind: 'Melhoria', scope: 'Corporativo', ownerId: 'u5', memberIds: ['u5', 'u11'], description: 'Reduzir de 55 para 30 minutos a troca do molde do Tab A11 na Injetora 02.', status: 'Planejado', startDate: '2026-10-20', endDate: '2026-11-28', milestones: [{ id: 'm4', title: 'Medição do setup atual', dueDate: '2026-10-22', done: false }, { id: 'm5', title: 'Novo carrinho de troca', dueDate: '2026-11-10', done: false }] },
     ],
     budgetGroups: [],
     budgetCategories: [
@@ -426,6 +469,37 @@ function baseState(): ErpState {
     ],
     accessProfiles: seededProfiles(),
     userProfileAssignments: [],
+    receipts: [],
+    warrantyPolicies: [{ tenantId: 'tenant-roboflex', months: 12, terms: 'Defeito de fabricação em case, base e componentes eletrônicos. Não cobre queda, mau uso, violação do lacre nem desgaste natural da película.' }],
+    warranties: [],
+    rentalContracts: [],
+    trainings: [],
+    facilities: [
+      { id: 'IN-1', tenantId: 'tenant-roboflex', code: 'INJ', name: 'Fábrica · Injeção', kind: 'Área produtiva', responsibleId: 'u11', status: 'Ativo' },
+      { id: 'IN-2', tenantId: 'tenant-roboflex', code: 'MON', name: 'Fábrica · Montagem e testes', kind: 'Área produtiva', responsibleId: 'u5', status: 'Ativo' },
+      { id: 'IN-3', tenantId: 'tenant-roboflex', code: 'FER', name: 'Ferramentaria', kind: 'Depósito', responsibleId: 'u11', status: 'Ativo' },
+      { id: 'IN-4', tenantId: 'tenant-roboflex', code: 'SHW', name: 'Showroom e demonstração', kind: 'Escritório', responsibleId: 'u12', status: 'Ativo' },
+    ],
+    assetMovements: [],
+    assetInventories: [],
+    registry: [
+      ...['un · Unidade', 'kg · Quilograma', 'cx · Caixa', 'kit · Kit', 'h · Hora'].map((entry, index) => reg('Unidade', index, entry)),
+      ...['BRL · Real', 'USD · Dólar americano'].map((entry, index) => reg('Moeda', index, entry)),
+      ...['AV · À vista', '28 · 28 dias', '28/56 · 28/56 dias', '30/60/90 · 30/60/90 dias'].map((entry, index) => reg('Condição de pagamento', index, entry)),
+      ...['Indicação', 'Site', 'Prospecção', 'Cliente existente', 'Outro'].map((entry, index) => reg('Origem de oportunidade', index, entry)),
+      ...['Preço', 'Prazo', 'Solução', 'Concorrente', 'Cancelamento', 'Outro'].map((entry, index) => reg('Motivo de perda', index, entry)),
+      ...['Preço', 'Prazo', 'Solução', 'Concorrente', 'Outro'].map((entry, index) => reg('Motivo de recusa', index, entry)),
+    ],
+    omieSources: [
+      { tenantId: 'tenant-roboflex', entity: 'Cliente', source: 'Thalamus', direction: 'Enviar', decidedBy: 'Lucas Lima', decidedAt: '2026-10-01T12:00:00.000Z' },
+      { tenantId: 'tenant-roboflex', entity: 'Fornecedor', source: 'Thalamus', direction: 'Enviar', decidedBy: 'Lucas Lima', decidedAt: '2026-10-01T12:00:00.000Z' },
+      { tenantId: 'tenant-roboflex', entity: 'Pedido de venda', source: 'Thalamus', direction: 'Bidirecional', decidedBy: 'Lucas Lima', decidedAt: '2026-10-01T12:00:00.000Z' },
+      { tenantId: 'tenant-roboflex', entity: 'Pedido de compra', source: 'Thalamus', direction: 'Enviar', decidedBy: 'Lucas Lima', decidedAt: '2026-10-01T12:00:00.000Z' },
+      { tenantId: 'tenant-roboflex', entity: 'Produto', source: 'Thalamus', direction: 'Bidirecional', decidedBy: 'Lucas Lima', decidedAt: '2026-10-01T12:00:00.000Z' },
+      { tenantId: 'tenant-roboflex', entity: 'Categoria financeira', source: 'Omie', direction: 'Receber', decidedBy: 'Lucas Lima', decidedAt: '2026-10-01T12:00:00.000Z' },
+      { tenantId: 'tenant-roboflex', entity: 'Centro de custo', source: 'Pendente', direction: 'Receber' },
+      { tenantId: 'tenant-roboflex', entity: 'Faturamento', source: 'Omie', direction: 'Receber', decidedBy: 'Lucas Lima', decidedAt: '2026-10-01T12:00:00.000Z' },
+    ],
     counters: { OP: 24030, RC: 5100, NC: 310, OS: 880, EV: 0, SY: 0, MV: 0, DT: 0, AL: 0, PC: 7310, NF: 18420, DM: 104, AP: 7308, AR: 18420, PV: 1056, OM: 98510, MF: 8, TP: 3, U: 18 },
   }
 }
@@ -535,9 +609,9 @@ function seedPeople(state: ErpState) {
     state.persons.push({
       id: personId, tenantId: personTenant, fullName: user.name, corporateEmail: user.email,
       phone: user.id === 'u6' ? '31999990006' : undefined,
-      cpf: user.id === 'u11' ? '111.222.333-44' : undefined,
+      cpf: user.id === 'u11' ? '529.982.247-25' : undefined,
       birthDate: user.id === 'u6' ? '1994-04-12' : undefined,
-      education: user.id === 'u13' ? [{ institution: 'UFMG', course: 'Engenharia mecânica', level: 'Graduação' }] : [],
+      education: user.id === 'u13' ? [{ institution: 'UFMG', course: 'Engenharia mecânica', level: 'Superior completo' }] : [],
       family: [], emergencies: user.id === 'u6' ? [{ name: 'Maria Pereira', phone: '31988880006', bond: 'Mãe' }] : [],
       banks: user.id === 'u6' ? [{ bank: '001', agency: '1234', account: '56789-0', kind: 'Corrente' }] : [],
       address: user.id === 'u6' ? { street: 'Rua das Acácias', number: '120', district: 'Industrial', zip: '32000-000', state: 'MG', city: 'Contagem' } : undefined,
@@ -557,7 +631,7 @@ function seedPeople(state: ErpState) {
   const diegoSul = 'p-z-diego'
   state.persons.push({
     id: diegoSul, tenantId: 'tenant-roboflex-sul', fullName: 'Diego Martins', corporateEmail: 'diego.martins@zontec.com.br',
-    cpf: '111.222.333-44', education: [], family: [], emergencies: [], banks: [],
+    cpf: '529.982.247-25', education: [], family: [], emergencies: [], banks: [],
   })
   state.employments.push({ id: 'emp-z-diego', tenantId: 'tenant-roboflex-sul', personId: diegoSul, contractType: 'CLT', startedOn: '2025-03-01', status: 'Ativo', workplace: 'Engenharia Zontec' })
   state.users.push({
@@ -746,7 +820,82 @@ export function createSeedState(): ErpState {
       note: 'Limites A, B e C ainda não definidos. Nenhuma classe foi sugerida e a classe vigente não muda.',
     }]
   }
+  prepareOperations(s)
   return s
+}
+
+/** Recebimento, garantia, locação, treinamento, patrimônio e o item provisório do P&D. */
+function prepareOperations(s: ErpState) {
+  const location: Record<string, string> = { 'a-inj1': 'IN-1', 'a-inj2': 'IN-1', 'a-inj3': 'IN-1', 'a-teste': 'IN-2', 'a-demo-a11': 'IN-4' }
+  s.assets.forEach((asset, index) => {
+    asset.patrimonyCode = `PAT-${String(index + 1).padStart(4, '0')}`
+    asset.facilityId = location[asset.id] ?? (asset.kind === 'Molde' ? 'IN-1' : 'IN-2')
+    asset.location = s.facilities.find(entry => entry.id === asset.facilityId)?.name
+    asset.condition = 'Bom'
+    asset.status ??= 'Operando'
+    asset.costCenter = asset.kind === 'Equipamento' && asset.rentable ? 'Comercial' : 'Produção'
+    asset.depreciationMethod = asset.acquisitionValue ? 'Linear' : undefined
+    asset.residualValue = asset.acquisitionValue ? Math.round(asset.acquisitionValue * 0.1) : undefined
+    asset.acquiredAt ??= asset.acquisitionValue ? '2023-03-01' : undefined
+  })
+
+  // Recebimento: TPU conferido, placas com avaria bloqueadas até a decisão de Compras
+  s.receipts.push({ id: 'RB-1', tenantId: 'tenant-roboflex', purchaseOrderId: 'PC-7310', supplierId: 'f2', itemId: 'mp-tpu', expected: 40, received: 20, accepted: 20, check: 'Conforme', receivedBy: 'Carlos Lima', receivedAt: '2026-10-16T09:10:00.000Z', status: 'Concluído' })
+  s.purchaseOrders.push({ id: 'PC-7311', supplierId: 'f3', demandIds: [], itemId: 'cp-placa', quantity: 100, received: 80, unitPrice: 58, promisedDate: '2026-10-20', status: 'Recebido parcial', quotes: [{ supplierId: 'f3', unitPrice: 58, leadDays: 10, selected: true }], createdAt: '2026-10-08T10:00:00.000Z' })
+  s.receipts.push({ id: 'RB-2', tenantId: 'tenant-roboflex', purchaseOrderId: 'PC-7311', supplierId: 'f3', itemId: 'cp-placa', expected: 100, received: 100, accepted: 80, check: 'Avaria', note: '20 placas com o conector pogo pin amassado na embalagem', receivedBy: 'Carlos Lima', receivedAt: '2026-10-20T14:30:00.000Z', status: 'Bloqueado' })
+  s.counters.RB = 2
+
+  // Garantia: o pedido entregue ganha garantia; o faturado aguarda a confirmação de entrega
+  const delivered = s.salesOrders.find(entry => entry.id === 'PV-2026-1033')
+  if (delivered?.shipment) {
+    delivered.shipment.status = 'Entregue'
+    delivered.shipment.deliveredAt = '2026-10-11T15:00:00.000Z'
+    delivered.shipment.deliveredTo = 'Bianca Alves'
+    s.warranties.push({ id: 'GT-1', tenantId: 'tenant-roboflex', partnerId: 'c2', salesOrderId: delivered.id, itemId: delivered.itemId, startsOn: '2026-10-11', endsOn: '2027-10-11', terms: s.warrantyPolicies[0].terms, status: 'Pendente', createdAt: '2026-10-11T15:00:00.000Z', note: 'A regra de 12 meses ainda não foi aprovada' })
+    s.counters.GT = 1
+  }
+
+  // Locação da Metalúrgica Horizonte: proposta aguardando aprovação de outra pessoa
+  s.rentalContracts.push({
+    id: 'LC-1', tenantId: 'tenant-roboflex', partnerId: 'c7', opportunityId: 'OPP-26049', assetId: 'a-demo-a11', startsOn: '2026-11-16', endsOn: '2026-12-16',
+    amount: 450, billing: 'Mensal', paymentTerms: '28 dias', expectedReturnOn: '2026-12-16', status: 'Proposta', createdBy: 'Camila Nunes', createdAt: '2026-10-22T16:00:00.000Z',
+    note: 'Unidade para teste no posto de solda antes da compra',
+  })
+  s.counters.LC = 1
+
+  // Treinamentos: válidos, vencido e a vencer
+  const person = (name: string) => s.persons.find(entry => entry.fullName === name)?.id
+  const trainings: [string, string, 'Segurança' | 'Operação' | 'Qualidade' | 'Sistema', string | undefined, string | undefined, 'Aprovado' | 'Pendente'][] = [
+    ['João Pereira', 'NR-12 · Segurança em máquinas injetoras', 'Segurança', '2025-11-10', '2026-11-10', 'Aprovado'],
+    ['Lucas Ferreira', 'NR-12 · Segurança em máquinas injetoras', 'Segurança', '2024-09-02', '2025-09-02', 'Aprovado'],
+    ['Ana Costa', 'Torque e montagem do Case A11', 'Operação', '2026-08-12', undefined, 'Aprovado'],
+    ['Fernanda Rocha', 'Inspeção de primeira peça', 'Qualidade', '2026-03-05', '2027-03-05', 'Aprovado'],
+    ['Carlos Lima', 'Conferência de recebimento no Thalamus', 'Sistema', undefined, undefined, 'Pendente'],
+  ]
+  trainings.forEach(([name, title, kind, completedOn, validUntil, result], index) => {
+    const personId = person(name)
+    if (!personId) return
+    s.trainings.push({ id: `TR-${index + 1}`, tenantId: 'tenant-roboflex', personId, name: title, kind, completedOn, validUntil, result, evidence: completedOn ? `certificado-${index + 1}.pdf` : undefined, createdBy: 'Marina Souza', createdAt: '2026-10-01T12:00:00.000Z' })
+  })
+  s.counters.TR = trainings.length
+
+  // Patrimônio: transferência aguardando aprovação e inventário da injeção com divergência
+  s.assetMovements.push({ id: 'MP-1', tenantId: 'tenant-roboflex', assetId: 'mold-a11b', fromFacilityId: 'IN-1', toFacilityId: 'IN-3', reason: 'Manutenção', status: 'Solicitada', requestedBy: 'Diego Martins', requestedAt: '2026-10-20T08:00:00.000Z', note: 'Polimento da cavidade 2 do bumper' })
+  s.counters.MP = 1
+  const injectionAssets = s.assets.filter(entry => entry.facilityId === 'IN-1')
+  s.assetInventories.push({
+    id: 'IV-1', tenantId: 'tenant-roboflex', facilityId: 'IN-1', date: '2026-10-19', responsible: 'Diego Martins', status: 'Pendente',
+    lines: injectionAssets.map(asset => ({ assetId: asset.id, expectedFacilityId: 'IN-1', expectedCondition: 'Bom', found: asset.id !== 'mold-s9t', condition: asset.id === 'mold-s9t' ? undefined : 'Bom' })),
+  })
+  s.counters.IV = 1
+  s.counters.IN = s.facilities.length
+  s.counters.PRJ = 21
+
+  const provisional = s.items.find(entry => entry.id === 'mh-pd-001')?.catalog
+  if (provisional) {
+    provisional.lifecycle = 'Em criação'
+    provisional.audit.unshift({ at: '2026-10-21T14:00:00.000Z', actor: 'Eduardo Freitas', version: 1, text: 'Código provisório do P&D (PRJ-26-021). Não entra em proposta, pedido nem compra até a Engenharia liberar a estrutura.' })
+  }
 }
 
 /** Catálogo, árvore, versões de estrutura com vigência e lotes iniciais. */
@@ -882,6 +1031,8 @@ function prepareExtendedLayers(s: ErpState) {
   price('pa-lite-ipad', 'TP-PADRAO', 246)
   price('pa-lite-ipad', 'TP-ECOM', 269)
   price('mr-carregador', 'TP-PADRAO', 89)
+  price('cst040435', 'TP-PADRAO', 389)
+  price('bse040021', 'TP-PADRAO', 89)
   price('kf-frota', 'TP-PADRAO', 2050, '2026-08-01', 'kit')
   price('kt-vitrine', 'TP-PADRAO', 470)
   const impPrices = catalogOf('pa-a11-imp').prices

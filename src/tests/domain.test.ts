@@ -240,11 +240,13 @@ describe('ERP integrado', () => {
   it('aceita proposta e cria um pedido aprovado no fluxo', () => {
     const state = createSeedState()
     const proposal = state.proposals.find(entry => entry.status === 'Enviada')!
+    proposal.validUntil = '2099-12-31'
     const before = state.salesOrders.length
     advanceProposal(state, proposal.id, 'Comercial')
     expect(proposal.status).toBe('Aceita')
     expect(state.salesOrders).toHaveLength(before + 1)
     expect(state.salesOrders[0].lines!.length).toBeGreaterThan(1)
+    expect(state.salesOrders[0]).toMatchObject({ origin: 'Thalamus', proposalId: proposal.id })
   })
 
   it('conclui assistência cobrável e envia a cobrança ao Omie', () => {
@@ -267,7 +269,7 @@ describe('ERP integrado', () => {
 
   it('conclui projeto pelos marcos', () => {
     const state = createSeedState()
-    const project = state.projects[1]
+    const project = state.projects.find(entry => entry.id === 'PRJ-26-011')!
     project.milestones.forEach(milestone => toggleMilestone(state, project.id, milestone.id, 'Gestor'))
     expect(project.status).toBe('Concluído')
   })
@@ -460,7 +462,7 @@ describe('orçamento integrado por categoria e período', () => {
   it('monta o DRE com depreciação dos ativos e premiação estimada', () => {
     const state = createSeedState()
     const depreciation = assetDepreciation(state, TENANT)
-    expect(depreciation.total).toBeCloseTo(82000 + 64000 + 91000 + 148000 / 5 + 132000 / 5 + 176000 / 5 + 98000 / 5 + 4500, 2)
+    expect(depreciation.total).toBeCloseTo(82000 + 64000 + 91000 + 148000 / 5 + 132000 / 5 + 176000 / 5 + 98000 / 5 + 4500 + 3800 / 3, 2)
     expect(assetDepreciation(state, 'tenant-roboflex-sul').total).toBe(0)
     const dre = dreStatement(state, [TENANT], { year: '2026', fromMonth: 1, toMonth: 12 })
     expect(dre.lines.find(line => line.id === 'rob')?.budget).toBe(48_000_000)
@@ -664,24 +666,28 @@ describe('CRM e propostas', () => {
     const partner = state.partners.find(entry => entry.roles.includes('Cliente') && !state.customers.some(customer => customer.id === entry.id))
       ?? state.partners.find(entry => entry.roles.includes('Cliente'))!
     const opportunity = createOpportunity(state, { partnerId: partner.id, title: 'Teste', ownerId: 'u12', value: 0, expectedClose: '2026-11-30', source: 'Site', nextAction: 'Ligar', itemIds: ['pa-a11-ext'], quantity: 30 }, 'Comercial')
-    expect(() => moveOpportunity(state, opportunity.id, 'Conquista', 'Comercial')).toThrow()
+    expect(() => moveOpportunity(state, opportunity.id, 'Ganho', 'Comercial')).toThrow()
     const proposal = createProposal(state, opportunity.id, 'Comercial')
     expect(opportunity.stage).toBe('Proposta')
     expect(proposal.lines[0]).toMatchObject({ itemId: 'pa-a11-ext', quantity: 30 })
-    expect(() => updateProposal(state, proposal.id, { discount: 20 }, 'Comercial')).toThrow('15%')
+    updateProposal(state, proposal.id, { discount: 20 }, 'Comercial')
     advanceProposal(state, proposal.id, 'Comercial')
+    expect(proposal.status).toBe('Em aprovação')
+    expect(() => advanceProposal(state, proposal.id, 'Comercial')).toThrow(/próprio|própria/)
+    advanceProposal(state, proposal.id, 'Gestor')
+    expect(proposal).toMatchObject({ status: 'Enviada', approvedBy: 'Gestor' })
     expect(opportunity.stage).toBe('Proposta')
     advanceProposal(state, proposal.id, 'Comercial')
-    expect(opportunity.stage).toBe('Conquista')
+    expect(opportunity.stage).toBe('Ganho')
     expect(proposal.salesOrderId).toBe(state.salesOrders[0].id)
     expect(state.customers.some(customer => customer.id === partner.id)).toBe(true)
   })
 
-  it('perder a oportunidade recusa as propostas em aberto', () => {
+  it('perder a oportunidade cancela as propostas em andamento', () => {
     const state = createSeedState()
     loseOpportunity(state, 'OPP-26042', 'Preço', 'Comercial')
-    expect(state.opportunities.find(entry => entry.id === 'OPP-26042')!.stage).toBe('Perdida')
-    expect(state.proposals.find(entry => entry.id === 'PROP-26018')!.status).toBe('Recusada')
+    expect(state.opportunities.find(entry => entry.id === 'OPP-26042')!.stage).toBe('Perdido')
+    expect(state.proposals.find(entry => entry.id === 'PROP-26018')!).toMatchObject({ status: 'Cancelada', cancelReason: expect.stringContaining('Preço') })
   })
 
   it('reunião entra na agenda de quem criou, convida o contato e o vendedor se for outra pessoa', () => {
@@ -861,7 +867,8 @@ describe('cadastro de itens', () => {
     setBomLine(state, revision.id, 'cp-paraf', 12, 'Eduardo', 'Engenharia')
     revision.checklist.forEach(entry => { entry.done = true })
     const future = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10)
-    releaseRevision(state, revision.id, 'Eduardo', future)
+    expect(() => releaseRevision(state, revision.id, 'Eduardo', future)).toThrow(/outra pessoa/)
+    releaseRevision(state, revision.id, 'Paulo', future)
     expect(item.currentRevisionId).toBe(previous)
     expect(state.productRevisions.find(entry => entry.id === previous)!.validTo).toBeTruthy()
     applyDueRevisions(state, future)
@@ -1096,6 +1103,17 @@ describe('parceiros', () => {
     expect(created.roles).toEqual(['Cliente', 'Fornecedor'])
     expect(created.name).toBe('Norte Dois')
     expect(state.partners.filter(entry => entry.document === '08.444.555/0001-66')).toHaveLength(1)
+  })
+
+  it('aceita parceiro sem documento e estrangeiro sem cnpj', () => {
+    const state = createSeedState()
+    const local = createPartner(state, { ...input, document: '', tradeName: 'Sem Documento' }, 'Marina')
+    expect(local.document).toBe('')
+    expect(local.country).toBe('Brasil')
+    const foreign = createPartner(state, { ...input, document: '', country: 'Alemanha', legalName: 'Munich Parts GmbH', tradeName: 'Munich Parts' }, 'Marina')
+    expect(foreign.country).toBe('Alemanha')
+    expect(() => createPartner(state, { ...input, document: '123' }, 'Marina')).toThrow(/em branco/)
+    expect(() => createPartner(state, { ...input, document: '', country: 'Alemanha', tradeName: 'Outro' }, 'Marina')).not.toThrow()
   })
 
   it('inativar o cliente não inativa o fornecedor e bloqueia só solicitação nova', () => {

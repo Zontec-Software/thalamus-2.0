@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import StatusBadge from '../../components/StatusBadge.vue'
 import { today } from '../../domain/engine'
-import { proposalTotal } from '../../domain/enterprise'
+import { proposalIsLive, proposalTotal } from '../../domain/enterprise'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import type { Proposal } from '../../types/domain'
@@ -19,9 +19,9 @@ const tab = ref<Tab>('andamento')
 const query = ref('')
 
 const TABS: { id: Tab; label: string; match: (entry: Proposal) => boolean }[] = [
-  { id: 'andamento', label: 'Em andamento', match: entry => entry.status === 'Rascunho' || entry.status === 'Enviada' },
+  { id: 'andamento', label: 'Em andamento', match: entry => proposalIsLive(entry) },
   { id: 'aceitas', label: 'Aceitas', match: entry => entry.status === 'Aceita' },
-  { id: 'recusadas', label: 'Recusadas', match: entry => entry.status === 'Recusada' },
+  { id: 'recusadas', label: 'Encerradas', match: entry => entry.status === 'Recusada' || entry.status === 'Vencida' || entry.status === 'Cancelada' },
 ]
 const opportunityOf = (entry: Proposal) => store.state.opportunities.find(item => item.id === entry.opportunityId)
 const text = (entry: Proposal) => `${entry.id} ${store.partnerName(entry.partnerId)} ${opportunityOf(entry)?.title ?? ''}`.toLowerCase()
@@ -50,7 +50,7 @@ const expired = (entry: Proposal) => entry.status === 'Enviada' && entry.validUn
           <td><b>{{ fmtCurrency(proposalTotal(proposal)) }}</b><span v-if="proposal.discount" class="cell-sub">{{ proposal.discount }}% desc.</span></td>
           <td :class="{ 'risk-text': expired(proposal) }">{{ fmtDate(proposal.validUntil) }}<span v-if="expired(proposal)" class="cell-sub">vencida, cobrar retorno</span></td>
           <td><span class="cell-sub">{{ proposal.salesOrderId ?? '—' }}</span></td>
-          <td><StatusBadge :value="proposal.status" /></td>
+          <td><StatusBadge :value="proposal.status" /><span v-if="proposal.version && proposal.version > 1" class="cell-sub">versão {{ proposal.version }}</span></td>
         </tr>
       </tbody>
     </table>

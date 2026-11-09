@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { ChevronRight } from 'lucide-vue-next'
 import CrumbBack from '../../components/CrumbBack.vue'
 import RecordTimeline from '../../components/records/RecordTimeline.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import PersonFile from './PersonFile.vue'
+import ShiftField from './ShiftField.vue'
 import PersonPhoto from './PersonPhoto.vue'
 import { sectorOf } from '../../domain/enterprise'
 import { reviewsShareScale } from '../../domain/people'
@@ -32,12 +33,15 @@ const record = computed(() => {
   return store.state.persons.find(entry => entry.id === id) ?? store.state.persons.find(entry => entry.id === store.state.users.find(user => user.id === id)?.personId)
 })
 const person = computed(() => store.state.users.find(entry => entry.personId === record.value?.id && entry.homeTenantId === record.value?.tenantId) ?? store.state.users.find(entry => entry.id === route.params.id))
-const form = reactive({ name: '', email: '', profileId: '', sector: '', positionId: '', shift: 'Manhã' as User['shift'], google: true, googleEmail: '' })
+const form = reactive({ name: '', email: '', profileId: '', sector: '', positionId: '', shift: '' as User['shift'], google: true, googleEmail: '' })
 const googleTouched = ref(false)
 const accountEmail = ref('')
 const moveForm = reactive({ sector: '', positionId: '', validFrom: today() })
 const reviewForm = reactive({ scoreLabel: '', scale: '', period: '', origin: '' })
-const contract = reactive({ contractType: '', cbo: '', workplace: '' })
+const contract = reactive({ contractType: '', workplace: '', startedOn: '' })
+const contractBase = ref('')
+const contractApplying = ref(false)
+const file = ref<{ isDirty: () => boolean } | null>(null)
 
 const companySectors = computed(() => store.state.sectors.filter(entry => entry.tenantId === (record.value?.tenantId ?? ui.activeTenantId)))
 const companyProfiles = computed(() => store.state.accessProfiles.filter(entry => entry.tenantId === ui.activeTenantId))
@@ -89,27 +93,58 @@ const access = computed(() => person.value ? AREAS.map(area => ({
   }).map(item => item.label),
 })).filter(entry => entry.modules.length) : [])
 
-const tabs = computed(() => [
-  { id: 'dados' as const, label: 'Dados pessoais' },
-  { id: 'vinculo' as const, label: 'Vínculo e trajetória', count: assignments.value.length },
-  { id: 'saude' as const, label: 'Saúde e benefícios' },
-  { id: 'avaliacoes' as const, label: 'Avaliações', count: reviews.value.length },
-  { id: 'acesso' as const, label: 'Acesso' },
-  ...(team.value.length ? [{ id: 'equipe' as const, label: 'Equipe', count: team.value.length }] : []),
-  { id: 'historico' as const, label: 'Histórico' },
-])
+const selfService = computed(() => person.value?.id === ui.sessionUserId && !store.can('pessoas.estrutura.gerir') && !store.can('pessoas.dados_sensiveis.consultar'))
+const tabs = computed(() => {
+  const items: { id: Tab; label: string; count?: number }[] = [
+    { id: 'dados', label: 'Dados pessoais' },
+    { id: 'saude', label: 'Saúde e benefícios' },
+  ]
+  if (selfService.value) return items
+  items.splice(1, 0, { id: 'vinculo', label: 'Vínculo e trajetória', count: assignments.value.length })
+  items.push(
+    { id: 'avaliacoes', label: 'Avaliações', count: reviews.value.length },
+    { id: 'acesso', label: 'Acesso' },
+    ...(team.value.length ? [{ id: 'equipe' as const, label: 'Equipe', count: team.value.length }] : []),
+    { id: 'historico', label: 'Histórico' },
+  )
+  return items
+})
 const tab = computed<Tab>(() => {
   const raw = String(route.query.aba ?? 'dados')
   const name = LEGACY[raw] ?? raw
   return tabs.value.some(entry => entry.id === name) ? name as Tab : 'dados'
 })
 
-watch(employment, current => Object.assign(contract, { contractType: current?.contractType ?? '', cbo: current?.cbo ?? '', workplace: current?.workplace ?? '' }), { immediate: true })
+const contractDirty = computed(() => contractBase.value !== '' && JSON.stringify(contract) !== contractBase.value)
+function syncContract(current = employment.value) {
+  Object.assign(contract, { contractType: current?.contractType ?? '', workplace: current?.workplace ?? '', startedOn: (current?.startedOn ?? '').slice(0, 10) })
+  contractBase.value = JSON.stringify(contract)
+}
+watch(employment, () => {
+  if (contractDirty.value && !contractApplying.value) return
+  syncContract()
+}, { immediate: true })
+const draftDirty = computed(() => isNew.value && [form.name, form.email, form.positionId, form.shift].some(value => value.trim() !== ''))
+function unsaved() {
+  return draftDirty.value || contractDirty.value || Boolean(file.value?.isDirty())
+}
+function allowLeave() {
+  return !unsaved() || window.confirm('Há alterações sem salvar. Sair mesmo assim?')
+}
+onBeforeRouteLeave(allowLeave)
+onBeforeRouteUpdate(allowLeave)
+function blockUnload(event: BeforeUnloadEvent) {
+  if (!unsaved()) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+onMounted(() => window.addEventListener('beforeunload', blockUnload))
+onBeforeUnmount(() => window.removeEventListener('beforeunload', blockUnload))
 watch(person, current => Object.assign(moveForm, { sector: current ? sectorOf(store.state, current)?.name ?? current.sector : '', positionId: '', validFrom: today() }), { immediate: true })
 watch(() => route.path, path => {
   if (!path.endsWith('/nova')) return
   googleTouched.value = false
-  Object.assign(form, { name: '', email: '', profileId: defaultProfile(), sector: companySectors.value[0]?.name ?? '', positionId: '', shift: 'Manhã', google: true, googleEmail: '' })
+  Object.assign(form, { name: '', email: '', profileId: defaultProfile(), sector: companySectors.value[0]?.name ?? '', positionId: '', shift: '', google: true, googleEmail: '' })
 }, { immediate: true })
 watch(() => form.name, name => { if (!googleTouched.value) form.googleEmail = proposedEmail(ui.activeTenantId, name) })
 watch(record, current => { accountEmail.value = current ? proposedEmail(current.tenantId, current.fullName) : '' }, { immediate: true })
@@ -124,7 +159,12 @@ function create() {
 }
 function saveContract() {
   if (!employment.value) return
-  store.updateEmployment(employment.value.id, { contractType: contract.contractType, cbo: contract.cbo, workplace: contract.workplace })
+  contractApplying.value = true
+  try {
+    store.updateEmployment(employment.value.id, { contractType: contract.contractType, workplace: contract.workplace, startedOn: contract.startedOn })
+  } finally {
+    contractApplying.value = false
+  }
 }
 function update(patch: Partial<Pick<User, 'shift' | 'active'>>) {
   if (person.value) store.updateUser(person.value.id, patch)
@@ -158,7 +198,7 @@ function registerReview() {
       <div class="field"><label>Conta Google</label><label class="check-line"><input v-model="form.google" type="checkbox" /> Criar no domínio da empresa</label><input v-if="form.google" v-model="form.googleEmail" @input="googleTouched = true" /></div>
       <div class="field"><label>Setor</label><select v-model="form.sector" @change="form.positionId = ''"><option v-for="entry in companySectors" :key="entry.id">{{ entry.name }}</option></select></div>
       <div class="field"><label>Posição</label><select v-model="form.positionId"><option value="">Sem posição por enquanto</option><option v-for="entry in freePositions(form.sector)" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>A pessoa ocupa uma vaga que já existe. O cargo é o dessa vaga.<template v-if="!freePositions(form.sector).length"> Nenhuma está livre. <RouterLink to="/pessoas/organograma">Abrir o organograma</RouterLink></template></small></div>
-      <div class="field"><label>Turno</label><select v-model="form.shift"><option>Manhã</option><option>Tarde</option><option>Administrativo</option></select></div>
+      <div class="field"><label>Turno</label><ShiftField v-model="form.shift" /></div>
       <div class="field"><label>Perfil</label><select v-model="form.profileId"><option v-for="entry in companyProfiles" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select><small>O mesmo catálogo da Gestão de acesso. A posição não concede perfil.</small></div>
     </div>
     <div class="drawer-actions">
@@ -185,15 +225,15 @@ function registerReview() {
         <div class="actions">
           <StatusBadge :value="situation" />
           <RouterLink v-if="offboarding" class="button secondary small" :to="`/pessoas/desligamento/${offboarding.id}`">Ver desligamento</RouterLink>
-          <RouterLink v-else-if="person.active !== false" class="button secondary small" :to="{ path: '/pessoas/desligamento/novo', query: { pessoa: person.id } }">Iniciar desligamento</RouterLink>
+          <RouterLink v-else-if="!selfService && person.active !== false" class="button secondary small" :to="{ path: '/pessoas/desligamento/novo', query: { pessoa: person.id } }">Iniciar desligamento</RouterLink>
         </div>
       </div>
       <div class="kpi-strip">
-        <button type="button" class="kpi link" @click="openTab('vinculo')"><span>Na empresa desde</span><strong>{{ employment ? fmtDate(employment.startedOn) : '—' }}</strong><small>{{ tenure || 'Sem vínculo registrado' }}</small></button>
-        <button type="button" class="kpi link" @click="manager && router.push(`/pessoas/pessoa/${manager.personId ?? manager.id}`)"><span>Gestor direto</span><strong>{{ manager?.name ?? '—' }}</strong><small>{{ manager ? 'Abrir a ficha' : 'Ninguém acima' }}</small></button>
-        <button v-if="team.length" type="button" class="kpi link" @click="openTab('equipe')"><span>Equipe</span><strong>{{ team.length }}</strong><small>Lidera {{ managed.map(entry => entry.name).join(', ') }}</small></button>
-        <button v-else type="button" class="kpi link" @click="openTab('avaliacoes')"><span>Última avaliação</span><strong>{{ reviews[0]?.scoreLabel ?? '—' }}</strong><small>{{ reviews[0] ? `${reviews[0].period} · escala ${reviews[0].scale}` : 'Nenhuma ainda' }}</small></button>
-        <button type="button" class="kpi link" @click="openTab('acesso')"><span>Acesso</span><strong>{{ homeProfileNames || 'Sem perfil' }}</strong><small>{{ companies.length ? companies.join(' · ') : 'Nenhuma empresa' }}</small></button>
+        <button type="button" class="kpi" :class="{ link: !selfService }" @click="selfService || openTab('vinculo')"><span>Na empresa desde</span><strong>{{ employment ? fmtDate(employment.startedOn) : '—' }}</strong><small>{{ tenure || 'Sem vínculo registrado' }}</small></button>
+        <button type="button" class="kpi" :class="{ link: !selfService && !!manager }" @click="!selfService && manager && router.push(`/pessoas/pessoa/${manager.personId ?? manager.id}`)"><span>Gestor direto</span><strong>{{ manager?.name ?? '—' }}</strong><small>{{ !manager ? 'Ninguém acima' : selfService ? '' : 'Abrir a ficha' }}</small></button>
+        <button v-if="team.length && !selfService" type="button" class="kpi link" @click="openTab('equipe')"><span>Equipe</span><strong>{{ team.length }}</strong><small>Lidera {{ managed.map(entry => entry.name).join(', ') }}</small></button>
+        <button v-else type="button" class="kpi" :class="{ link: !selfService }" @click="selfService || openTab('avaliacoes')"><span>Última avaliação</span><strong>{{ reviews[0]?.scoreLabel ?? '—' }}</strong><small>{{ reviews[0] ? `${reviews[0].period} · escala ${reviews[0].scale}` : 'Nenhuma ainda' }}</small></button>
+        <button type="button" class="kpi" :class="{ link: !selfService }" @click="selfService || openTab('acesso')"><span>Acesso</span><strong>{{ homeProfileNames || 'Sem perfil' }}</strong><small>{{ companies.length ? companies.join(' · ') : 'Nenhuma empresa' }}</small></button>
       </div>
     </article>
 
@@ -202,8 +242,8 @@ function registerReview() {
         <button v-for="entry in tabs" :key="entry.id" type="button" :class="{ active: tab === entry.id }" @click="openTab(entry.id)">{{ entry.label }}<b v-if="entry.count">{{ entry.count }}</b></button>
       </div>
 
-      <PersonFile v-if="tab === 'dados' && record" :person-id="record.id" part="pessoal" />
-      <PersonFile v-else-if="tab === 'saude' && record" :person-id="record.id" part="saude" />
+      <PersonFile v-if="tab === 'dados' && record" ref="file" :person-id="record.id" part="pessoal" />
+      <PersonFile v-else-if="tab === 'saude' && record" ref="file" :person-id="record.id" part="saude" />
 
       <div v-else-if="tab === 'vinculo'" data-tour="person-role">
         <p v-if="offboarding" class="hint">Desligamento em andamento, efetivo em {{ fmtDate(offboarding.effectiveOn) }}. <RouterLink :to="`/pessoas/desligamento/${offboarding.id}`">Abrir o processo</RouterLink></p>
@@ -214,7 +254,7 @@ function registerReview() {
             <div class="field"><label>Posição</label><input :value="position?.name ?? 'Sem posição'" disabled /><small>{{ position ? 'A vaga que esta pessoa ocupa.' : 'Sem vaga, não há cargo.' }}</small></div>
             <div class="field"><label>Cargo</label><input :value="job?.name ?? '—'" disabled /><small v-if="position">É o cargo desta vaga. Troca no <RouterLink to="/pessoas/organograma">organograma</RouterLink>, não nesta ficha.</small></div>
             <div class="field"><label>Gestor direto</label><input :value="manager?.name ?? '—'" disabled /></div>
-            <div class="field"><label>Turno</label><select :value="person.shift" @change="update({ shift: ($event.target as HTMLSelectElement).value as User['shift'] })"><option>Manhã</option><option>Tarde</option><option>Administrativo</option></select></div>
+            <div class="field"><label>Turno</label><ShiftField :model-value="person.shift" @update:model-value="shift => update({ shift })" /></div>
           </div>
         </section>
 
@@ -222,15 +262,15 @@ function registerReview() {
           <h3>Contrato</h3>
           <div class="form-grid">
             <div class="field"><label>Tipo</label><select v-model="contract.contractType"><option>CLT</option><option>Estágio</option><option>PJ</option><option>Temporário</option></select></div>
-            <div class="field"><label>Início</label><input :value="fmtDate(employment.startedOn)" disabled /></div>
-            <div class="field"><label>CBO</label><input v-model="contract.cbo" /></div>
+            <div class="field"><label>Admissão</label><input v-model="contract.startedOn" type="date" /></div>
+            <div class="field"><label>CBO</label><input :value="job?.cbo || '—'" disabled /></div>
             <div class="field"><label>Local de trabalho</label><input v-model="contract.workplace" /></div>
             <div v-if="canSeePersonBlock(fileView, 'salario')" class="field"><label>Salário</label><input :value="job?.salary != null ? fmtCurrency(job.salary) : 'Não informado no cargo'" disabled /><small v-if="job">Vem do cargo {{ job.name }}. Quem ocupa uma posição deste cargo recebe o mesmo valor. Altera em <RouterLink to="/pessoas/cargos">Cargos</RouterLink>.</small><small v-else>Sem cargo, não há salário.</small></div>
           </div>
           <div class="save-bar"><button class="button" @click="saveContract">Salvar contrato</button></div>
         </section>
 
-        <PersonFile v-if="record && canSeePersonBlock(fileView, 'banco')" :person-id="record.id" part="banco" />
+        <PersonFile v-if="record && canSeePersonBlock(fileView, 'banco')" ref="file" :person-id="record.id" part="banco" />
 
         <section class="person-section">
           <h3>Trajetória</h3>

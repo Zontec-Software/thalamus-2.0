@@ -20,6 +20,7 @@ const openOrders = computed(() => store.state.salesOrders.filter(order => store.
 const atRisk = computed(() => openOrders.value.filter(order => store.risks(order).length))
 const shortages = computed(() => store.state.items.filter(item => plansMaterial(item) && store.available(item.id) < item.minimum))
 const injectors = computed(() => store.state.resources.filter(resource => resource.tenantId === ui.activeTenantId && resource.kind === 'Injetora' && showOnFloor(store.state, resource)))
+const floor = computed(() => store.state.resources.filter(resource => resource.tenantId === ui.activeTenantId && showOnFloor(store.state, resource)).sort((a, b) => Number(b.kind === 'Injetora') - Number(a.kind === 'Injetora')))
 const running = computed(() => injectors.value.filter(resource => store.machineState(resource.id) === 'Produzindo').length)
 const byStage = computed(() => FLOW_STAGES.map(stage => ({ stage, count: store.state.salesOrders.filter(order => store.stage(order) === stage).length })))
 
@@ -68,10 +69,11 @@ const weekly = [
   <section class="grid-2">
     <div class="stack">
       <article class="card" data-tour="machines">
-        <div class="section-head"><div><h2>Injetoras agora</h2><p>Estado vindo dos apontamentos do tablet</p></div><RouterLink class="link" to="/injecao">Painel de injeção</RouterLink></div>
+        <div class="section-head"><div><h2>Fábrica agora</h2><p>Injetoras, montagem e demais postos, pelos apontamentos do tablet</p></div><RouterLink class="link" to="/injecao">Painel de injeção</RouterLink></div>
         <div class="machine-grid">
-          <div v-for="resource in injectors" :key="resource.id" class="machine-tile" :class="store.machineState(resource.id)">
+          <div v-for="resource in floor" :key="resource.id" class="machine-tile" :class="store.machineState(resource.id)">
             <strong>{{ resource.name }}</strong>
+            <small>{{ resource.kind }}</small>
             <StatusBadge :value="store.machineState(resource.id)" />
             <small>{{ store.state.productionOrders.find(op => op.resourceId === resource.id && ['Em produção', 'Liberada'].includes(op.status))?.id ?? 'Sem OP em andamento' }}</small>
           </div>

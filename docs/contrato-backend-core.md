@@ -7,7 +7,7 @@ Endpoints acrescentados para o sistema oficial: `GET /api/internal/session` (int
 ## Recursos
 
 - `users`: identidade, e-mail, senha com hash, situação e último acesso.
-- `tenants`: empresas do produto, com cadastro legal e situação.
+- `tenants`: empresas do produto, com cadastro legal e situação. O nome fantasia (`trade_name`) é o nome exibido no topo, nas listas e na escolha da empresa. `PATCH /api/tenants/{id}` altera razão social, nome fantasia, estado, cidade e situação (`Ativa` ou `Inativa`). Nome fantasia em branco volta a razão social. Empresa inativa sai da escolha de empresa; o cadastro permanece.
 - `economic-groups`: grupos econômicos e suas empresas.
 - `functionalities`: catálogo versionado de ações estáveis (`<módulo>.<ação>`).
 - `access-profiles`: perfis reutilizáveis por empresa, com funcionalidades.

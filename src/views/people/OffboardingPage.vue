@@ -70,7 +70,7 @@ function revoke() {
     <h2>Iniciar desligamento</h2>
     <p class="cell-sub" style="margin-bottom:14px">O motivo é texto livre. A lista oficial ainda não existe. Nada de senha é pedido aqui.</p>
     <div class="form-grid">
-      <div class="field"><label>Pessoa</label><select v-model="form.userId"><option value="">—</option><option v-for="entry in eligible" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+      <div class="field"><label>Pessoa</label><select v-model="form.userId"><option v-for="entry in eligible" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
       <div class="field"><label>Data efetiva</label><input v-model="form.effectiveOn" type="date" /></div>
       <div class="field"><label>Motivo</label><input v-model="form.reason" placeholder="Texto livre" /></div>
     </div>

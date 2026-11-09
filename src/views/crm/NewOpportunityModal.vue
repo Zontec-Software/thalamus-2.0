@@ -9,13 +9,14 @@ import { CLIENT_VERTICALS, roleIsOpen } from '../../domain/partners'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import type { OpportunityDeal } from '../../types/domain'
-import { CRM_COMPANIES, CRM_SOURCES, CRM_VERTICALS, DEAL_TYPES } from './shared'
+import { CRM_COMPANIES, CRM_SOURCES, CRM_VERTICALS, DEAL_TYPES, useCrmLists } from './shared'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const store = useErpStore()
 const ui = useUiStore()
 const router = useRouter()
+const { sources } = useCrmLists()
 const clients = computed(() => store.state.partners.filter(entry => roleIsOpen(entry, 'Cliente')))
 const sellers = computed(() => store.state.users.filter(entry => !entry.platformMaster && (entry.role === 'Comercial' || entry.role === 'Gestor' || entry.role === 'Administrador')))
 
@@ -23,7 +24,7 @@ const blank = () => ({
   tenantId: CRM_COMPANIES.some(company => company.id === ui.activeTenantId) ? ui.activeTenantId : CRM_COMPANIES[0].id,
   ownerId: sellers.value.find(entry => entry.id === ui.sessionUserId)?.id ?? sellers.value.find(entry => entry.name === ui.userName)?.id ?? sellers.value[0]?.id ?? '',
   partnerId: '',
-  source: CRM_SOURCES[3],
+  source: CRM_SOURCES[2],
   dealType: 'Venda' as OpportunityDeal,
   vertical: '',
   expectedClose: addDays(today(), 30),
@@ -50,7 +51,7 @@ watch(() => form.partnerId, id => {
 })
 
 function applyBrief() {
-  const read = readOpportunityBrief(brief.value, { clients: clients.value.map(entry => ({ id: entry.id, name: entry.name })), sources: CRM_SOURCES, verticals: CRM_VERTICALS })
+  const read = readOpportunityBrief(brief.value, { clients: clients.value.map(entry => ({ id: entry.id, name: entry.name })), sources: sources.value, verticals: CRM_VERTICALS })
   if (read.tenantId) form.tenantId = read.tenantId
   if (read.partnerId) form.partnerId = read.partnerId
   if (read.source) form.source = read.source
@@ -107,7 +108,7 @@ function create() {
 </script>
 
 <template>
-  <BaseModal :open="open" title="Nova oportunidade" subtitle="Nasce fria, em Prospecção. O relato pode ser escrito ou falado: nesta demonstração a gravação e a leitura dos campos são simuladas." width="680px" @close="emit('close')">
+  <BaseModal :open="open" title="Nova oportunidade" subtitle="Nasce fria, em Novo contato. O relato pode ser escrito ou falado: nesta demonstração a gravação e a leitura dos campos são simuladas." width="680px" @close="emit('close')">
     <div class="field">
       <label>Relato</label>
       <textarea v-model="brief" rows="3" placeholder="Conte o negócio. A leitura preenche os campos que reconhecer."></textarea>
@@ -125,7 +126,7 @@ function create() {
         <select v-model="form.partnerId"><option value="">Escolher…</option><option v-for="client in clients" :key="client.id" :value="client.id">{{ client.name }}</option></select>
         <small><button type="button" class="link" @click="registering = !registering">{{ registering ? 'Cancelar cadastro' : 'Cadastrar cliente' }}</button></small>
       </div>
-      <div class="field"><label>Origem</label><select v-model="form.source"><option v-for="source in CRM_SOURCES" :key="source">{{ source }}</option></select></div>
+      <div class="field"><label>Origem</label><select v-model="form.source"><option v-for="source in sources" :key="source">{{ source }}</option></select></div>
       <div class="field"><label>Tipo</label><select v-model="form.dealType"><option v-for="type in DEAL_TYPES" :key="type">{{ type }}</option></select></div>
       <div class="field"><label>Vertical</label><select v-model="form.vertical"><option value="">Não informada</option><option v-for="vertical in CRM_VERTICALS" :key="vertical">{{ vertical }}</option></select><small>Fica no cadastro do cliente.</small></div>
       <div class="field"><label>Previsão de fechamento</label><input v-model="form.expectedClose" type="date" /></div>

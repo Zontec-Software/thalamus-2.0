@@ -7,6 +7,7 @@ export interface NewCompanyInput {
   legalName: string
   tradeName: string
   document: string
+  state?: string
   city: string
   adminName: string
   adminEmail: string
@@ -22,7 +23,8 @@ export function provisionCompany(state: ErpState, input: NewCompanyInput) {
   if (!legalName || !document || !adminName || !adminEmail) throw new DomainError('Informe a empresa, o documento e o primeiro administrador')
   if (state.tenants.some(entry => entry.document === document)) throw new DomainError('Já existe uma empresa com este documento')
   const tenantId = `tenant-${state.tenants.length + 1}`
-  const tenant: Tenant = { id: tenantId, legalName, tradeName, document, city: input.city.trim() || 'Não informada', status: 'Ativa' }
+  const stateCode = input.state?.trim().toUpperCase()
+  const tenant: Tenant = { id: tenantId, legalName, tradeName, document, city: input.city.trim() || 'Não informada', status: 'Ativa', ...(stateCode ? { state: stateCode } : {}) }
   state.tenants.push(tenant)
   state.omieConnections.push({ tenantId, appKey: '', secretDefined: false, status: 'Não configurada', accountLabel: '' })
   const profileId = `profile-${tenantId}-administrador`

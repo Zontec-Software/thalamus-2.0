@@ -2,24 +2,72 @@ import { describe, expect, it } from 'vitest'
 import { today } from '../domain/engine'
 import { createUser } from '../domain/enterprise'
 import {
-  addProjectParticipation, canSeePersonBlock, companyAccessOf, createJob, createPosition, directManager, directoryCard, grantCompanyAccess, occupantsAt, openLinkedEmployment, personView, placeSector, removePosition, resetPin, setCompanyProfile, setPersonPhoto, setSectorLeadership, suggestIdentity, updateJob, updatePosition,
+  addProjectParticipation, canSeePersonBlock, companyAccessOf, createJob, createJobLevel, createPosition, directManager, directoryCard, grantCompanyAccess, maskPhone, missingProfile, moveJobLevel, occupantsAt, openLinkedEmployment, personView, placeSector, removeJobLevel, removePosition, renameJobLevel, resetPin, setCompanyProfile, setPersonPhoto, setSectorLeadership, suggestIdentity, updateEmployment, updateJob, updatePerson, updatePosition,
 } from '../domain/organization'
 import {
   BRIEFING_VERSION, changeAssignment, closeOffboarding, createJobOpening, hireCandidate, prepareBriefing, recordReview, registerCandidate, revokeAccess, reviewsShareScale, setApplicationStage, setChecklistItem, startOffboarding,
 } from '../domain/people'
+import { addressFromCep, lookupCep, maskZip } from '../domain/cep'
 import { createSeedState } from '../mocks/seed'
 
 const TENANT = 'tenant-roboflex'
 
+describe('telefone', () => {
+  it('mascara celular e fixo enquanto digita', () => {
+    expect(maskPhone('3')).toBe('(3')
+    expect(maskPhone('31')).toBe('(31')
+    expect(maskPhone('319')).toBe('(31) 9')
+    expect(maskPhone('3133331000')).toBe('(31) 3333-1000')
+    expect(maskPhone('31998840099')).toBe('(31) 99884-0099')
+    expect(maskPhone('(31) 99884-0099')).toBe('(31) 99884-0099')
+    expect(maskPhone('31998840099999')).toBe('(31) 99884-0099')
+  })
+})
+
+describe('cep', () => {
+  it('mascara e lê o endereço que o CEP devolve', async () => {
+    expect(maskZip('30130174')).toBe('30130-174')
+    expect(addressFromCep({ logradouro: 'Rua da Bahia', bairro: 'Centro', localidade: 'Belo Horizonte', uf: 'mg' })).toEqual({
+      street: 'Rua da Bahia', district: 'Centro', city: 'Belo Horizonte', state: 'MG',
+    })
+    expect(addressFromCep({ erro: true })).toBeNull()
+    expect(addressFromCep({ localidade: 'Cidade', uf: 'MG' })).toMatchObject({ street: '', district: '', state: 'MG' })
+    const found = await lookupCep('30130174', async () => new Response(JSON.stringify({
+      logradouro: 'Avenida Afonso Pena', bairro: 'Centro', localidade: 'Belo Horizonte', uf: 'MG',
+    })))
+    expect(found?.city).toBe('Belo Horizonte')
+  })
+})
+
 describe('pessoas', () => {
+  it('lista o que falta para o cadastro da pessoa', () => {
+    const person = createSeedState().persons.find(entry => entry.id === 'p-u6')!
+    expect(missingProfile({ ...person, birthDate: undefined, sex: undefined, cpf: undefined, phone: undefined, address: undefined })).toEqual(['Nascimento', 'Sexo', 'CPF', 'Celular', 'Endereço'])
+    expect(missingProfile({ ...person, birthDate: '1990-01-02', sex: 'Feminino', cpf: '529.982.247-25', phone: '31999999999', address: { street: 'Rua da Bahia', number: '10', district: 'Centro', zip: '30130-100', state: 'MG', city: 'Belo Horizonte' } })).toEqual([])
+  })
+
   it('guarda o salário no cargo, não no vínculo', () => {
     const state = createSeedState()
     expect(state.jobs.find(entry => entry.id === 'job-op')?.salary).toBe(3200)
     expect(state.employments.every(entry => !('salary' in entry))).toBe(true)
     const created = createJob(state, TENANT, { name: 'Ferramenteiro', level: 'Pleno', cbo: '', mission: 'Cuidar do molde', requirements: [], salary: 4500 }, 'Marina')
     expect(created.salary).toBe(4500)
-    expect(() => createJob(state, TENANT, { name: 'Outro', level: '', cbo: '', mission: 'Apoio', requirements: [], salary: -1 }, 'Marina')).toThrow(/salário/i)
+    expect(() => createJob(state, TENANT, { name: 'Outro', level: '', cbo: '', mission: 'Apoio', requirements: [] }, 'Marina')).toThrow(/nível/i)
+    expect(() => createJob(state, TENANT, { name: 'Outro', level: 'Pleno', cbo: '', mission: 'Apoio', requirements: [], salary: -1 }, 'Marina')).toThrow(/salário/i)
+    expect(() => createJob(state, TENANT, { name: 'ferramenteiro', level: 'pleno', cbo: '', mission: 'Outra', requirements: [] }, 'Marina')).toThrow(/já existe o cargo/i)
+    expect(() => updateJob(state, created.id, { level: 'Sênior' }, 'Marina')).toThrow(/cadastre o nível/i)
+    const senior = createJobLevel(state, TENANT, 'Sênior', 'Marina')
+    expect(updateJob(state, created.id, { level: 'sênior' }, 'Marina').level).toBe('Sênior')
+    expect(moveJobLevel(state, senior.id, 'up', 'Marina').rank).toBe(4)
+    expect(renameJobLevel(state, senior.id, 'Sênior II', 'Marina').name).toBe('Sênior II')
+    expect(state.jobs.find(entry => entry.id === created.id)?.level).toBe('Sênior II')
+    expect(() => removeJobLevel(state, senior.id, 'Marina')).toThrow(/cargo neste nível/i)
     expect(updateJob(state, created.id, { salary: 4800 }, 'Marina').salary).toBe(4800)
+    const employment = state.employments.find(entry => entry.personId === 'p-u6')
+    expect(updateEmployment(state, employment!.id, { startedOn: '2020-05-04' }, 'Marina').startedOn).toBe('2020-05-04')
+    expect(() => updateEmployment(state, employment!.id, { startedOn: '' }, 'Marina')).toThrow(/admissão/i)
+    expect(updatePerson(state, 'p-u6', { sex: 'Feminino' }, 'Marina').sex).toBe('Feminino')
+    expect(() => updatePerson(state, 'p-u6', { sex: 'outro' }, 'Marina')).toThrow(/sexo/i)
   })
 
   it('efetiva o candidato no cadastro único e guarda a candidatura', () => {
@@ -124,7 +172,10 @@ describe('pessoas', () => {
     expect(JSON.stringify(participation)).not.toMatch(/cpf|salary|banks|address/i)
     const diego = state.identityLinks.find(entry => entry.id === 'IDN-DIEGO')!
     expect(diego.status).toBe('Confirmado')
-    expect(state.persons.find(entry => entry.id === 'p-u11')!.cpf).toBe('111.222.333-44')
+    expect(state.persons.find(entry => entry.id === 'p-u11')!.cpf).toBe('529.982.247-25')
+    expect(() => updatePerson(state, 'p-u11', { cpf: '111.111.111-11' }, 'Marina')).toThrow(/CPF inválido/)
+    expect(() => updatePerson(state, 'p-u11', { cpf: '123' }, 'Marina')).toThrow(/11 dígitos/)
+    expect(updatePerson(state, 'p-u11', { cpf: '' }, 'Marina').cpf).toBeUndefined()
     expect(state.persons.find(entry => entry.id === 'p-z-diego')!.tenantId).toBe(sul)
     const suggestion = suggestIdentity(state, 'p-u12', 'Marina')
     expect(suggestion?.status).toBe('Sugerido')

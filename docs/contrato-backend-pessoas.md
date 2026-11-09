@@ -17,8 +17,8 @@ Repositório `thalamus2-pessoas`: API em `api/` (schema `t2_pessoas`) e tela em 
 | `sectors` | nome único por empresa, setor superior (sem ciclo), posição de liderança (do próprio setor) |
 | `jobs` (cargos) | nome, nível, CBO, missão, requisitos, **salário** (do cargo, não da pessoa), situação |
 | `positions` | setor, cargo, posição superior (sem ciclo), quantidade de vagas, situação. O nome e a descrição vêm do cargo |
-| `people` | nome, e-mails, telefone, ramal, turno (`Manhã`, `Tarde`, `Administrativo`), foto, CPF (válido e único por empresa), nascimento e o restante da ficha (documentos, saúde, endereço, formação, família, contatos de emergência, contas bancárias), conta do core opcional |
-| `employments` | pessoa, tipo de contrato, início, fim, CBO, local de trabalho, situação (`Ativo`, `Encerrado`) |
+| `people` | nome, e-mails, telefone, ramal, turno (item da lista da empresa), foto, CPF (válido e único por empresa), nascimento e o restante da ficha (documentos, saúde, endereço, formação, família, contatos de emergência, contas bancárias), conta do core opcional |
+| `employments` | pessoa, tipo de contrato, início, fim, local de trabalho, situação (`Ativo`, `Encerrado`). O CBO é o do cargo da posição, não um campo do vínculo |
 | `assignments` | pessoa, setor, posição, vigência (`valid_from`, `valid_to`) |
 | `performance_reviews` | pessoa, nota, escala, período, origem |
 | `identity_links` | ligação confirmada entre o cadastro de origem e o de outra empresa do grupo |
@@ -46,7 +46,7 @@ Repositório `thalamus2-pessoas`: API em `api/` (schema `t2_pessoas`) e tela em 
 - `PATCH /api/checklists/{id}/items/{item}` (a funcionalidade exigida depende do processo do checklist)
 - `GET|POST /api/offboardings`, `GET /api/offboardings/{id}`, `POST /api/offboardings/{id}/revocations`, `POST /api/offboardings/{id}/close`
 - `GET /api/board` (contadores para gestão à vista)
-- Leitura para outros módulos: `GET /api/sectors` (Finanças usa para destinar o orçamento). Só exige sessão válida, sem `modulo.pessoas.consultar`
+- Leitura para outros módulos, só com sessão válida, sem `modulo.pessoas.consultar`: `GET /api/sectors` (Finanças destina o orçamento) e `GET /api/me` (a casca mostra no cabeçalho a foto da pessoa ligada à conta, na empresa ativa)
 
 ## Permissões
 
@@ -63,7 +63,7 @@ Repositório `thalamus2-pessoas`: API em `api/` (schema `t2_pessoas`) e tela em 
 
 1. Setor: nome obrigatório e único na empresa. Um setor não fica abaixo de si nem de um descendente.
 2. Liderança do setor é uma posição ativa do próprio setor. O líder é quem ocupa a posição.
-3. Cargo exige nome e missão. Salário, quando informado, é número maior ou igual a zero.
+3. Cargo exige nome, missão e nível. O nível é um item da lista da empresa. Essa lista tem ordem: o 1 é o mais alto. O par nome e nível é único na empresa. Salário, quando informado, é número maior ou igual a zero. O turno da pessoa também sai de uma lista da empresa, sem ordem: renomear atualiza as pessoas, e remover só vale quando ninguém usa.
 4. Posição: setor e cargo da mesma empresa; posição superior ativa e fora da própria cadeia abaixo; vagas inteiro ≥ 1 e nunca abaixo dos ocupantes atuais.
 5. Remover posição com ocupante ou com posição respondendo a ela é recusado. Se já teve ocupante, fica inativa para o histórico; senão é apagada.
 6. Trocar a posição de uma pessoa exige vaga livre e vigência nova depois da atual. A vigência anterior termina no dia anterior. A troca abre o checklist de movimentação (acesso, equipamento, treinamento).
@@ -72,7 +72,7 @@ Repositório `thalamus2-pessoas`: API em `api/` (schema `t2_pessoas`) e tela em 
 9. Entrevista exige data, local e ao menos um entrevistador da empresa. A primeira entrevista leva a candidatura de Triagem para Entrevista.
 10. Marcar Selecionado abre o checklist de efetivação. Efetivar exige Selecionado e checklist obrigatório concluído. Efetivar cria pessoa, vínculo e, com posição, a vigência (com vaga livre). Com perfil e senha, cria a conta no core. Se o e-mail do candidato já é de uma pessoa da empresa, a efetivação une os cadastros em vez de criar outro.
 11. Desligamento: um em andamento por pessoa, data efetiva e motivo obrigatórios. O item de acesso só conclui pela revogação. A confirmação final só depois dos demais obrigatórios. Concluir encerra o vínculo e a vigência na data efetiva. Revogação com segredo no texto é recusada; a referência do cofre é aceita.
-12. Ficha: quem não tem `pessoas.dados_sensiveis.consultar` recebe a visão profissional e não pode gravar campo sensível (403).
+12. Ficha: quem não tem `pessoas.dados_sensiveis.consultar` recebe a visão profissional e não pode gravar campo sensível (403). Sexo, gênero, estado civil, escolaridade, categoria da CNH, UF, cor ou raça, PCD, camisa, calçado, parentesco, nível da formação e tipo de conta saem de listas fechadas; vazio é permitido. A data de admissão do vínculo ativo pode ser alterada. O CEP é consultado no navegador (ViaCEP) e preenche logradouro, bairro, cidade e UF; a API só grava o endereço. `GET /api/me` também devolve `person_id` e `missing` (nascimento, sexo, CPF, celular e endereço). Sem `pessoas.estrutura.gerir` e sem `pessoas.dados_sensiveis.consultar`, a própria pessoa lê e grava só Dados pessoais e Saúde; o restante da ficha não sai na resposta e outra pessoa dá 403.
 13. Foto: imagem em data URL, até 439 KB.
 14. Diretório do grupo: só as empresas do grupo da sessão (`groupPeers`). Contratar aqui também exige setor e tipo de contrato, cria outro cadastro nesta empresa com a mesma conta e liga os dois por confirmação.
 15. Toda mudança grava auditoria no schema do módulo.

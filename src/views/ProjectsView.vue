@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { BadgeDollarSign, CalendarClock, Flag, FolderKanban, Plus } from 'lucide-vue-next'
 import StatusBadge from '../components/StatusBadge.vue'
 import { today } from '../domain/engine'
@@ -10,10 +11,15 @@ import { fmtCurrency, fmtDate, fmtShortDate } from '../utils/format'
 
 const store = useErpStore()
 const ui = useUiStore()
+const route = useRoute()
 const status = ref<'Ativos' | Project['status']>('Ativos')
+/** /pd mostra o P&D da Engenharia; /projetos, o corporativo da Gestão. */
+const pd = computed(() => route.path === '/pd')
+const scoped = computed(() => store.state.projects.filter(entry => (entry.scope === 'P&D') === pd.value))
 
-const projects = computed(() => store.state.projects.filter(entry => status.value === 'Ativos' ? entry.status === 'Planejado' || entry.status === 'Em andamento' : entry.status === status.value))
-const active = computed(() => store.state.projects.filter(entry => entry.status === 'Planejado' || entry.status === 'Em andamento'))
+const projects = computed(() => scoped.value.filter(entry => status.value === 'Ativos' ? entry.status === 'Planejado' || entry.status === 'Em andamento' : entry.status === status.value))
+const active = computed(() => scoped.value.filter(entry => entry.status === 'Planejado' || entry.status === 'Em andamento'))
+const provisional = (project: Project) => project.itemId && store.item(project.itemId).catalog?.lifecycle === 'Em criação' ? store.item(project.itemId) : undefined
 const progress = (project: Project) => project.milestones.length ? Math.round(project.milestones.filter(entry => entry.done).length / project.milestones.length * 100) : 0
 const late = (project: Project) => project.milestones.filter(entry => !entry.done && entry.dueDate < today())
 const next = (project: Project) => project.milestones.find(entry => !entry.done)
@@ -59,11 +65,12 @@ const months = computed(() => {
     <div class="filter-row">
       <button v-for="entry in ['Ativos', 'Planejado', 'Em andamento', 'Concluído', 'Cancelado']" :key="entry" class="chip" :class="{ active: status === entry }" @click="status = entry as typeof status">{{ entry }}</button>
     </div>
-    <button data-tour="new-record" class="button" @click="ui.openRecord('project', 'new')"><Plus :size="15" /> Novo projeto</button>
+    <button data-tour="new-record" class="button" @click="ui.openRecord('project', 'new', { scope: pd ? 'P&D' : 'Corporativo' })"><Plus :size="15" /> {{ pd ? 'Novo projeto de P&D' : 'Novo projeto' }}</button>
   </div>
+  <p class="hint">{{ pd ? 'Desenvolvimento de produto da Engenharia. O item novo nasce com código provisório e fica bloqueado para venda até a estrutura ser liberada.' : 'Iniciativas da empresa. Projetos de P&D ficam em Engenharia.' }}</p>
 
   <section class="metrics">
-    <article class="metric"><div class="metric-head">Projetos ativos <FolderKanban :size="17" /></div><strong>{{ active.length }}</strong><small>{{ store.state.projects.filter(entry => entry.status === 'Concluído').length }} concluído(s)</small></article>
+    <article class="metric"><div class="metric-head">Projetos ativos <FolderKanban :size="17" /></div><strong>{{ active.length }}</strong><small>{{ scoped.filter(entry => entry.status === 'Concluído').length }} concluído(s)</small></article>
     <article class="metric"><div class="metric-head">Marcos atrasados <Flag :size="17" /></div><strong :class="{ 'risk-text': active.some(entry => late(entry).length) }">{{ active.reduce((sum, entry) => sum + late(entry).length, 0) }}</strong><small>Precisam de replanejamento</small></article>
     <article class="metric"><div class="metric-head">Orçamento dos projetos <BadgeDollarSign :size="17" /></div><strong>{{ fmtCurrency(active.reduce((sum, entry) => sum + (projectPlan(entry)?.amount ?? 0), 0)) }}</strong><small>{{ fmtCurrency(active.reduce((sum, entry) => sum + projectRealized(entry), 0)) }} realizados pagos</small></article>
     <article class="metric"><div class="metric-head">Próximos 7 dias <CalendarClock :size="17" /></div><strong>{{ active.flatMap(entry => entry.milestones).filter(entry => !entry.done && entry.dueDate >= today() && entry.dueDate <= new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)).length }}</strong><small>Marcos a entregar</small></article>
@@ -85,7 +92,7 @@ const months = computed(() => {
   <section class="project-grid" data-tour="record-list">
     <article v-for="project in projects" :key="project.id" class="card project-card clickable" @click="ui.openRecord('project', project.id)">
       <header><span class="metric-icon"><FolderKanban :size="17" /></span><StatusBadge :value="health(project).label" :tone="health(project).tone" /></header>
-      <span class="eyebrow">{{ project.kind }} · {{ project.id }}</span>
+      <span class="eyebrow">{{ project.kind }} · {{ project.id }}{{ project.priority && project.priority !== 'Normal' ? ` · prioridade ${project.priority.toLowerCase()}` : '' }}</span>
       <h2>{{ project.name }}</h2>
       <p>{{ store.userName(project.ownerId) }}{{ project.partnerId ? ` · ${store.partnerName(project.partnerId)}` : '' }} · até {{ fmtDate(project.endDate) }}</p>
       <div class="progress wide"><span :style="{ width: `${progress(project)}%` }"></span></div>
@@ -94,6 +101,7 @@ const months = computed(() => {
         <div class="mini-stat"><strong :class="{ 'risk-text': budgetUse(project) > 85 }">{{ budget(project) ? `${budgetUse(project)}%` : '—' }}</strong><span>orçamento</span></div>
         <div class="mini-stat"><strong>{{ openDemands(project) }}</strong><span>demandas abertas</span></div>
       </div>
+      <p v-if="provisional(project)" class="next-line"><StatusBadge :value="`${provisional(project)!.code} provisório`" tone="warning" /> bloqueado para venda</p>
       <p v-if="next(project)" class="next-line" :class="{ 'risk-text': next(project)!.dueDate < today() }"><Flag :size="13" /> Próximo: {{ next(project)!.title }} · {{ fmtShortDate(next(project)!.dueDate) }}</p>
     </article>
   </section>

@@ -2,20 +2,38 @@ import { computed, reactive, watch } from 'vue'
 import { opportunityIsOpen } from '../../domain/enterprise'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
-import type { Opportunity, Proposal } from '../../types/domain'
+import { registryOptions } from '../../domain/registry'
+import type { Opportunity, Proposal, RegistryKind } from '../../types/domain'
 
 /** Ano e mês do relógio da demonstração (29/10/2026). */
 export const CRM_YEAR = 2026
 export const CRM_MONTH = '2026-10'
 
-export const CRM_SOURCES = ['Feira e Eventos', 'Canais Digitais', 'Prospecção Passiva', 'Prospecção Ativa', 'Indicação', 'Carteira', 'Site']
+/** Valores de partida. A lista em uso vem de Cadastros gerais (`useCrmLists`). */
+export const CRM_SOURCES = ['Indicação', 'Site', 'Prospecção', 'Cliente existente', 'Outro']
 export { CLIENT_VERTICALS as CRM_VERTICALS } from '../../domain/partners'
-export const LOSS_REASONS = ['Preço', 'Prazo', 'Concorrente', 'Projeto cancelado', 'Sem retorno']
+export const LOSS_REASONS = ['Preço', 'Prazo', 'Solução', 'Concorrente', 'Cancelamento', 'Outro']
+export const REFUSAL_REASONS = ['Preço', 'Prazo', 'Solução', 'Concorrente', 'Outro']
+
+/** Origem, motivo de perda e motivo de recusa mantidos em Cadastros gerais. */
+export function useCrmLists() {
+  const store = useErpStore()
+  const ui = useUiStore()
+  const from = (kind: RegistryKind, fallback: string[]) => computed(() => {
+    const list = registryOptions(store.state, kind, ui.activeTenantId)
+    return list.length ? list : fallback
+  })
+  return {
+    sources: from('Origem de oportunidade', CRM_SOURCES),
+    lossReasons: from('Motivo de perda', LOSS_REASONS),
+    refusalReasons: from('Motivo de recusa', REFUSAL_REASONS),
+  }
+}
 
 /** Vendedor e grupo valem para todas as abas do CRM. */
 export const crmScope = reactive({ owner: '', groupId: '' })
 
-export const lifeOf = (entry: Opportunity) => entry.stage === 'Conquista' ? 'won' as const : entry.stage === 'Perdida' ? 'lost' as const : 'open' as const
+export const lifeOf = (entry: Opportunity) => entry.stage === 'Ganho' ? 'won' as const : entry.stage === 'Perdido' ? 'lost' as const : 'open' as const
 
 export const CRM_COMPANIES = [
   { id: 'tenant-roboflex', label: 'Roboflex' },
@@ -59,7 +77,8 @@ watch(() => [...opportunityList.columns], columns => localStorage.setItem(COLUMN
 
 export function proposalSituation(status: Proposal['status']) {
   if (status === 'Aceita') return 'Aprovada'
-  if (status === 'Recusada' || status === 'Expirada') return 'Cancelada'
+  if (status === 'Recusada' || status === 'Vencida' || status === 'Cancelada') return 'Encerrada'
+  if (status === 'Em aprovação') return 'Aguardando aprovação'
   return 'Em análise'
 }
 

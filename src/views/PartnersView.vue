@@ -6,6 +6,7 @@ import CrumbBack from '../components/CrumbBack.vue'
 import BaseModal from '../components/BaseModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import ReasonModal from './products/ReasonModal.vue'
+import { BRAZIL_STATES, documentError, loadBrazilCities, lookupCnpj, maskCnpj, maskCpf, onlyDigits, validCnpj } from '../domain/brazil'
 import { ADDRESS_PURPOSES, CLIENT_VERTICALS, clientSalesBase, duplicatePartner, homologationsOf, phaseOf, roleStatus, supplierReceiptBase } from '../domain/partners'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
@@ -31,6 +32,8 @@ const inactivating = ref<Role | ''>('')
 const duplicateAck = ref(false)
 
 const form = reactive({
+  origin: 'Brasil' as 'Brasil' | 'Estrangeiro',
+  country: '',
   personType: 'Jurídica' as 'Física' | 'Jurídica',
   legalName: '', tradeName: '', document: '',
   roles: [] as Role[],
@@ -41,7 +44,15 @@ const form = reactive({
 const contactFromQuery = ref(false)
 const contact = reactive({ name: '', duty: '', phone: '', email: '' })
 const address = reactive({ purpose: 'Entrega' as AddressPurpose, line: '', city: '', state: '' })
-const master = reactive({ personType: 'Jurídica' as 'Física' | 'Jurídica', legalName: '', tradeName: '', document: '' })
+const master = reactive({ origin: 'Brasil' as 'Brasil' | 'Estrangeiro', country: '', personType: 'Jurídica' as 'Física' | 'Jurídica', legalName: '', tradeName: '', document: '' })
+const formCities = ref<string[]>([])
+const addressCities = ref<string[]>([])
+const consulting = ref(false)
+const masterConsulting = ref(false)
+const documentNote = ref('Opcional. Com o CNPJ completo, o nome, o estado e a cidade vêm da Receita.')
+const masterNote = ref('')
+let lookupSeq = 0
+let masterSeq = 0
 
 const selectedId = computed(() => typeof route.params.id === 'string' ? route.params.id : '')
 const partner = computed(() => store.state.partners.find(entry => entry.id === selectedId.value))
@@ -75,7 +86,15 @@ const portraits = computed(() => partner.value ? homologationsOf(store.state, pa
 const pendingAbc = computed(() => partner.value?.abcSuggestions.filter(entry => entry.status === 'Pendente') ?? [])
 const canDecideAbc = computed(() => ui.role === 'Comercial' || ui.role === 'Administrador')
 const show = (role: PartnerRoleName) => !!partner.value?.roles.includes(role)
-const masterChanged = computed(() => !!partner.value && (master.personType !== partner.value.personType || master.legalName !== partner.value.legalName || master.tradeName !== partner.value.tradeName || master.document !== partner.value.document))
+const blankNote = 'Opcional. Com o CNPJ completo, o nome, o estado e a cidade vêm da Receita.'
+const sameDocument = (next: string, previous: string) => next.trim() === previous.trim() || (onlyDigits(next).length >= 11 && onlyDigits(next) === onlyDigits(previous))
+const masterCountry = () => master.origin === 'Brasil' ? 'Brasil' : master.country.trim()
+const masterChanged = computed(() => {
+  const value = partner.value
+  if (!value) return false
+  const stored = !value.country || value.country === 'Brasil' ? 'Brasil' : value.country
+  return master.personType !== value.personType || master.legalName !== value.legalName || master.tradeName !== value.tradeName || masterCountry() !== stored || !sameDocument(master.document, value.document)
+})
 
 const TABS = computed(() => {
   const value = partner.value
@@ -106,10 +125,24 @@ const kpis = computed<Kpi[]>(() => {
   return list
 })
 
+watch(() => form.origin, () => {
+  form.state = ''
+  form.city = ''
+  formCities.value = []
+})
 watch(partner, value => {
   if (!value) return
   if (!TABS.value.some(entry => entry.id === tab.value)) tab.value = 'cadastro'
-  Object.assign(master, { personType: value.personType, legalName: value.legalName, tradeName: value.tradeName, document: value.document })
+  const foreign = !!value.country && value.country !== 'Brasil'
+  Object.assign(master, {
+    origin: foreign ? 'Estrangeiro' : 'Brasil',
+    country: foreign ? value.country : '',
+    personType: value.personType,
+    legalName: value.legalName,
+    tradeName: value.tradeName,
+    document: foreign ? value.document : value.personType === 'Física' ? maskCpf(value.document) : maskCnpj(value.document),
+  })
+  masterNote.value = ''
 }, { immediate: true })
 watch(selectedId, () => {
   contactFromQuery.value = false
@@ -145,21 +178,119 @@ function open(id: string) {
 }
 function startNew(role?: Role) {
   duplicateAck.value = false
-  Object.assign(form, { personType: 'Jurídica', legalName: '', tradeName: '', document: '', roles: role ? [role] : [], vertical: '', contactName: '', duty: 'Comercial', phone: '', email: '', purpose: 'Sede', line: '', city: '', state: '' })
+  lookupSeq += 1
+  consulting.value = false
+  formCities.value = []
+  documentNote.value = blankNote
+  Object.assign(form, { origin: 'Brasil', country: '', personType: 'Jurídica', legalName: '', tradeName: '', document: '', roles: role ? [role] : [], vertical: '', contactName: '', duty: 'Comercial', phone: '', email: '', purpose: 'Sede', line: '', city: '', state: '' })
   creating.value = true
 }
 function closeCreate() {
+  lookupSeq += 1
+  consulting.value = false
   creating.value = false
   if (route.query.novo) router.replace({ path: '/parceiros', query: originQuery() })
+}
+async function onFormDocument(event: Event) {
+  const raw = (event.target as HTMLInputElement).value
+  form.document = form.personType === 'Física' ? maskCpf(raw) : maskCnpj(raw)
+  if (form.origin !== 'Brasil' || form.personType !== 'Jurídica') {
+    consulting.value = false
+    documentNote.value = form.personType === 'Física' ? 'CPF opcional.' : blankNote
+    return
+  }
+  const digits = onlyDigits(form.document)
+  const seq = ++lookupSeq
+  if (digits.length !== 14) {
+    consulting.value = false
+    documentNote.value = digits.length ? 'Complete o CNPJ para consultar a Receita, ou apague para cadastrar sem documento.' : blankNote
+    return
+  }
+  if (!validCnpj(digits)) {
+    consulting.value = false
+    documentNote.value = 'CNPJ inválido.'
+    return
+  }
+  consulting.value = true
+  documentNote.value = 'Consultando o cadastro do CNPJ…'
+  const found = await lookupCnpj(digits)
+  if (seq !== lookupSeq) return
+  consulting.value = false
+  if (!found.ok) {
+    documentNote.value = found.message
+    return
+  }
+  form.legalName = found.value.legalName
+  form.tradeName = found.value.tradeName
+  form.state = found.value.state
+  const cities = await loadBrazilCities(found.value.state)
+  if (seq !== lookupSeq) return
+  formCities.value = cities.ok ? cities.value : []
+  form.city = formCities.value.includes(found.value.city) ? found.value.city : ''
+  if (!cities.ok) documentNote.value = cities.message
+  else if (found.value.situation && found.value.situation.toUpperCase() !== 'ATIVA') documentNote.value = `Situação na Receita: ${found.value.situation}`
+  else if (!form.city && found.value.state) documentNote.value = 'Escolha a cidade. O município informado pela Receita não coincidiu com a lista.'
+  else documentNote.value = 'Confira os dados. Dá para ajustar antes de salvar.'
+}
+async function onFormState() {
+  const seq = lookupSeq
+  form.city = ''
+  const cities = await loadBrazilCities(form.state)
+  if (seq !== lookupSeq) return
+  formCities.value = cities.ok ? cities.value : []
+  if (!cities.ok) documentNote.value = cities.message
+}
+async function onMasterDocument(event: Event) {
+  const raw = (event.target as HTMLInputElement).value
+  master.document = master.personType === 'Física' ? maskCpf(raw) : maskCnpj(raw)
+  if (master.origin !== 'Brasil' || master.personType !== 'Jurídica') {
+    masterConsulting.value = false
+    masterNote.value = ''
+    return
+  }
+  const digits = onlyDigits(master.document)
+  const seq = ++masterSeq
+  if (digits.length !== 14 || !validCnpj(digits)) {
+    masterConsulting.value = false
+    masterNote.value = digits.length === 14 ? 'CNPJ inválido.' : ''
+    return
+  }
+  masterConsulting.value = true
+  masterNote.value = 'Consultando o cadastro do CNPJ…'
+  const found = await lookupCnpj(digits)
+  if (seq !== masterSeq) return
+  masterConsulting.value = false
+  if (!found.ok) {
+    masterNote.value = found.message
+    return
+  }
+  master.legalName = found.value.legalName
+  master.tradeName = found.value.tradeName
+  masterNote.value = found.value.situation && found.value.situation.toUpperCase() !== 'ATIVA' ? `Situação na Receita: ${found.value.situation}` : 'Razão social e nome fantasia vieram da Receita. O endereço se ajusta na outra aba.'
+}
+async function onAddressState() {
+  address.city = ''
+  const cities = await loadBrazilCities(address.state)
+  addressCities.value = cities.ok ? cities.value : []
 }
 function toggleRole(role: Role) {
   form.roles = form.roles.includes(role) ? form.roles.filter(entry => entry !== role) : [...form.roles, role]
 }
 function saveNew() {
+  if (consulting.value) return
+  const problem = documentError(form.origin, form.personType, form.document)
+  if (problem) {
+    ui.notify('error', problem)
+    return
+  }
+  if (form.origin === 'Estrangeiro' && !form.country.trim()) {
+    ui.notify('error', 'Informe o país.')
+    return
+  }
   const created = store.createPartner({
-    personType: form.personType, legalName: form.legalName, tradeName: form.tradeName, document: form.document, roles: form.roles,
+    personType: form.personType, legalName: form.legalName, tradeName: form.tradeName, document: form.document, country: form.origin === 'Brasil' ? 'Brasil' : form.country.trim(), roles: form.roles,
     contacts: form.contactName.trim() ? [{ name: form.contactName, duty: form.duty, phone: form.phone, email: form.email }] : [],
-    addresses: form.city.trim() || form.line.trim() ? [{ purpose: form.purpose, line: form.line, city: form.city, state: form.state }] : [],
+    addresses: form.city.trim() || form.line.trim() || form.state.trim() ? [{ purpose: form.purpose, line: form.line, city: form.city, state: form.state }] : [],
     forceDuplicate: duplicateAck.value,
     vertical: form.roles.includes('Cliente') ? form.vertical : undefined,
   })
@@ -171,7 +302,17 @@ function saveNew() {
   }
 }
 function saveMaster() {
-  if (partner.value) store.updatePartnerMaster(partner.value.id, { ...master })
+  if (!partner.value || masterConsulting.value) return
+  const problem = sameDocument(master.document, partner.value.document) ? '' : documentError(master.origin, master.personType, master.document)
+  if (problem) {
+    ui.notify('error', problem)
+    return
+  }
+  if (master.origin === 'Estrangeiro' && !master.country.trim()) {
+    ui.notify('error', 'Informe o país.')
+    return
+  }
+  store.updatePartnerMaster(partner.value.id, { personType: master.personType, legalName: master.legalName, tradeName: master.tradeName, document: master.document, country: masterCountry() })
 }
 function openContact() {
   Object.assign(contact, { name: '', duty: '', phone: '', email: '' })
@@ -190,6 +331,7 @@ function saveVertical(value: string) {
   if (partner.value) store.setPartnerVertical(partner.value.id, value)
 }
 function openAddress() {
+  addressCities.value = []
   Object.assign(address, { purpose: 'Entrega', line: '', city: '', state: '' })
   addingAddress.value = true
 }
@@ -223,7 +365,7 @@ function inactivate(reason: string) {
         <tbody>
         <tr v-for="entry in listed" :key="entry.id" class="clickable" @click="open(entry.id)">
           <td><span class="cell-main">{{ entry.name }}</span><span v-if="entry.legalName !== entry.name" class="cell-sub">{{ entry.legalName }}</span></td>
-          <td class="code">{{ entry.document }}</td>
+          <td class="code">{{ entry.document || '—' }}</td>
           <td>{{ entry.city || '—' }}</td>
           <td><span class="cell-main">{{ entry.contact || '—' }}</span><span v-if="entry.email" class="cell-sub">{{ entry.email }}</span></td>
           <td>
@@ -254,7 +396,7 @@ function inactivate(reason: string) {
         <div class="item-head">
           <div class="item-photo placeholder">{{ partner.name.slice(0, 2).toUpperCase() }}</div>
           <div class="item-head-main">
-            <span class="eyebrow">Pessoa {{ partner.personType.toLowerCase() }} · {{ partner.document }}</span>
+            <span class="eyebrow">Pessoa {{ partner.personType.toLowerCase() }} · {{ partner.document || (partner.country && partner.country !== 'Brasil' ? partner.country : 'Sem documento') }}</span>
             <h2>{{ partner.name }}</h2>
             <div class="meta">
               <span v-if="partner.legalName !== partner.name">{{ partner.legalName }}</span>
@@ -284,12 +426,15 @@ function inactivate(reason: string) {
           <section>
             <h3 class="partner-h">Dados gerais</h3>
             <div class="form-grid">
-              <div class="field"><label>Pessoa</label><select v-model="master.personType"><option>Jurídica</option><option>Física</option></select></div>
-              <div class="field"><label>{{ master.personType === 'Física' ? 'CPF' : 'CNPJ' }}</label><input v-model="master.document" /></div>
-              <div class="field wide"><label>{{ master.personType === 'Física' ? 'Nome' : 'Razão social' }}</label><input v-model="master.legalName" /></div>
-              <div class="field wide"><label>Nome fantasia</label><input v-model="master.tradeName" /><small>É o nome que aparece nas listas, pedidos e compras.</small></div>
+              <div class="field"><label>Origem</label><select v-model="master.origin" :disabled="masterConsulting"><option>Brasil</option><option>Estrangeiro</option></select></div>
+              <div class="field"><label>Pessoa</label><select v-model="master.personType" :disabled="masterConsulting"><option>Jurídica</option><option>Física</option></select></div>
+              <div v-if="master.origin === 'Estrangeiro'" class="field wide"><label>País<span class="required-mark" title="Obrigatório">*</span></label><input v-model="master.country" :disabled="masterConsulting" placeholder="Ex.: Alemanha" /></div>
+              <div class="field"><label>{{ master.origin === 'Estrangeiro' ? 'Identificação fiscal' : master.personType === 'Física' ? 'CPF' : 'CNPJ' }}</label><input v-if="master.origin === 'Estrangeiro'" v-model="master.document" :disabled="masterConsulting" placeholder="Opcional" /><input v-else :value="master.document" :disabled="masterConsulting" inputmode="numeric" autocomplete="off" :placeholder="master.personType === 'Física' ? '000.000.000-00' : '00.000.000/0001-00'" @input="onMasterDocument" /></div>
+              <div class="field wide"><label>{{ master.personType === 'Física' ? 'Nome' : 'Razão social' }}</label><input v-model="master.legalName" :disabled="masterConsulting" /></div>
+              <div class="field wide"><label>Nome fantasia</label><input v-model="master.tradeName" :disabled="masterConsulting" /><small>É o nome que aparece nas listas, pedidos e compras.</small></div>
             </div>
-            <button class="button" :disabled="!masterChanged" @click="saveMaster">Salvar dados gerais</button>
+            <p v-if="masterNote" class="hint">{{ masterNote }}</p>
+            <button class="button" :disabled="!masterChanged || masterConsulting" @click="saveMaster">{{ masterConsulting ? 'Consultando…' : 'Salvar dados gerais' }}</button>
           </section>
           <section>
             <h3 class="partner-h">Papéis</h3>
@@ -420,10 +565,17 @@ function inactivate(reason: string) {
   <BaseModal :open="creating" title="Novo parceiro" subtitle="Um registro só. Cliente, fornecedor ou os dois, agora ou depois." width="720px" @close="closeCreate">
     <form id="new-partner" @submit.prevent="saveNew">
       <div class="form-grid">
-        <div class="field"><label>Pessoa</label><select v-model="form.personType"><option>Jurídica</option><option>Física</option></select></div>
-        <div class="field"><label>{{ form.personType === 'Física' ? 'CPF' : 'CNPJ' }}</label><input v-model="form.document" required /></div>
-        <div class="field wide"><label>{{ form.personType === 'Física' ? 'Nome' : 'Razão social' }}</label><input v-model="form.legalName" required /></div>
-        <div class="field wide"><label>Nome fantasia</label><input v-model="form.tradeName" placeholder="Se vazio, usa a razão social" /></div>
+        <div class="field"><label>Origem</label><select v-model="form.origin" :disabled="consulting"><option>Brasil</option><option>Estrangeiro</option></select></div>
+        <div class="field"><label>Pessoa</label><select v-model="form.personType" :disabled="consulting"><option>Jurídica</option><option>Física</option></select></div>
+        <div v-if="form.origin === 'Estrangeiro'" class="field wide"><label>País<span class="required-mark" title="Obrigatório">*</span></label><input v-model="form.country" :disabled="consulting" placeholder="Ex.: Alemanha" required /></div>
+        <div class="field wide">
+          <label>{{ form.origin === 'Estrangeiro' ? 'Identificação fiscal' : form.personType === 'Física' ? 'CPF' : 'CNPJ' }}</label>
+          <input v-if="form.origin === 'Estrangeiro'" v-model="form.document" :disabled="consulting" placeholder="Opcional. Número no país de origem" />
+          <input v-else :value="form.document" :disabled="consulting" inputmode="numeric" autocomplete="off" :placeholder="form.personType === 'Física' ? '000.000.000-00' : '00.000.000/0001-00'" @input="onFormDocument" />
+          <p class="hint">{{ consulting ? 'Consultando o cadastro do CNPJ…' : form.origin === 'Estrangeiro' ? 'Parceiro estrangeiro não tem CNPJ. O documento fica em branco ou leva a identificação do país.' : documentNote }}</p>
+        </div>
+        <div class="field wide"><label>{{ form.personType === 'Física' ? 'Nome' : 'Razão social' }}<span class="required-mark" title="Obrigatório">*</span></label><input v-model="form.legalName" :disabled="consulting" required /></div>
+        <div class="field wide"><label>Nome fantasia</label><input v-model="form.tradeName" :disabled="consulting" placeholder="Se vazio, usa a razão social" /></div>
       </div>
       <p v-if="duplicate" class="notice warning">
         Já existe <b>{{ duplicate.name }}</b> com este documento.
@@ -447,15 +599,25 @@ function inactivate(reason: string) {
       </div>
       <h3 class="partner-h">Endereço</h3>
       <div class="form-grid three">
-        <div class="field"><label>Finalidade</label><select v-model="form.purpose"><option v-for="purpose in ADDRESS_PURPOSES" :key="purpose">{{ purpose }}</option></select></div>
-        <div class="field"><label>Cidade</label><input v-model="form.city" /></div>
-        <div class="field"><label>UF</label><input v-model="form.state" maxlength="2" /></div>
-        <div class="field wide"><label>Logradouro</label><input v-model="form.line" /></div>
+        <div class="field"><label>Finalidade</label><select v-model="form.purpose" :disabled="consulting"><option v-for="purpose in ADDRESS_PURPOSES" :key="purpose">{{ purpose }}</option></select></div>
+        <template v-if="form.origin === 'Brasil'">
+          <div class="field"><label>Estado</label>
+            <select v-model="form.state" :disabled="consulting" @change="onFormState"><option value="">Selecione</option><option v-for="state in BRAZIL_STATES" :key="state.uf" :value="state.uf">{{ state.name }}</option></select>
+          </div>
+          <div class="field"><label>Cidade</label>
+            <select v-model="form.city" :disabled="consulting || !form.state"><option value="">Selecione</option><option v-for="city in formCities" :key="city">{{ city }}</option></select>
+          </div>
+        </template>
+        <template v-else>
+          <div class="field"><label>Região</label><input v-model="form.state" :disabled="consulting" maxlength="80" /></div>
+          <div class="field"><label>Cidade</label><input v-model="form.city" :disabled="consulting" /></div>
+        </template>
+        <div class="field wide"><label>Logradouro</label><input v-model="form.line" :disabled="consulting" /></div>
       </div>
     </form>
     <template #footer>
       <button class="button secondary" type="button" @click="closeCreate">Cancelar</button>
-      <button class="button" type="submit" form="new-partner" :disabled="!!duplicate && !duplicateAck">Salvar parceiro</button>
+      <button class="button" type="submit" form="new-partner" :disabled="consulting || (!!duplicate && !duplicateAck)">{{ consulting ? 'Consultando…' : 'Salvar parceiro' }}</button>
       </template>
   </BaseModal>
 
@@ -475,8 +637,18 @@ function inactivate(reason: string) {
   <BaseModal :open="addingAddress" title="Novo endereço" @close="addingAddress = false">
     <form id="new-address" class="form-grid" @submit.prevent="saveAddress">
       <div class="field"><label>Finalidade</label><select v-model="address.purpose"><option v-for="purpose in ADDRESS_PURPOSES" :key="purpose">{{ purpose }}</option></select></div>
-      <div class="field"><label>UF</label><input v-model="address.state" maxlength="2" /></div>
-      <div class="field wide"><label>Cidade</label><input v-model="address.city" /></div>
+      <template v-if="!partner?.country || partner.country === 'Brasil'">
+        <div class="field"><label>Estado</label>
+          <select v-model="address.state" @change="onAddressState"><option value="">Selecione</option><option v-for="state in BRAZIL_STATES" :key="state.uf" :value="state.uf">{{ state.name }}</option></select>
+        </div>
+        <div class="field wide"><label>Cidade</label>
+          <select v-model="address.city" :disabled="!address.state"><option value="">Selecione</option><option v-for="city in addressCities" :key="city">{{ city }}</option></select>
+        </div>
+      </template>
+      <template v-else>
+        <div class="field"><label>Região</label><input v-model="address.state" maxlength="80" /></div>
+        <div class="field wide"><label>Cidade</label><input v-model="address.city" /></div>
+      </template>
       <div class="field wide"><label>Logradouro</label><input v-model="address.line" /></div>
     </form>
     <template #footer>

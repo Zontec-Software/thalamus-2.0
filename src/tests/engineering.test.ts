@@ -87,7 +87,7 @@ describe('ferramental e roteiro da versão', () => {
     expect(diff.bom).toEqual([expect.objectContaining({ itemId: 'cp-paraf', kind: 'alterado' })])
     expect(diff.routing).toEqual(expect.arrayContaining([expect.objectContaining({ name: 'Inspeção final', kind: 'novo' })]))
     for (const check of draft.checklist) toggleRevisionCheck(state, draft.id, check.label)
-    releaseRevision(state, draft.id, 'Eduardo')
+    releaseRevision(state, draft.id, 'Paulo')
     expect(item(state, 'pa-lite-ipad').routing!.some(step => step.name === 'Inspeção final')).toBe(true)
   })
 

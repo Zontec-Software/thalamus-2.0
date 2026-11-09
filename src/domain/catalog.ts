@@ -1145,6 +1145,8 @@ const PRESET: Record<string, Partial<ItemCatalog>> = {
   'pa-a11-imp': { commercialName: 'Case Impact para Samsung Tab A11', gtin: withCheckDigit('789123450002'), weightKg: 0.62 },
   'pa-s9-min': { commercialName: 'Case Mining para Galaxy Tab S9 FE', ncm: '', cest: '', gtin: '' },
   'pa-lite-ipad': { commercialName: 'Mesa Lite para iPad 10ª geração', gtin: withCheckDigit('789123450004'), weightKg: 1.4 },
+  'cst040435': { commercialName: 'Case Impact Parafusada para Samsung Tab A11 SM-X133', ncm: '42029200', weightKg: 0.64 },
+  'bse040021': { commercialName: 'Base Adesiva Tamanho C', ncm: '39269090', weightKg: 0.12 },
   'mp-abs-cinza': {
     lifecycle: 'Em criação', ncm: '', approvals: {}, conversions: [],
     audit: [{ at: '2026-10-16T11:00:00.000Z', actor: 'Eduardo Freitas', version: 1, text: 'Cadastro em criação para a resina cinza. Ainda não entra em compra nem em produção.' }],

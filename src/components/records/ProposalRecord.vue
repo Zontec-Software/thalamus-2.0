@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { CheckCircle2, Plus, Send, Trash2, XCircle } from 'lucide-vue-next'
+import { Ban, CheckCircle2, CopyPlus, Plus, Send, Trash2, XCircle } from 'lucide-vue-next'
 import RecordHeader from './RecordHeader.vue'
 import RecordTimeline from './RecordTimeline.vue'
 import { DEFAULT_PRICE_TABLE, currentPrice, isKitVirtual, sellable } from '../../domain/catalog'
 import { today } from '../../domain/engine'
-import { deliveryLead, proposalTotal } from '../../domain/enterprise'
+import { DISCOUNT_APPROVAL_LIMIT, deliveryLead, proposalIsLive, proposalTotal } from '../../domain/enterprise'
+import { registryOptions } from '../../domain/registry'
+import { useCrmLists } from '../../views/crm/shared'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import { fmtCurrency, fmtDate } from '../../utils/format'
@@ -20,7 +22,7 @@ const proposal = computed(() => store.state.proposals.find(entry => entry.id ===
 const draft = computed(() => proposal.value?.status === 'Rascunho')
 const opportunity = computed(() => store.state.opportunities.find(entry => entry.id === proposal.value?.opportunityId))
 const order = computed(() => store.state.salesOrders.find(entry => entry.id === proposal.value?.salesOrderId))
-const STEPS = ['Rascunho', 'Enviada', 'Aceita'] as const
+const STEPS = ['Rascunho', 'Em aprovação', 'Enviada', 'Aceita'] as const
 const stepIndex = computed(() => STEPS.indexOf(proposal.value?.status as typeof STEPS[number]))
 
 const subtotal = computed(() => proposal.value?.lines.reduce((sum, line) => sum + line.quantity * line.unitPrice, 0) ?? 0)
@@ -44,6 +46,17 @@ const products = computed(() => store.state.items.filter(entry => sellable(entry
 const services = computed(() => store.state.services.filter(entry => entry.sellable && entry.status === 'Ativo'))
 const rejecting = ref(false)
 const rejection = ref('')
+const rejectionDetail = ref('')
+const cancelling = ref(false)
+const cancelReason = ref('')
+const { refusalReasons } = useCrmLists()
+const paymentOptions = computed(() => {
+  const list = registryOptions(store.state, 'Condição de pagamento', ui.activeTenantId)
+  return list.length ? list : ['À vista', '28 dias', '28/56 dias', '30/60/90 dias']
+})
+const needsApproval = computed(() => (proposal.value?.discount ?? 0) > DISCOUNT_APPROVAL_LIMIT)
+const canApproveDiscount = computed(() => store.can('crm.desconto.aprovar') && proposal.value?.approvalRequestedBy !== ui.userName)
+const canRevise = computed(() => ['Enviada', 'Recusada', 'Vencida'].includes(proposal.value?.status ?? ''))
 
 function addLine() {
   const id = newLine.id || (newLine.kind === 'item' ? products.value[0]?.id : services.value[0]?.id)
@@ -61,7 +74,21 @@ function editCondition(field: 'discount' | 'validUntil' | 'suggestedDate' | 'pay
 }
 
 function reject() {
-  if (store.rejectProposal(props.id, rejection.value)) rejecting.value = false
+  const reason = [rejection.value, rejectionDetail.value.trim()].filter(Boolean).join(': ')
+  if (store.rejectProposal(props.id, reason)) {
+    rejecting.value = false
+    rejection.value = ''
+    rejectionDetail.value = ''
+  }
+}
+
+function cancel() {
+  if (store.cancelProposal(props.id, cancelReason.value)) cancelling.value = false
+}
+
+function revise() {
+  const next = store.reviseProposal(props.id)
+  if (next && typeof next === 'object') ui.openRecord('proposal', next.id)
 }
 
 function openOrder(id: string) {
@@ -72,9 +99,11 @@ function openOrder(id: string) {
 
 <template>
   <template v-if="proposal">
-    <RecordHeader :eyebrow="`Proposta comercial · ${proposal.id}`" :title="store.partnerName(proposal.partnerId)" :subtitle="opportunity?.title" />
+    <RecordHeader :eyebrow="`Proposta comercial · ${proposal.id}${proposal.version && proposal.version > 1 ? ` · versão ${proposal.version}` : ''}`" :title="store.partnerName(proposal.partnerId)" :subtitle="opportunity?.title" />
     <div class="drawer-body">
       <div v-if="proposal.status === 'Recusada'" class="notice danger">Recusada: {{ proposal.rejectionReason }}</div>
+      <div v-else-if="proposal.status === 'Vencida'" class="notice warning">Venceu em {{ fmtDate(proposal.validUntil) }} sem resposta. Gere uma nova versão para reenviar.</div>
+      <div v-else-if="proposal.status === 'Cancelada'" class="notice">Cancelada{{ proposal.cancelReason ? `: ${proposal.cancelReason}` : '' }}</div>
       <div v-else class="stage-stepper">
         <div v-for="(step, index) in STEPS" :key="step" class="stage-step" :class="{ done: index < stepIndex, current: index === stepIndex }"><i></i><span>{{ step }}</span></div>
       </div>
@@ -88,19 +117,32 @@ function openOrder(id: string) {
       <div v-if="margin < 35" class="notice warning">Margem abaixo de 35%. Revise preço ou desconto antes de enviar.</div>
 
       <div class="drawer-actions" data-tour="prop-actions">
-        <button v-if="draft" class="button" @click="store.advanceProposal(proposal.id)"><Send :size="15" /> Enviar ao cliente</button>
+        <button v-if="draft" class="button" @click="store.advanceProposal(proposal.id)"><Send :size="15" /> {{ needsApproval ? 'Pedir aprovação do desconto' : 'Enviar ao cliente' }}</button>
+        <template v-if="proposal.status === 'Em aprovação' && canApproveDiscount">
+          <button class="button" @click="store.advanceProposal(proposal.id)"><CheckCircle2 :size="15" /> Aprovar desconto e enviar</button>
+          <button class="button secondary" @click="rejecting = !rejecting"><XCircle :size="15" /> Devolver ao vendedor</button>
+        </template>
         <template v-if="proposal.status === 'Enviada'">
           <button class="button" @click="store.advanceProposal(proposal.id)"><CheckCircle2 :size="15" /> Cliente aceitou</button>
           <button class="button secondary" @click="rejecting = !rejecting"><XCircle :size="15" /> Cliente recusou</button>
         </template>
+        <button v-if="canRevise" class="button secondary" @click="revise"><CopyPlus :size="15" /> Nova versão</button>
+        <button v-if="proposalIsLive(proposal)" class="button secondary" @click="cancelling = !cancelling"><Ban :size="15" /> Cancelar</button>
         <button v-if="order" class="button" @click="openOrder(order.id)">Abrir pedido {{ order.id }}</button>
         <button v-if="opportunity" class="button secondary" @click="router.push(`/crm/oportunidade/${opportunity.id}`)">Ver oportunidade</button>
       </div>
+      <div v-if="proposal.status === 'Em aprovação' && !canApproveDiscount" class="notice warning">Desconto de {{ proposal.discount }}% acima do limite de {{ DISCOUNT_APPROVAL_LIMIT }}%. Aguardando aprovação de outra pessoa{{ proposal.approvalRequestedBy ? `; pedido por ${proposal.approvalRequestedBy}` : '' }}.</div>
       <div v-if="rejecting" class="inline-form row">
-        <input v-model="rejection" class="filter grow" placeholder="Motivo informado pelo cliente" />
-        <button class="button danger small" @click="reject">Registrar recusa</button>
+        <select v-if="proposal.status === 'Enviada'" v-model="rejection" class="filter"><option value="">Motivo</option><option v-for="reason in refusalReasons" :key="reason">{{ reason }}</option></select>
+        <input v-if="proposal.status === 'Enviada'" v-model="rejectionDetail" class="filter grow" placeholder="Detalhe (opcional)" />
+        <input v-else v-model="rejection" class="filter grow" placeholder="Por que o desconto não foi aprovado" />
+        <button class="button danger small" :disabled="!rejection.trim()" @click="reject">{{ proposal.status === 'Enviada' ? 'Registrar recusa' : 'Devolver' }}</button>
       </div>
-      <p v-if="proposal.status === 'Enviada'" class="hint">Ao aceitar, o pedido é aprovado no Omie simulado e entra no fluxo de produção com todas as linhas de produto. Cada kit virtual é explodido nos componentes da estrutura vigente, com o preço rateado entre eles.</p>
+      <div v-if="cancelling" class="inline-form row">
+        <input v-model="cancelReason" class="filter grow" placeholder="Motivo do cancelamento" />
+        <button class="button danger small" :disabled="!cancelReason.trim()" @click="cancel">Cancelar proposta</button>
+      </div>
+      <p v-if="proposal.status === 'Enviada'" class="hint">Ao aceitar, nasce o pedido de venda no Thalamus, aguardando análise. Na confirmação ele vai ao Omie, se a empresa usa o Omie. Cada kit virtual é explodido nos componentes da estrutura vigente, com o preço rateado entre eles.</p>
 
       <div data-tour="prop-items">
       <h3 class="drawer-title">Itens</h3>
@@ -145,8 +187,8 @@ function openOrder(id: string) {
       <h3 class="drawer-title">Condições</h3>
       <div class="card kv-card">
         <div class="kv"><span>Subtotal</span><b>{{ fmtCurrency(subtotal) }}</b></div>
-        <div class="kv"><span>Desconto (%)</span><input v-if="draft" class="cell-input" type="number" min="0" max="15" :value="proposal.discount" @change="editCondition('discount', $event)" /><b v-else>{{ proposal.discount }}%</b></div>
-        <div class="kv"><span>Condição de pagamento</span><select v-if="draft" class="cell-input wide" :value="proposal.paymentTerms" @change="editCondition('paymentTerms', $event)"><option>À vista</option><option>28 dias</option><option>28/56 dias</option><option>30/60/90 dias</option></select><b v-else>{{ proposal.paymentTerms ?? '28 dias' }}</b></div>
+        <div class="kv"><span>Desconto (%)</span><input v-if="draft" class="cell-input" type="number" min="0" max="100" :value="proposal.discount" @change="editCondition('discount', $event)" /><b v-else>{{ proposal.discount }}%</b><small v-if="draft && needsApproval" class="cell-sub risk-text">Acima de {{ DISCOUNT_APPROVAL_LIMIT }}%: passa por aprovação</small></div>
+        <div class="kv"><span>Condição de pagamento</span><select v-if="draft" class="cell-input wide" :value="proposal.paymentTerms" @change="editCondition('paymentTerms', $event)"><option v-for="option in paymentOptions" :key="option">{{ option }}</option></select><b v-else>{{ proposal.paymentTerms ?? '28 dias' }}</b></div>
         <div class="kv"><span>Validade</span><input v-if="draft" class="cell-input wide" type="date" :value="proposal.validUntil" @change="editCondition('validUntil', $event)" /><b v-else>{{ fmtDate(proposal.validUntil) }}</b></div>
         <div class="kv"><span>Entrega sugerida</span><input v-if="draft" class="cell-input wide" type="date" :value="proposal.suggestedDate" @change="editCondition('suggestedDate', $event)" /><b v-else>{{ fmtDate(proposal.suggestedDate) }}</b></div>
         <div class="kv"><span>Prazo dos produtos</span><b>{{ lead }} dias</b><small class="cell-sub">fabricação mais a compra dos componentes</small></div>

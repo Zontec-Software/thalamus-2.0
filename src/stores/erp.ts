@@ -13,6 +13,10 @@ import * as organization from '../domain/organization'
 import * as directory from '../domain/directory'
 import * as resources from '../domain/resources'
 import * as serviceCatalog from '../domain/services'
+import * as aftersales from '../domain/aftersales'
+import * as training from '../domain/training'
+import * as patrimony from '../domain/patrimony'
+import * as registry from '../domain/registry'
 import { profileCan, syncAccessCatalog } from '../domain/access'
 import { provisionCompany, saveEconomicGroup, saveOmieConnection } from '../domain/platform'
 import type { ErpState } from '../domain/engine'
@@ -22,7 +26,7 @@ import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NewActivityFile, NewActivityInput, NonConformity, Resource, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v63'
+const STORAGE_KEY = 'thalamus-erp-v66'
 
 /** Versões anteriores ficam no navegador e estouram a cota. Não há migração: a chave atual é a única que vale. */
 function forgetOlderSaves() {
@@ -42,12 +46,14 @@ function load(): ErpState {
       if (Object.keys(seed).some(key => !(key in state))) throw new Error('Estado salvo de outra versão')
       engine.applyDueRevisions(state)
       directory.applyDueSuspensions(state)
+      enterprise.expireProposals(state)
       return state
     } catch {
       localStorage.removeItem(STORAGE_KEY)
     }
   }
   directory.applyDueSuspensions(seed)
+  enterprise.expireProposals(seed)
   return seed
 }
 
@@ -195,6 +201,11 @@ export const useErpStore = defineStore('erp', () => {
   }
 
   async function syncOmie() {
+    const blocked = engine.omieBlock(state, 'Pedido de venda', tenantId())
+    if (blocked) {
+      ui.notify('info', 'Sincronização com o Omie desligada', blocked)
+      return
+    }
     ui.notify('info', 'Consultando o Omie…', 'Buscando pedidos aprovados desde a última sincronização')
     const orders = await omie.fetchApprovedOrders()
     run(() => engine.receiveOmieOrders(state, orders), count => count ? `${count} pedido(s) novo(s) importado(s) do Omie` : 'Nenhum pedido novo no Omie')
@@ -241,8 +252,9 @@ export const useErpStore = defineStore('erp', () => {
   }, 'Conferência registrada')
 
   async function shipOrder(orderId: string, operator = actor()) {
-    const pending = run(() => engine.shipOrder(state, orderId, operator), 'Carga expedida. Aguardando NF-e do Omie…')
-    if (!pending || pending === true) return
+    const blocked = engine.omieBlock(state, 'Faturamento', tenantId())
+    const pending = run(() => engine.shipOrder(state, orderId, operator), blocked ? `Carga expedida. ${blocked}` : 'Carga expedida. Aguardando NF-e do Omie…')
+    if (!pending || pending === true || blocked) return
     const { invoice } = await omie.requestInvoice(engine.getOrder(state, orderId))
     engine.invoiceOrder(state, orderId, pending.id, invoice)
     ui.notify('success', `${invoice} emitida no Omie`, `Pedido ${orderId} faturado`)
@@ -300,8 +312,51 @@ export const useErpStore = defineStore('erp', () => {
   const addProposalLine = bind(enterprise.addProposalLine, 'Linha adicionada')
   const updateProposalLine = bind(enterprise.updateProposalLine)
   const removeProposalLine = bind(enterprise.removeProposalLine, 'Linha removida')
-  const advanceProposal = bind(enterprise.advanceProposal, proposal => proposal.status === 'Aceita' ? `${proposal.id} aceita: pedido ${proposal.salesOrderId} criado` : `${proposal.id}: ${proposal.status}`)
-  const rejectProposal = bind(enterprise.rejectProposal, 'Proposta recusada')
+  const advanceProposal = (id: string) => run(() => {
+    if (state.proposals.find(entry => entry.id === id)?.status === 'Em aprovação') requireFeature('crm.desconto.aprovar')
+    return enterprise.advanceProposal(state, id, actor())
+  }, proposal => proposal.status === 'Aceita' ? `${proposal.id} aceita: pedido ${proposal.salesOrderId} criado` : `${proposal.id}: ${proposal.status}`)
+  const rejectProposal = (id: string, reason: string) => run(() => {
+    if (state.proposals.find(entry => entry.id === id)?.status === 'Em aprovação') requireFeature('crm.desconto.aprovar')
+    return enterprise.rejectProposal(state, id, reason, actor())
+  }, proposal => proposal.status === 'Rascunho' ? 'Desconto recusado: a proposta voltou para rascunho' : 'Proposta recusada')
+  const cancelProposal = bind(enterprise.cancelProposal, 'Proposta cancelada')
+  const reviseProposal = bind(enterprise.reviseProposal, proposal => `${proposal.id} aberta em rascunho`)
+  const confirmSalesOrder = bind(enterprise.confirmSalesOrder, order => `${order.id} confirmado${order.omieId ? ` e enviado ao Omie (${order.omieId})` : ''}`)
+  const changeSalesOrderLine = bind(enterprise.changeSalesOrderLine, 'Linha do pedido alterada')
+  const cancelSalesOrder = bind(enterprise.cancelSalesOrder, order => `${order.id} cancelado`)
+  const confirmDelivery = (orderId: string, receiver: string) => run(() => {
+    const order = engine.confirmDelivery(state, orderId, receiver, actor())
+    aftersales.openWarranty(state, order, actor())
+    return order
+  }, order => `Entrega de ${order.id} confirmada: garantia registrada`)
+  const receivePurchase = bind(enterprise.receivePurchase, receipt => receipt.status === 'Bloqueado' ? `${receipt.id}: ${receipt.received - receipt.accepted} bloqueado(s) aguardando decisão` : `${receipt.id}: ${receipt.accepted} aceito(s) no saldo`)
+  const decideReceipt = (id: string, decision: 'Aceitar' | 'Devolver', note: string) =>
+    as(name => enterprise.decideReceipt(state, id, decision, note, name), decision === 'Aceitar' ? 'Bloqueio aceito: entrou no saldo' : 'Devolução registrada', 'recebimento.bloqueio.decidir')
+  const setWarrantyPolicy = (input: { months: number; terms: string }) => as(name => aftersales.setWarrantyPolicy(state, input, name), 'Regra salva: aguarda aprovação', 'modulo.garantia.gerir')
+  const approveWarrantyPolicy = () => as(name => aftersales.approveWarrantyPolicy(state, name), 'Regra aprovada: garantias pendentes ativadas', 'garantia.regra.aprovar')
+  const setWarrantyStatus = (id: string, status: 'Suspensa' | 'Encerrada' | 'Ativa', note: string) => as(name => aftersales.setWarrantyStatus(state, id, status, note, name), warranty => `${warranty.id}: ${warranty.status}`, 'modulo.garantia.gerir')
+  const createRental = (input: Parameters<typeof aftersales.createRental>[1]) => as(name => aftersales.createRental(state, input, name), contract => `${contract.id} criado como proposta`, 'modulo.locacao.gerir')
+  const updateRental = (id: string, patch: Parameters<typeof aftersales.updateRental>[2]) => as(name => aftersales.updateRental(state, id, patch, name), 'Proposta de locação salva', 'modulo.locacao.gerir')
+  const activateRental = (id: string) => as(name => aftersales.activateRental(state, id, name), contract => `${contract.id} ativo`, 'locacao.contrato.aprovar')
+  const returnRental = (id: string, condition: Parameters<typeof aftersales.returnRental>[2], note: string) => as(name => aftersales.returnRental(state, id, condition, note, name), contract => `${contract.id} encerrado`, 'modulo.locacao.gerir')
+  const cancelRental = (id: string, reason: string) => as(name => aftersales.cancelRental(state, id, reason, name), 'Proposta de locação cancelada', 'modulo.locacao.gerir')
+  const recordTraining = (input: Parameters<typeof training.recordTraining>[1]) => as(name => training.recordTraining(state, input, name), 'Treinamento registrado', 'modulo.treinamentos.gerir')
+  const updateTraining = (id: string, patch: Parameters<typeof training.updateTraining>[2]) => as(name => training.updateTraining(state, id, patch, name), 'Treinamento atualizado', 'modulo.treinamentos.gerir')
+  const saveFacility = (input: Parameters<typeof patrimony.saveFacility>[1]) => as(name => patrimony.saveFacility(state, input, name), facility => `${facility.code} salva`, 'modulo.patrimonio.gerir')
+  const requestMovement = (input: Parameters<typeof patrimony.requestMovement>[1]) => as(name => patrimony.requestMovement(state, input, name), movement => `${movement.id} solicitada`, 'modulo.patrimonio.gerir')
+  const approveMovement = (id: string) => as(name => patrimony.approveMovement(state, id, name), 'Movimentação aprovada', 'patrimonio.movimentacao.aprovar')
+  const completeMovement = (id: string) => as(name => patrimony.completeMovement(state, id, name), 'Movimentação concluída: localização atualizada', 'modulo.patrimonio.gerir')
+  const cancelMovement = (id: string, reason: string) => as(name => patrimony.cancelMovement(state, id, reason, name), 'Movimentação cancelada', 'modulo.patrimonio.gerir')
+  const openInventory = (facilityId: string) => as(name => patrimony.openInventory(state, facilityId, name), inventory => `${inventory.id} aberto`, 'modulo.patrimonio.gerir')
+  const countInventoryLine = (id: string, assetId: string, found: boolean, condition?: Parameters<typeof patrimony.countInventoryLine>[4]) => as(name => patrimony.countInventoryLine(state, id, assetId, found, condition, name), undefined, 'modulo.patrimonio.gerir')
+  const closeInventoryCount = (id: string) => as(name => patrimony.closeInventoryCount(state, id, name), inventory => inventory.status === 'Conciliado' ? 'Inventário conciliado' : 'Contagem fechada com divergências', 'modulo.patrimonio.gerir')
+  const resolveInventoryLine = (id: string, assetId: string, resolution: string) => as(name => patrimony.resolveInventoryLine(state, id, assetId, resolution, name), inventory => inventory.status === 'Conciliado' ? 'Inventário conciliado' : 'Divergência tratada', 'modulo.patrimonio.gerir')
+  const setDepreciation = (assetId: string, input: Parameters<typeof patrimony.setDepreciation>[2]) => as(name => patrimony.setDepreciation(state, assetId, input, name), 'Parâmetros de depreciação salvos', 'modulo.patrimonio.gerir')
+  const saveRegistryEntry = (input: Parameters<typeof registry.saveRegistryEntry>[1]) => as(name => registry.saveRegistryEntry(state, input, name), entry => `${entry.code} salvo`, 'modulo.cadastros_gerais.gerir')
+  const setRegistryStatus = (id: string, status: 'Ativo' | 'Inativo') => as(name => registry.setRegistryStatus(state, id, status, name), status === 'Ativo' ? 'Opção reativada' : 'Opção inativada', 'modulo.cadastros_gerais.gerir')
+  const setOmieSource = (entity: Parameters<typeof registry.setOmieSource>[1], source: Parameters<typeof registry.setOmieSource>[2], direction: Parameters<typeof registry.setOmieSource>[3]) =>
+    as(name => registry.setOmieSource(state, entity, source, direction, name, tenantId()), entry => `${entry.entity}: ${entry.source === 'Pendente' ? 'sincronização desligada' : `fonte ${entry.source}`}`, 'integracao.fonte.decidir')
   const createTechnicalOrder = bind(enterprise.createTechnicalOrder, order => `${order.id} aberto${order.warranty ? ' em garantia' : ''}`)
   const scheduleTechnicalOrder = bind(enterprise.scheduleTechnicalOrder, 'Atendimento agendado')
   const updateTechnicalOrder = bind(enterprise.updateTechnicalOrder, 'Registro técnico salvo')
@@ -313,6 +368,7 @@ export const useErpStore = defineStore('erp', () => {
   const toggleMilestone = bind(enterprise.toggleMilestone, 'Marco atualizado')
   const setProjectStatus = bind(enterprise.setProjectStatus, project => `${project.id}: ${project.status}`)
   const addProjectRisk = bind(enterprise.addProjectRisk, 'Risco registrado')
+  const recordProjectResult = bind(enterprise.recordProjectResult, 'Resultado registrado')
   const budgetRole = (feature: FunctionalityId): Role => {
     requireFeature(feature)
     return 'Administrador'
@@ -398,6 +454,13 @@ export const useErpStore = defineStore('erp', () => {
   const createSector = bind(organization.createSector, sector => `Setor ${sector.name} criado`)
   const createJob = bind(organization.createJob, job => `Cargo ${job.name} no catálogo`)
   const updateJob = bind(organization.updateJob, job => `Cargo ${job.name} atualizado`)
+  const createJobLevel = bind(organization.createJobLevel, level => `Nível ${level.name} no catálogo`)
+  const renameJobLevel = bind(organization.renameJobLevel, level => `Nível ${level.name} salvo`)
+  const moveJobLevel = bind(organization.moveJobLevel, 'Hierarquia dos níveis atualizada')
+  const removeJobLevel = bind(organization.removeJobLevel, level => `Nível ${level.name} removido`)
+  const createShift = bind(organization.createShift, shift => `Turno ${shift.name} no catálogo`)
+  const renameShift = bind(organization.renameShift, shift => `Turno ${shift.name} salvo`)
+  const removeShift = bind(organization.removeShift, shift => `Turno ${shift.name} removido`)
   const createPosition = bind(organization.createPosition, position => `Posição ${position.name} aberta`)
   const updatePosition = bind(organization.updatePosition, position => `Posição ${position.name} atualizada`)
   const removePosition = bind(organization.removePosition, position => `Posição ${position.name} removida do organograma`)
@@ -508,6 +571,7 @@ export const useErpStore = defineStore('erp', () => {
       return action(actor(), ui.role)
     }, success)
   const releaseRevision = (revisionId: string, validFrom?: string) => as((name) => enterprise.releaseRevision(state, revisionId, name, validFrom), revision => `Versão ${revision.code} liberada`, 'produtos.revisao.liberar')
+  const rejectRevision = (revisionId: string, reason: string) => as((name) => enterprise.rejectRevision(state, revisionId, reason, name), revision => `Versão ${revision.code} rejeitada`, 'produtos.revisao.liberar')
   const newRevision = (itemId: string, notes = '') => as((name, role) => catalog.openBomVersion(state, itemId, notes, name, role), revision => `Versão ${revision.code} aberta em rascunho`, 'produtos.manufatura.gerir')
   const toggleRevisionCheck = (revisionId: string, label: string) => as((_name, role) => catalog.toggleRevisionCheck(state, revisionId, label, role), undefined, 'produtos.manufatura.gerir')
   const setBomLine = (revisionId: string, componentId: string, quantity: number, loss?: number) => as((name, role) => catalog.setBomLine(state, revisionId, componentId, quantity, name, role, loss), undefined, 'produtos.manufatura.gerir')
@@ -701,10 +765,15 @@ export const useErpStore = defineStore('erp', () => {
     createPurchaseOrder, selectQuote, cancelPurchaseOrder, advancePurchaseOrder,
     createOpportunity, updateOpportunity, setSalesGoal, moveOpportunity, advanceOpportunity, loseOpportunity, addActivity, addActivityAttachment, toggleActivity,
     createProposal, updateProposal, addProposalLine, updateProposalLine, removeProposalLine, advanceProposal, rejectProposal,
+    cancelProposal, reviseProposal, confirmSalesOrder, changeSalesOrderLine, cancelSalesOrder, confirmDelivery,
+    receivePurchase, decideReceipt, setWarrantyPolicy, approveWarrantyPolicy, setWarrantyStatus,
+    createRental, updateRental, activateRental, returnRental, cancelRental, recordTraining, updateTraining,
+    saveFacility, requestMovement, approveMovement, completeMovement, cancelMovement, openInventory, countInventoryLine, closeInventoryCount, resolveInventoryLine, setDepreciation,
+    saveRegistryEntry, setRegistryStatus, setOmieSource, rejectRevision,
     createTechnicalOrder, scheduleTechnicalOrder, updateTechnicalOrder, addTechnicalPart, advanceTechnicalOrder, cancelTechnicalOrder,
-    createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk,
+    createProject, addMilestone, toggleMilestone, setProjectStatus, addProjectRisk, recordProjectResult,
     createBudget, distributeGroupBudget, setAnnualBudget, adjustBudget, createBudgetCategory, updateBudgetCategory, configureBudget, decideBudgetException, acknowledgeBudgetAlert, linkBudgetInvoice,
     applyBudgetGrowth, applyRevenueTarget, applyBudgetApproach, applyPriorSeasonality, setMonthlyBudget, setSectorAllocations, setCategoryAssignment, createBudgetGroup, createPlannedCompany, saveBudgetSimulation, applyBudgetSimulation, applyGroupGrowth, applyGroupRevenueTarget,
-    createUser, linkAccountToPerson, updateUser, updatePerson, setPersonPhoto, updateEmployment, createSector, createJob, updateJob, createPosition, updatePosition, removePosition, placeSector, setSectorLeadership, suggestIdentity, confirmIdentity, refuseIdentity, addProjectParticipation, grantCompanyAccess, openLinkedEmployment, resetPin, provisionDirectoryAccount, retryDirectoryAccount, createJobOpening, updateJobOpening, setJobStatus, addPeopleChecklistItem, registerCandidate, noteCandidateView, prepareBriefing, reviewBriefing, scheduleInterview, setInterviewConfirmation, recordSelectionResult, setApplicationStage, setPeopleChecklistItem, hireCandidate, changeAssignment, recordReview, startOffboarding, revokeAccess, closeOffboarding, createPartner, updatePartnerMaster, addPartnerContact, setPartnerVertical, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, setServiceStatus, openServiceRoutingChange, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
+    createUser, linkAccountToPerson, updateUser, updatePerson, setPersonPhoto, updateEmployment, createSector, createJob, updateJob, createJobLevel, renameJobLevel, moveJobLevel, removeJobLevel, createShift, renameShift, removeShift, createPosition, updatePosition, removePosition, placeSector, setSectorLeadership, suggestIdentity, confirmIdentity, refuseIdentity, addProjectParticipation, grantCompanyAccess, openLinkedEmployment, resetPin, provisionDirectoryAccount, retryDirectoryAccount, createJobOpening, updateJobOpening, setJobStatus, addPeopleChecklistItem, registerCandidate, noteCandidateView, prepareBriefing, reviewBriefing, scheduleInterview, setInterviewConfirmation, recordSelectionResult, setApplicationStage, setPeopleChecklistItem, hireCandidate, changeAssignment, recordReview, startOffboarding, revokeAccess, closeOffboarding, createPartner, updatePartnerMaster, addPartnerContact, setPartnerVertical, addPartnerAddress, addPartnerRole, inactivatePartnerRole, registerAnnualBilling, decideAbcSuggestion, setItemCriticality, createService, updateService, setServiceStatus, openServiceRoutingChange, createAsset, updateAsset, createResource, updateResource, inactivateResource, reactivateResource, removeResource,
   }
 })

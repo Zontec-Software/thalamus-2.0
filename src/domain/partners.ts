@@ -7,6 +7,8 @@ export interface NewPartnerInput {
   legalName: string
   tradeName: string
   document: string
+  /** Brasil quando ausente. Qualquer outro nome é parceiro estrangeiro, sem CPF/CNPJ. */
+  country?: string
   roles: PartnerRoleName[]
   contacts: PartnerContact[]
   addresses: PartnerAddress[]
@@ -40,10 +42,30 @@ export function phaseOf(partner: BusinessPartner): 'Em cadastro' | 'Ativo' | 'In
   return 'Em cadastro'
 }
 
+export function partnerCountry(value?: string) {
+  const country = (value ?? '').trim()
+  if (!country || country.toLowerCase() === 'brasil') return 'Brasil'
+  return country
+}
+
 export function duplicatePartner(state: ErpState, document: string, exceptId?: string) {
-  const key = digits(document)
-  if (key.length < 11) return undefined
-  return state.partners.find(partner => partner.id !== exceptId && digits(partner.document) === key)
+  const trimmed = document.trim()
+  if (!trimmed) return undefined
+  const key = digits(trimmed)
+  if (key.length === 11 || key.length === 14) {
+    return state.partners.find(partner => partner.id !== exceptId && digits(partner.document) === key)
+  }
+  const folded = trimmed.toLowerCase()
+  return state.partners.find(partner => partner.id !== exceptId && partner.document.trim().toLowerCase() === folded)
+}
+
+function assertDocument(document: string, country: string) {
+  const trimmed = document.trim()
+  if (!trimmed) return ''
+  if (country === 'Brasil' && digits(trimmed).length !== 11 && digits(trimmed).length !== 14) {
+    throw new DomainError('Informe o CPF (11 dígitos) ou o CNPJ (14 dígitos), ou deixe em branco.')
+  }
+  return trimmed
 }
 
 function mirror(partner: BusinessPartner) {
@@ -63,9 +85,10 @@ function audit(partner: BusinessPartner, actor: string, text: string, before?: s
 export function createPartner(state: ErpState, input: NewPartnerInput, actor: string) {
   const legalName = input.legalName.trim()
   const tradeName = input.tradeName.trim()
+  const country = partnerCountry(input.country)
+  const document = assertDocument(input.document, country)
   if (legalName.length < 2) throw new DomainError('Informe a razão social ou o nome')
-  if (digits(input.document).length < 11) throw new DomainError('Informe o CPF ou o CNPJ')
-  const existing = duplicatePartner(state, input.document)
+  const existing = duplicatePartner(state, document)
   if (existing && !input.forceDuplicate) {
     throw new DomainError(`Já existe um parceiro com este documento: ${existing.name}. Abra esse cadastro ou confirme que quer outro registro.`)
   }
@@ -75,11 +98,12 @@ export function createPartner(state: ErpState, input: NewPartnerInput, actor: st
     legalName,
     tradeName: tradeName || legalName,
     name: '',
-    document: input.document.trim(),
+    document,
+    country,
     roles: [...new Set(input.roles)],
     roleStatus: Object.fromEntries(input.roles.map(role => [role, 'Ativo'])) as BusinessPartner['roleStatus'],
     contacts: input.contacts.filter(entry => entry.name.trim()).map(entry => ({ ...entry, name: entry.name.trim() })),
-    addresses: input.addresses.filter(entry => entry.city.trim() || entry.line.trim()),
+    addresses: input.addresses.filter(entry => entry.city.trim() || entry.line.trim() || entry.state.trim()),
     city: '',
     vertical: input.roles.includes('Cliente') ? input.vertical || undefined : undefined,
     contact: '',
@@ -98,16 +122,18 @@ export function createPartner(state: ErpState, input: NewPartnerInput, actor: st
   return partner
 }
 
-export function updatePartnerMaster(state: ErpState, id: string, patch: { legalName: string; tradeName: string; document: string; personType: 'Física' | 'Jurídica' }, actor: string) {
+export function updatePartnerMaster(state: ErpState, id: string, patch: { legalName: string; tradeName: string; document: string; personType: 'Física' | 'Jurídica'; country?: string }, actor: string) {
   const partner = findPartner(state, id)
   const before = `${partner.legalName} · ${partner.document}`
+  const country = partnerCountry(patch.country ?? partner.country)
+  const document = assertDocument(patch.document, country)
   if (patch.legalName.trim().length < 2) throw new DomainError('Informe a razão social ou o nome')
-  if (digits(patch.document).length < 11) throw new DomainError('Informe o CPF ou o CNPJ')
-  const existing = duplicatePartner(state, patch.document, id)
+  const existing = duplicatePartner(state, document, id)
   if (existing) throw new DomainError(`Este documento já é de ${existing.name}`)
   partner.legalName = patch.legalName.trim()
   partner.tradeName = patch.tradeName.trim() || partner.legalName
-  partner.document = patch.document.trim()
+  partner.document = document
+  partner.country = country
   partner.personType = patch.personType
   mirror(partner)
   const after = `${partner.legalName} · ${partner.document}`
@@ -137,7 +163,7 @@ export function addContact(state: ErpState, id: string, contact: PartnerContact,
 
 export function addAddress(state: ErpState, id: string, address: PartnerAddress, actor: string) {
   const partner = findPartner(state, id)
-  if (!address.city.trim() && !address.line.trim()) throw new DomainError('Informe a cidade ou o logradouro')
+  if (!address.city.trim() && !address.line.trim() && !address.state.trim()) throw new DomainError('Informe a cidade ou o logradouro')
   partner.addresses.push(address)
   mirror(partner)
   audit(partner, actor, `Endereço incluído (${address.purpose})`)

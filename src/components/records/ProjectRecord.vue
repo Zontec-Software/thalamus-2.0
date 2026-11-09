@@ -29,7 +29,9 @@ const form = reactive({
   ownerId: owners.value.find(entry => entry.role === 'Engenharia')?.id ?? owners.value[0]?.id ?? '',
   partnerId: props.context.partnerId ?? '', opportunityId: props.context.opportunityId ?? '', itemId: '',
   startDate: today(), endDate: addDays(today(), 60), budget: 50000, description: '',
+  scope: (props.context.scope === 'P&D' ? 'P&D' : 'Corporativo') as NonNullable<Project['scope']>, priority: 'Normal' as NonNullable<Project['priority']>,
 })
+const result = ref('')
 
 function create() {
   const created = store.createProject({
@@ -84,6 +86,8 @@ function addRisk() {
     <div class="drawer-body">
       <div class="field"><label>Nome</label><input v-model="form.name" placeholder="Ex.: Case Mining Galaxy Tab S10" /></div>
       <div class="form-grid">
+        <div class="field"><label>Escopo</label><select v-model="form.scope"><option value="P&D">P&amp;D · Engenharia</option><option value="Corporativo">Corporativo · Gestão</option></select></div>
+        <div class="field"><label>Prioridade</label><select v-model="form.priority"><option>Baixa</option><option>Normal</option><option>Alta</option><option>Urgente</option></select></div>
         <div class="field"><label>Tipo</label><select v-model="form.kind"><option>Produto novo</option><option>Molde</option><option>Melhoria</option><option>Cliente</option></select></div>
         <div class="field"><label>Responsável</label><select v-model="form.ownerId"><option v-for="user in owners" :key="user.id" :value="user.id">{{ user.name }} · {{ user.role }}</option></select></div>
         <div class="field"><label>Cliente</label><select v-model="form.partnerId"><option value="">Interno</option><option v-for="client in clients" :key="client.id" :value="client.id">{{ client.name }}</option></select></div>
@@ -102,7 +106,7 @@ function addRisk() {
   </template>
 
   <template v-else-if="project">
-    <RecordHeader :eyebrow="`${project.kind} · ${project.id}`" :title="project.name" :subtitle="`${store.userName(project.ownerId)}${project.partnerId ? ` · ${store.partnerName(project.partnerId)}` : ' · interno'} · ${fmtDate(project.startDate)} a ${fmtDate(project.endDate)}`">
+    <RecordHeader :eyebrow="`${project.scope === 'P&D' ? 'P&D' : 'Corporativo'} · ${project.kind} · ${project.id}${project.priority ? ` · prioridade ${project.priority.toLowerCase()}` : ''}`" :title="project.name" :subtitle="`${store.userName(project.ownerId)}${project.partnerId ? ` · ${store.partnerName(project.partnerId)}` : ' · interno'} · ${fmtDate(project.startDate)} a ${fmtDate(project.endDate)}`">
       <template #actions>
         <select class="filter" :value="project.status" @change="store.setProjectStatus(project.id, ($event.target as HTMLSelectElement).value as Project['status'])">
           <option>Planejado</option><option>Em andamento</option><option>Concluído</option><option>Cancelado</option>
@@ -183,6 +187,13 @@ function addRisk() {
           <div><strong>{{ store.itemLabel(project.itemId) }}</strong><span>{{ revision ? `Revisão ${revision.code} em rascunho: ${revision.checklist.filter(entry => entry.done).length}/${revision.checklist.length} itens do checklist` : `Revisão vigente ${store.item(project.itemId).revision ?? '—'}` }}</span></div><span class="link">Produto</span>
         </button>
       </template>
+
+      <h3 class="drawer-title">Resultado e entregáveis</h3>
+      <p v-if="project.result" class="hint">{{ project.result }}</p>
+      <div class="inline-form row">
+        <input v-model="result" class="filter grow" :placeholder="project.scope === 'P&D' ? 'Parecer da Engenharia: viável, inviável ou produto liberado' : 'O que o projeto entregou'" @keyup.enter="store.recordProjectResult(project.id, result) && (result = '')" />
+        <button class="button secondary small" @click="store.recordProjectResult(project.id, result) && (result = '')">Registrar</button>
+      </div>
 
       <h3 class="drawer-title">Equipe e riscos</h3>
       <div class="chip-row">

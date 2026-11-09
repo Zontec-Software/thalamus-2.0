@@ -4,6 +4,7 @@ export const MODULES = [
   'Painel', 'Fluxo do pedido', 'Vendas', 'CRM', 'Produtos', 'Pessoas', 'Parceiros', 'Serviços', 'Ativos', 'Postos', 'Planejamento',
   'Ordens de produção', 'Demandas', 'Compras', 'Almoxarifado', 'Injeção', 'Montagem', 'Qualidade', 'Expedição',
   'Manutenção', 'Assistência Técnica', 'Indicadores', 'Projetos', 'Orçamentos', 'DRE', 'Organização', 'Integração Omie',
+  'Recebimento', 'Garantia', 'Locação', 'Treinamentos', 'Patrimônio', 'Cadastros gerais',
 ]
 
 export const moduleFeature = (module: string): FunctionalityId => `modulo.${module.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_')}.consultar`
@@ -56,6 +57,12 @@ export const FUNCTIONALITIES: Functionality[] = [
   functionality('orcamentos.alerta.reconhecer', 'Orçamentos', 'reconhecer_alerta', 'Reconhecer alerta orçamentário', 'Registra ciência de alerta de limiar.'),
   functionality('orcamentos.consultar_consolidado', 'Orçamentos', 'consultar_consolidado', 'Consultar consolidado de grupo', 'Consulta orçamento das empresas autorizadas do grupo econômico.'),
   functionality('crm.consultar_consolidado', 'CRM', 'consultar_consolidado', 'Consultar CRM do grupo', 'Vê oportunidades das empresas autorizadas do grupo. O lançamento continua na empresa.'),
+  functionality('crm.desconto.aprovar', 'CRM', 'aprovar_desconto', 'Aprovar desconto da proposta', 'Aprova a proposta com desconto acima do limite. Quem pediu não aprova.'),
+  functionality('recebimento.bloqueio.decidir', 'Recebimento', 'decidir_bloqueio', 'Decidir recebimento bloqueado', 'Aceita com ressalva ou devolve o que ficou bloqueado na conferência.'),
+  functionality('locacao.contrato.aprovar', 'Locação', 'aprovar_contrato', 'Aprovar contrato de locação', 'Ativa o contrato e libera a saída do bem. Quem propôs não aprova.'),
+  functionality('garantia.regra.aprovar', 'Garantia', 'aprovar_regra', 'Aprovar regra de garantia', 'Aprova prazo e cobertura. Sem regra aprovada, a garantia nasce pendente.'),
+  functionality('patrimonio.movimentacao.aprovar', 'Patrimônio', 'aprovar_movimentacao', 'Aprovar movimentação de bem', 'Aprova transferência, manutenção e baixa. Quem pediu não aprova.'),
+  functionality('integracao.fonte.decidir', 'Integração Omie', 'decidir_fonte', 'Decidir fonte oficial', 'Define, por entidade, se o Thalamus ou o Omie é a fonte e o sentido da sincronização.'),
 
   ...MODULES.filter(module => !['Produtos', 'Orçamentos', 'Organização', 'Pessoas'].includes(module))
     .map(module => functionality(`modulo.${module.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_')}.gerir`, module, 'gerir', `Gerir ${module}`, `Mantém registros e decisões do módulo ${module}.`)),
@@ -67,17 +74,17 @@ const budgetFeature = (action: string): FunctionalityId => `orcamentos.${action}
 const roleModuleGrants: Record<Role, string[]> = {
   Administrador: MODULES,
   Gestor: MODULES,
-  Comercial: ['CRM', 'Vendas', 'Expedição', 'Produtos', 'Parceiros'],
-  Engenharia: ['Produtos', 'Serviços', 'Ativos', 'Postos', 'Projetos', 'Parceiros'],
+  Comercial: ['CRM', 'Vendas', 'Expedição', 'Produtos', 'Parceiros', 'Locação', 'Garantia'],
+  Engenharia: ['Produtos', 'Serviços', 'Ativos', 'Postos', 'Projetos', 'Parceiros', 'Patrimônio'],
   PCP: ['Painel', 'Fluxo do pedido', 'Vendas', 'Produtos', 'Postos', 'Planejamento', 'Ordens de produção', 'Demandas', 'Injeção', 'Montagem', 'Indicadores', 'Parceiros'],
-  Compras: ['Painel', 'Demandas', 'Compras', 'Almoxarifado', 'Orçamentos', 'Produtos', 'Parceiros'],
-  Almoxarifado: ['Almoxarifado', 'Compras', 'Demandas', 'Ordens de produção', 'Produtos', 'Parceiros'],
+  Compras: ['Painel', 'Demandas', 'Compras', 'Almoxarifado', 'Orçamentos', 'Produtos', 'Parceiros', 'Recebimento'],
+  Almoxarifado: ['Almoxarifado', 'Compras', 'Demandas', 'Ordens de produção', 'Produtos', 'Parceiros', 'Recebimento'],
   'Líder de produção': ['Painel', 'Fluxo do pedido', 'Planejamento', 'Ordens de produção', 'Demandas', 'Injeção', 'Montagem', 'Qualidade', 'Manutenção'],
   Operador: [],
   Qualidade: ['Qualidade', 'Ordens de produção', 'Indicadores'],
   Expedição: ['Expedição', 'Vendas', 'Parceiros'],
-  Manutenção: ['Manutenção', 'Ativos', 'Postos', 'Serviços', 'Demandas', 'Injeção', 'Parceiros'],
-  Assistência: ['Assistência Técnica', 'Serviços', 'Demandas', 'Almoxarifado', 'Parceiros'],
+  Manutenção: ['Manutenção', 'Ativos', 'Postos', 'Serviços', 'Demandas', 'Injeção', 'Parceiros', 'Patrimônio'],
+  Assistência: ['Assistência Técnica', 'Serviços', 'Demandas', 'Almoxarifado', 'Parceiros', 'Garantia'],
   Financeiro: ['Orçamentos', 'DRE', 'Projetos', 'Indicadores', 'Produtos', 'Parceiros'],
 }
 
@@ -89,14 +96,15 @@ const roleDetailedGrants: Partial<Record<Role, FunctionalityId[]>> = {
     productFeature('homologar.tecnica'), productFeature('excecao_campo_chave.decidir'), productFeature('revisao.liberar'),
     budgetFeature('planejamento.gerir'), budgetFeature('categorias.gerir'), budgetFeature('excecao.tratar'), budgetFeature('excecao.vincular'),
     budgetFeature('liberar_saldo'), budgetFeature('alerta.reconhecer'), budgetFeature('consultar_consolidado'), 'organizacao.consultar_consolidado',
-    'crm.consultar_consolidado',
+    'crm.consultar_consolidado', 'crm.desconto.aprovar', 'recebimento.bloqueio.decidir', 'locacao.contrato.aprovar', 'garantia.regra.aprovar',
+    'patrimonio.movimentacao.aprovar', 'integracao.fonte.decidir',
   ],
   Engenharia: [
     productFeature('nucleo.gerir'), productFeature('manufatura.gerir'), productFeature('ferramental.gerir'), productFeature('midia.gerir'),
     productFeature('projetos.gerir'), productFeature('ciclo.gerir'), productFeature('homologar.tecnica'), productFeature('revisao.liberar'),
   ],
   PCP: [productFeature('manufatura.gerir'), productFeature('homologar.pcp'), productFeature('revisao.liberar')],
-  Compras: [productFeature('estoque.gerir'), budgetFeature('alerta.reconhecer')],
+  Compras: [productFeature('estoque.gerir'), budgetFeature('alerta.reconhecer'), 'recebimento.bloqueio.decidir'],
   Almoxarifado: [productFeature('estoque.gerir')],
   Comercial: [productFeature('comercial.gerir'), productFeature('midia.gerir'), productFeature('homologar.comercial')],
   Manutenção: [productFeature('ferramental.gerir')],

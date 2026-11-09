@@ -1,4 +1,4 @@
-export type SyncStatus = 'sincronizado' | 'pendente' | 'erro'
+export type SyncStatus = 'sincronizado' | 'pendente' | 'erro' | 'ignorado'
 
 /** PA acabado, SE semiacabado injetado, MP matéria-prima, CP componente, EM embalagem, SV serviço, KF kit físico, KT kit virtual, IM imobilizado */
 /** Tipo do item no padrão da escrituração: 00 revenda, 01 matéria-prima, 02 embalagem, 03 em processo, 04 acabado, 06 intermediário, 07 uso e consumo, 08 imobilizado. */
@@ -318,6 +318,7 @@ export interface Tenant {
   legalName: string
   tradeName: string
   document: string
+  state?: string
   city: string
   status: 'Ativa' | 'Inativa'
   groupId?: string
@@ -483,7 +484,16 @@ export interface Asset {
   serial?: string
   location?: string
   responsibleId?: string
-  status?: 'Operando' | 'Parado' | 'Em manutenção'
+  status?: 'Operando' | 'Parado' | 'Em manutenção' | 'Locado' | 'Baixado'
+  patrimonyCode?: string
+  /** Instalação onde o bem está. Só a movimentação concluída muda este campo. */
+  facilityId?: string
+  condition?: AssetCondition
+  costCenter?: string
+  /** Pode ser locado ao cliente (unidade de demonstração). */
+  rentable?: boolean
+  residualValue?: number
+  depreciationMethod?: 'Linear'
   preventiveLimit?: number
   nextPreventive: string
   manufacturer?: string
@@ -498,28 +508,64 @@ export interface Asset {
 
 export type SalesOrderPriority = 'Normal' | 'Alta' | 'Urgente'
 
+export type SalesOrderStatus = 'Aguardando análise' | 'Confirmado' | 'Em atendimento' | 'Parcialmente expedido' | 'Expedido' | 'Concluído' | 'Cancelado'
+
+export interface SalesOrderLine {
+  itemId: string
+  quantity: number
+  unitPrice: number
+  /** kitId marca a linha que veio da explosão de um kit virtual. */
+  kitId?: string
+  /** Revisão liberada do produto quando a linha entrou no pedido. */
+  revision?: string
+}
+
+export interface SalesOrderChange {
+  at: string
+  actor: string
+  line: number
+  field: 'quantity' | 'unitPrice'
+  from: number
+  to: number
+  reason: string
+}
+
 export interface SalesOrder {
   id: string
-  omieId: string
+  /** Ausente quando o pedido nasceu no Thalamus e a empresa não envia ao Omie. */
+  omieId?: string
   customerId: string
   itemId: string
   quantity: number
-  /** kitId marca a linha que veio da explosão de um kit virtual. */
-  lines?: { itemId: string; quantity: number; unitPrice: number; kitId?: string }[]
+  lines?: SalesOrderLine[]
   promisedDate: string
   priority: SalesOrderPriority
   value: number
   receivedAt: string
   planned: boolean
   shipment?: Shipment
+  /** Onde o pedido nasceu. Sem isto, é pedido importado do Omie. */
+  origin?: 'Thalamus' | 'Omie'
+  proposalId?: string
+  opportunityId?: string
+  paymentTerms?: string
+  /** Pedido do Thalamus nasce aguardando análise; o do Omie já chega confirmado. */
+  confirmedAt?: string
+  confirmedBy?: string
+  cancelledAt?: string
+  cancelReason?: string
+  changes?: SalesOrderChange[]
 }
 
 export interface Shipment {
-  status: 'Aguardando conferência' | 'Conferido' | 'Expedido' | 'Faturado'
+  status: 'Aguardando conferência' | 'Conferido' | 'Expedido' | 'Faturado' | 'Entregue'
   volumes: number
   carrier: string
   invoice?: string
   shippedAt?: string
+  tracking?: string
+  deliveredAt?: string
+  deliveredTo?: string
 }
 
 export interface OpMaterial {
@@ -661,7 +707,7 @@ export interface User {
   name: string
   role: Role
   sector: string
-  shift: 'Manhã' | 'Tarde' | 'Administrativo'
+  shift: string
   pin: string
   email?: string
   /** Posição organizacional vigente. O cargo fica no catálogo, ligado a essa posição. */
@@ -855,6 +901,21 @@ export interface Sector {
   parentId?: string
 }
 
+/** Nível de cargo da empresa. A ordem é a hierarquia: 1 é o mais alto. */
+export interface JobLevel {
+  id: string
+  tenantId: string
+  name: string
+  rank: number
+}
+
+/** Turno da empresa. Não tem hierarquia. */
+export interface WorkShift {
+  id: string
+  tenantId: string
+  name: string
+}
+
 /** Catálogo de trabalho da empresa. Não forma hierarquia. */
 export interface JobCatalog {
   id: string
@@ -1044,6 +1105,8 @@ export interface BusinessPartner {
   tradeName: string
   name: string
   document: string
+  /** Brasil quando ausente. */
+  country?: string
   roles: PartnerRoleName[]
   roleStatus: Partial<Record<PartnerRoleName, PartnerRoleStatus>>
   contacts: PartnerContact[]
@@ -1068,11 +1131,16 @@ export interface ProductRevision {
   id: string
   itemId: string
   code: string
-  status: 'Rascunho' | 'Liberada' | 'Substituída'
+  status: 'Rascunho' | 'Liberada' | 'Substituída' | 'Rejeitada'
   createdAt: string
   createdBy?: string
   releasedAt?: string
   releasedBy?: string
+  rejectedAt?: string
+  rejectedBy?: string
+  rejectionReason?: string
+  /** Projeto de P&D que originou a versão. */
+  projectId?: string
   checklist: { label: string; done: boolean }[]
   notes: string
   /** Estrutura desta versão; a liberada copia para o item. */
@@ -1257,7 +1325,7 @@ export interface NewActivityInput {
   attachments?: NewActivityFile[]
 }
 
-export type OpportunityStage = 'Prospecção' | 'Desenvolvimento' | 'Elaboração' | 'Proposta' | 'Conquista' | 'Perdida'
+export type OpportunityStage = 'Novo contato' | 'Qualificação' | 'Levantamento' | 'Proposta' | 'Negociação' | 'Ganho' | 'Perdido'
 export type OpportunityTemperature = 'Quente' | 'Morno' | 'Frio'
 export type OpportunityDeal = 'Venda' | 'Locação'
 
@@ -1322,12 +1390,24 @@ export interface Proposal {
   discount: number
   validUntil: string
   suggestedDate: string
-  status: 'Rascunho' | 'Enviada' | 'Aceita' | 'Recusada' | 'Expirada'
+  status: ProposalStatus
   createdAt: string
   paymentTerms?: string
   salesOrderId?: string
   rejectionReason?: string
+  /** Começa em 1. A nova versão nasce em rascunho e cancela a anterior. */
+  version?: number
+  /** Primeira versão da proposta; ausente na própria primeira. */
+  rootId?: string
+  createdBy?: string
+  /** Desconto acima do limite passa por aprovação de outra pessoa. */
+  approvalRequestedBy?: string
+  approvedBy?: string
+  approvedAt?: string
+  cancelReason?: string
 }
+
+export type ProposalStatus = 'Rascunho' | 'Em aprovação' | 'Enviada' | 'Aceita' | 'Recusada' | 'Vencida' | 'Cancelada'
 
 export interface TechnicalServiceOrder {
   id: string
@@ -1379,6 +1459,11 @@ export interface Project {
   opportunityId?: string
   memberIds?: string[]
   risks?: string[]
+  /** P&D fica na Engenharia; corporativo fica em Gestão. Ausente vale corporativo. */
+  scope?: 'P&D' | 'Corporativo'
+  priority?: Priority
+  /** Resultado e entregáveis, registrados ao concluir. */
+  result?: string
 }
 
 export type BudgetCategoryStatus = 'Ativa' | 'Inativa'
@@ -1554,4 +1639,196 @@ export interface OmiePayment {
   /** Pagar (custo, padrão) ou Receber (realizado de receita). Sem isto, é Pagar — compatível com o que já existia. */
   flow?: 'Pagar' | 'Receber'
   error?: string
+}
+
+/* ---------- Recebimento ---------- */
+
+export type ReceiptCheck = 'Conforme' | 'Divergência' | 'Avaria' | 'Incompleto'
+export type ReceiptStatus = 'Bloqueado' | 'Concluído'
+
+/** Conferência do que chegou. Só a quantidade aceita entra no saldo. */
+export interface Receipt {
+  id: string
+  tenantId: string
+  purchaseOrderId: string
+  supplierId: string
+  itemId: string
+  expected: number
+  received: number
+  accepted: number
+  check: ReceiptCheck
+  note?: string
+  receivedBy: string
+  receivedAt: string
+  status: ReceiptStatus
+  /** Decisão sobre o que ficou bloqueado. */
+  decision?: 'Aceitar' | 'Devolver'
+  decidedBy?: string
+  decidedAt?: string
+  decisionNote?: string
+}
+
+/* ---------- Garantia ---------- */
+
+/** Regra da empresa. Enquanto não aprovada, a garantia nasce Pendente e a cobertura é só sugerida. */
+export interface WarrantyPolicy {
+  tenantId: string
+  months: number
+  terms: string
+  approvedBy?: string
+  approvedAt?: string
+}
+
+export type WarrantyStatus = 'Pendente' | 'Ativa' | 'Vencida' | 'Suspensa' | 'Encerrada'
+
+export interface Warranty {
+  id: string
+  tenantId: string
+  partnerId: string
+  salesOrderId: string
+  itemId: string
+  startsOn: string
+  endsOn: string
+  terms: string
+  /** Vencida é calculada pela data; não é gravada. */
+  status: Exclude<WarrantyStatus, 'Vencida'>
+  createdAt: string
+  note?: string
+}
+
+/* ---------- Locação ---------- */
+
+export type RentalBilling = 'Mensal' | 'Semanal' | 'Diária' | 'Valor fixo'
+export type AssetCondition = 'Bom' | 'Com avaria' | 'Indisponível para uso'
+export type RentalStatus = 'Proposta' | 'Ativo' | 'Encerrado' | 'Atrasado' | 'Cancelado'
+
+/** Nasce como proposta. Só fica ativo com bem disponível, condições definidas e aprovação registrada. */
+export interface RentalContract {
+  id: string
+  tenantId: string
+  partnerId: string
+  opportunityId?: string
+  salesOrderId?: string
+  assetId?: string
+  startsOn: string
+  endsOn: string
+  amount?: number
+  billing?: RentalBilling
+  paymentTerms?: string
+  departureOn?: string
+  expectedReturnOn: string
+  returnedOn?: string
+  conditionOut?: AssetCondition
+  conditionIn?: AssetCondition
+  /** Atrasado é calculado pela data prevista de retorno. */
+  status: Exclude<RentalStatus, 'Atrasado'>
+  createdBy: string
+  createdAt: string
+  approvedBy?: string
+  approvedAt?: string
+  cancelReason?: string
+  note?: string
+}
+
+/* ---------- Treinamentos ---------- */
+
+export type TrainingKind = 'Segurança' | 'Operação' | 'Qualidade' | 'Sistema' | 'Outro'
+export type TrainingResult = 'Aprovado' | 'Reprovado' | 'Pendente'
+export type TrainingStatus = 'Válido' | 'Vencido' | 'Pendente'
+
+/** Registro e validade. Não bloqueia operação enquanto não houver treinamento obrigatório por função. */
+export interface Training {
+  id: string
+  tenantId: string
+  personId: string
+  name: string
+  kind: TrainingKind
+  completedOn?: string
+  validUntil?: string
+  result: TrainingResult
+  /** Nome do certificado; o arquivo real fica no armazenamento. */
+  evidence?: string
+  createdBy: string
+  createdAt: string
+}
+
+/* ---------- Patrimônio ---------- */
+
+export interface Facility {
+  id: string
+  tenantId: string
+  code: string
+  name: string
+  kind: 'Área produtiva' | 'Depósito' | 'Escritório' | 'Utilidade' | 'Outro'
+  address?: string
+  responsibleId?: string
+  status: 'Ativo' | 'Indisponível' | 'Em manutenção' | 'Inativo'
+}
+
+export type AssetMovementReason = 'Transferência' | 'Manutenção' | 'Locação' | 'Devolução' | 'Baixa' | 'Outro'
+
+export interface AssetMovement {
+  id: string
+  tenantId: string
+  assetId: string
+  fromFacilityId?: string
+  toFacilityId?: string
+  reason: AssetMovementReason
+  status: 'Solicitada' | 'Aprovada' | 'Concluída' | 'Cancelada'
+  requestedBy: string
+  requestedAt: string
+  approvedBy?: string
+  approvedAt?: string
+  completedAt?: string
+  note?: string
+  /** Contrato de locação que pediu a saída ou o retorno. */
+  rentalId?: string
+}
+
+export interface AssetInventoryLine {
+  assetId: string
+  expectedFacilityId?: string
+  expectedCondition?: AssetCondition
+  /** Ausente até a contagem do bem. */
+  found?: boolean
+  condition?: AssetCondition
+  resolution?: string
+}
+
+export interface AssetInventory {
+  id: string
+  tenantId: string
+  facilityId: string
+  date: string
+  responsible: string
+  status: 'Planejado' | 'Em contagem' | 'Pendente' | 'Conciliado'
+  lines: AssetInventoryLine[]
+}
+
+/* ---------- Cadastros gerais ---------- */
+
+export type RegistryKind = 'Unidade' | 'Moeda' | 'Condição de pagamento' | 'Origem de oportunidade' | 'Motivo de perda' | 'Motivo de recusa'
+
+/** Lista compartilhada. Uma opção existe uma vez por empresa e tipo. */
+export interface RegistryEntry {
+  id: string
+  tenantId: string
+  kind: RegistryKind
+  code: string
+  description: string
+  status: EntityStatus
+}
+
+/* ---------- Integração Omie ---------- */
+
+export type OmieEntity = 'Cliente' | 'Fornecedor' | 'Pedido de venda' | 'Pedido de compra' | 'Produto' | 'Categoria financeira' | 'Centro de custo' | 'Faturamento'
+
+/** Fonte oficial por entidade. Pendente bloqueia a sincronização daquela entidade. */
+export interface OmieEntitySource {
+  tenantId: string
+  entity: OmieEntity
+  source: 'Thalamus' | 'Omie' | 'Pendente'
+  direction: 'Enviar' | 'Receber' | 'Bidirecional'
+  decidedBy?: string
+  decidedAt?: string
 }
