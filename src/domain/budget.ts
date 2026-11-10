@@ -33,17 +33,17 @@ export const BUDGET_REASONS = [
 
 export const BUDGET_ROLES: Role[] = ['Financeiro', 'Gestor', 'PCP', 'Compras', 'Engenharia', 'Comercial', 'Manutenção', 'Assistência', 'Qualidade']
 
-/** Define orçamento, categorias, regras e trata pagamentos retidos. O Administrador também. */
-export const PLANNER_ROLES: Role[] = ['Financeiro', 'Administrador']
-/** Autoriza o lançamento acima do saldo. O Financeiro não entra; o Administrador entra. */
-export const APPROVER_ROLES: Role[] = ['Gestor', 'Administrador']
+/** Define orçamento, categorias, regras e trata pagamentos retidos. O Admin também. */
+export const PLANNER_ROLES: Role[] = ['Financeiro', 'Admin']
+/** Autoriza o lançamento acima do saldo. O Financeiro não entra; o Admin entra. */
+export const APPROVER_ROLES: Role[] = ['Gestor', 'Admin']
 
 const money = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const round2 = (value: number) => Math.round(value * 100) / 100
 export const monthOf = (date = today()) => date.slice(0, 7)
 
 function assertPlanner(role: Role, action: string) {
-  if (!PLANNER_ROLES.includes(role)) throw new DomainError(`Somente o Financeiro ou o Administrador ${action}`)
+  if (!PLANNER_ROLES.includes(role)) throw new DomainError(`Somente o Financeiro ou o Admin ${action}`)
 }
 
 export function categoryOf(state: ErpState, id: string) {
@@ -794,9 +794,9 @@ export function applyBudgetSimulation(state: ErpState, tenantId: string, year: s
   return simulation
 }
 
-/** Financeiro e Administrador veem todas as categorias. Os demais veem só as contas em que são o responsável. */
+/** Financeiro e Admin veem todas as categorias. Os demais veem só as contas em que são o responsável. */
 export function viewerCategoryScope(state: ErpState, tenantId: string, userId: string, role: Role) {
-  if (role === 'Administrador' || role === 'Financeiro') return { limited: false, categoryIds: [] as string[] }
+  if (role === 'Admin' || role === 'Financeiro') return { limited: false, categoryIds: [] as string[] }
   const categoryIds = state.budgetCategories.filter(entry => entry.tenantId === tenantId && entry.responsibleUserId === userId).map(entry => entry.id)
   return { limited: true, categoryIds }
 }
@@ -1190,7 +1190,7 @@ export const canDecide = (exception: BudgetException, role: Role) =>
 
 /** Sem categoria fica com o Financeiro. Sem vínculo fica com o setor executor. Saldo excedido fica com o responsável da conta. */
 export function seesBudgetException(state: ErpState, exception: BudgetException, userId: string, role: Role) {
-  if (role === 'Administrador') return true
+  if (role === 'Admin') return true
   const category = exception.categoryIds[0] ? state.budgetCategories.find(entry => entry.id === exception.categoryIds[0]) : undefined
   if (exception.kind === 'Sem categoria' || exception.kind === 'Múltiplas categorias' || exception.kind === 'Duplicidade' || exception.kind === 'Erro de sincronização') return role === 'Financeiro'
   if (exception.kind === 'Sem vínculo') {
@@ -1210,8 +1210,8 @@ export function decideBudgetException(state: ErpState, tenantId: string, id: str
   if (!entry || entry.status !== 'Pendente') throw new DomainError('Exceção pendente não encontrada')
   if (entry.tenantId !== tenantId) throw new DomainError('A exceção não pertence à empresa ativa')
   if (!canDecide(entry, role)) throw new DomainError(entry.kind === 'Saldo excedido'
-    ? 'Somente o Gestor ou o Administrador libera lançamento acima do saldo. Quem define o orçamento não autoriza a exceção.'
-    : 'Somente o Financeiro ou o Administrador trata pagamentos retidos')
+    ? 'Somente o Gestor ou o Admin libera lançamento acima do saldo. Quem define o orçamento não autoriza a exceção.'
+    : 'Somente o Financeiro ou o Admin trata pagamentos retidos')
   if (!note.trim()) throw new DomainError('Informe a justificativa')
 
   if (entry.kind === 'Saldo excedido') {

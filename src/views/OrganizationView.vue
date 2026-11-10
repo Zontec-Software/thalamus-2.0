@@ -110,7 +110,7 @@ function createProfile() {
 
   <section v-if="catalogHere" class="grid-2">
     <article class="card">
-      <div class="section-head"><div><h2><ShieldCheck :size="18" /> Perfis</h2><p>O vínculo é aqui: escolha o perfil, marque as funcionalidades e salve. A conta recebe o perfil; o perfil define o que ela pode fazer. Administrador recebe todas e não se edita.</p></div></div>
+      <div class="section-head"><div><h2><ShieldCheck :size="18" /> Perfis</h2><p>O vínculo é aqui: escolha o perfil, marque as funcionalidades e salve. A conta recebe o perfil; o perfil define o que ela pode fazer. Admin recebe todas e não se edita.</p></div></div>
       <select v-model="selectedId.value" class="filter"><option v-for="profile in profiles" :key="profile.id" :value="profile.id">{{ profile.name }}{{ profile.system ? ' · sistema' : '' }}</option></select>
       <template v-if="selected">
         <div class="form-grid" style="margin-top:12px"><div class="field"><label>Nome</label><input v-model="form.name" class="filter" :disabled="selected.system || !canEditAccess" /></div><div class="field"><label>Descrição</label><input v-model="form.description" class="filter" :disabled="selected.system || !canEditAccess" /></div></div>

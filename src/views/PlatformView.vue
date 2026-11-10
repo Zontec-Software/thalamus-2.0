@@ -143,7 +143,7 @@ function openCompany(id: string) {
 </script>
 
 <template>
-  <div class="toolbar" data-tour="platform-intro"><p>O usuário mestre cadastra empresas, grupos econômicos e o vínculo com o Omie. Ele não opera o ERP. Cada empresa nasce só com o perfil Administrador; os demais perfis são criados dentro dela.</p></div>
+  <div class="toolbar" data-tour="platform-intro"><p>O usuário mestre cadastra empresas, grupos econômicos e o vínculo com o Omie. Ele não opera o ERP. Cada empresa nasce só com o perfil Admin; os demais perfis são criados dentro dela.</p></div>
 
   <section class="grid-2">
     <article class="card">
@@ -162,7 +162,7 @@ function openCompany(id: string) {
       </table>
     </article>
     <article class="card">
-      <div class="section-head"><div><h2>Nova empresa</h2><p>Cria o tenant, o Administrador com todas as funcionalidades do código e o primeiro usuário.</p></div></div>
+      <div class="section-head"><div><h2>Nova empresa</h2><p>Cria o tenant, o Admin com todas as funcionalidades do código e o primeiro usuário.</p></div></div>
       <div class="form-grid">
         <div class="field wide">
           <label>CNPJ<span class="required-mark" title="Obrigatório">*</span></label>

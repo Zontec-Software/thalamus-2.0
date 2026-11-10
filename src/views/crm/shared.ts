@@ -111,7 +111,7 @@ export function useCrmScope() {
   const opportunityIds = computed(() => new Set(opportunities.value.map(entry => entry.id)))
   const proposals = computed(() => store.state.proposals.filter(entry => opportunityIds.value.has(entry.opportunityId)))
   const sellers = computed(() => [...new Map(store.state.users
-    .filter(entry => !entry.platformMaster && (entry.role === 'Comercial' || entry.role === 'Gestor' || entry.role === 'Administrador'))
+    .filter(entry => !entry.platformMaster && (entry.role === 'Comercial' || entry.role === 'Gestor' || entry.role === 'Admin'))
     .map(entry => [entry.id, entry])).values()])
   const tenantName = (id?: string) => store.state.tenants.find(entry => entry.id === (id ?? ui.activeTenantId))?.tradeName ?? '—'
   return { canGroup, tenantIds, inScope, opportunities, proposals, sellers, tenantName, grouped: computed(() => tenantIds.value.length > 1) }

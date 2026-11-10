@@ -18,7 +18,7 @@ export const WELCOME_TOUR: TourStep[] = [
   t('home-producao', 'Operações', 'Aqui ficam o planejamento, a produção, a qualidade, a expedição e a manutenção. O painel, o fluxo, a injeção e a montagem ficam na barra de módulos, depois de entrar.'),
   t('home-engenharia', 'Engenharia', 'Produtos e estruturas ficam neste bloco. Pessoas e patrimônio estão na faixa de apoio, cada um no seu módulo.'),
   t('search', 'Busca', 'De qualquer área, encontre pedidos, OPs, produtos, oportunidades, demandas, projetos, chamados ou pessoas. Produto e pessoa abrem a página do cadastro; o restante abre o detalhe à direita.'),
-  t('role', 'Visualizar perfis', 'Só o Administrador vê este seletor. Ele mostra como outro perfil enxerga a interface sem trocar a identidade real. Perfis recebem funcionalidades, não apenas módulos.'),
+  t('role', 'Visualizar perfis', 'Só o Admin vê este seletor. Ele mostra como outro perfil enxerga a interface sem trocar a identidade real. Perfis recebem funcionalidades, não apenas módulos.'),
   t('help', 'Guia de cada tela', 'Depois de entrar numa área, cada tela explica a si mesma na primeira visita. Este botão reabre o guia.'),
 ]
 
@@ -63,7 +63,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
   ],
   '/tarefas': [
     t('task-list', 'Fila de trabalho', 'Tudo o que depende de você aparece aqui, já com a ação principal. As tarefas somem quando concluídas e a próxima área é avisada automaticamente.'),
-    t('role', 'Visualização de perfil', 'O Administrador pode conferir a interface de outro perfil sem alterar os acessos da pessoa.'),
+    t('role', 'Visualização de perfil', 'O Admin pode conferir a interface de outro perfil sem alterar os acessos da pessoa.'),
   ],
   '/pedidos': [
     t('sync-omie', 'Pedidos vêm do Omie', 'Pedidos aprovados no Omie são importados aqui. Cliente, produto, quantidade e prazo chegam prontos.'),
@@ -181,7 +181,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
   '/orcamentos': [
     t('budget-tabs', 'Quatro abas, na ordem do trabalho', 'Visão geral acompanha. Ações decide. Categorias define o valor, o responsável e os setores. Planejamento monta o ano. O guia passa por uma de cada vez.', 'close'),
     t('period-scope', 'Período e empresa', 'Escolha o ano e o intervalo de meses. Quem tem a consulta consolidada também escolhe a empresa do grupo ou a soma do grupo, só para leitura.', 'close'),
-    t('record-list', 'Visão geral', 'Custo, despesa e investimento no período: orçado, realizado, previsão, desvio e uso, com a cor da situação. Financeiro e Administrador veem todas as contas, inclusive sem movimento. Os demais veem só as categorias em que são o responsável. Clique numa conta para ver o valor e o percentual de cada setor utilizador. Clique num setor para filtrar as origens, da maior para a menor.', 'close'),
+    t('record-list', 'Visão geral', 'Custo, despesa e investimento no período: orçado, realizado, previsão, desvio e uso, com a cor da situação. Financeiro e Admin veem todas as contas, inclusive sem movimento. Os demais veem só as categorias em que são o responsável. Clique numa conta para ver o valor e o percentual de cada setor utilizador. Clique num setor para filtrar as origens, da maior para a menor.', 'close'),
     t('budget-detail', 'A ficha da conta', 'O realizado é a nota do Omie. A linha diz a compra, o projeto ou a ordem. Sem esse vínculo, a ação aparece para o setor executor.', 'budget'),
     t('budget-actions', 'Ações', 'Sem categoria fica com o Financeiro. Sem vínculo fica com o executor da categoria. Saldo excedido fica com o responsável da conta.', 'close'),
     t('budget-categories', 'Categorias', 'O valor do ano, a pessoa responsável, os setores que usam o valor e o setor que recebe a demanda. Nova categoria abre o formulário. A categoria mãe usa um código de dois dígitos.', 'close'),
@@ -240,7 +240,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('kpi-grid', 'Indicadores de gestão', 'Entrega no prazo, lead time, refugo e compras atrasadas saem dos registros operacionais. O orçamento consumido soma somente pagamentos confirmados pelo Omie.'),
   ],
   '/plataforma': [
-    t('platform-intro', 'Usuário mestre', 'Esta tela fica fora das empresas. Cadastre o tenant, o grupo econômico e o primeiro administrador. A empresa nasce só com o perfil Administrador.'),
+    t('platform-intro', 'Usuário mestre', 'Esta tela fica fora das empresas. Cadastre o tenant, o grupo econômico e o primeiro administrador. A empresa nasce só com o perfil Admin.'),
     t('platform-omie', 'Vínculo Omie', 'A chave identifica a conta. O segredo é informado e descartado. A sincronização continua simulada até o Core existir.'),
   ],
   '/organizacao': [

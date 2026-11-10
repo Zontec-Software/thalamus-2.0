@@ -7,7 +7,7 @@ import type { Employment, IdentityLink, JobCatalog, JobLevel, JobPosition, Perso
 /** Campos que não saem da empresa, nem no projeto nem no diretório. */
 export const SENSITIVE_PERSON_KEYS = ['cpf', 'rg', 'cnh', 'birthDate', 'race', 'pcd', 'drugAllergy', 'foodAllergy', 'controlledMedicine', 'address', 'banks', 'family', 'salary'] as const
 
-export const ACCOUNT_ROLES: Role[] = ['Administrador', 'Gestor', 'Comercial', 'Engenharia', 'PCP', 'Compras', 'Almoxarifado', 'Líder de produção', 'Operador', 'Qualidade', 'Expedição', 'Manutenção', 'Assistência', 'Financeiro']
+export const ACCOUNT_ROLES: Role[] = ['Admin', 'Gestor', 'Comercial', 'Engenharia', 'PCP', 'Compras', 'Almoxarifado', 'Líder de produção', 'Operador', 'Qualidade', 'Expedição', 'Manutenção', 'Assistência', 'Financeiro']
 
 export type PersonView = 'completa' | 'financeira' | 'profissional'
 export type PersonBlock = 'documentos' | 'saude' | 'endereco' | 'familia' | 'salario' | 'banco' | 'profissional'
@@ -500,7 +500,7 @@ export function missingProfile(person: Person): string[] {
 /** RH vê a ficha; financeiro vê salário e banco; gestor e as demais pessoas veem o profissional. A própria pessoa vê a sua ficha. */
 export function personView(role: Role, sessionUserId: string, person: Person, accountId?: string, managesTeam = false): PersonView {
   if (accountId === sessionUserId && person.id) return 'completa'
-  if (role === 'Administrador' || role === 'Gestor') return 'completa'
+  if (role === 'Admin' || role === 'Gestor') return 'completa'
   if (role === 'Financeiro') return 'financeira'
   if (managesTeam) return 'profissional'
   return 'profissional'

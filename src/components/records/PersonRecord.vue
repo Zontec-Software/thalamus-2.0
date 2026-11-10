@@ -18,7 +18,7 @@ const store = useErpStore()
 const ui = useUiStore()
 const router = useRouter()
 
-const ROLES: Role[] = ['Administrador', 'Gestor', 'Comercial', 'Engenharia', 'PCP', 'Compras', 'Almoxarifado', 'Líder de produção', 'Operador', 'Qualidade', 'Expedição', 'Manutenção', 'Assistência', 'Financeiro']
+const ROLES: Role[] = ['Admin', 'Gestor', 'Comercial', 'Engenharia', 'PCP', 'Compras', 'Almoxarifado', 'Líder de produção', 'Operador', 'Qualidade', 'Expedição', 'Manutenção', 'Assistência', 'Financeiro']
 const isNew = computed(() => props.id === 'new')
 const person = computed(() => store.state.users.find(entry => entry.id === props.id))
 const form = reactive({ name: '', email: '', role: 'Operador' as Role, sector: props.context.sector ?? store.state.sectors[0]?.name ?? '', positionId: '', shift: '' as User['shift'] })

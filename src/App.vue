@@ -214,7 +214,7 @@ watch(() => ui.tourSteps.length, length => { if (length === 0) maybeStartTour() 
           <label v-if="canPreview" class="role-switch" data-tour="role">
             <span>Visualizar como</span>
             <select :value="ui.previewProfileId ?? ''" @change="changeProfile(($event.target as HTMLSelectElement).value)">
-              <option value="">Administrador</option>
+              <option value="">Admin</option>
               <option v-for="profile in store.state.accessProfiles.filter(entry => !entry.system && entry.tenantId === ui.activeTenantId)" :key="profile.id" :value="profile.id">{{ profile.name }}</option>
             </select>
           </label>

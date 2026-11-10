@@ -25,13 +25,13 @@ function loadSeenTours() {
 
 export const useUiStore = defineStore('ui', () => {
   const toasts = ref<Toast[]>([])
-  /** Usuário autenticado na futura API Core; o mockup inicia com Lucas, Administrador. */
+  /** Usuário autenticado na futura API Core; o mockup inicia com Lucas, Admin. */
   const sessionUserId = ref('u16')
   /** Empresa ativa. Vazio enquanto a sessão é o usuário mestre. */
   const activeTenantId = ref('tenant-roboflex')
-  /** Perfil usado apenas pelo Administrador para conferir a interface. Não troca a identidade real. */
+  /** Perfil usado apenas pelo Admin para conferir a interface. Não troca a identidade real. */
   const previewProfileId = ref<string | null>(null)
-  const role = ref<Role>('Administrador')
+  const role = ref<Role>('Admin')
   const userName = ref('Lucas Lima')
   const orderDrawer = ref<string | null>(null)
   const opDrawer = ref<string | null>(null)

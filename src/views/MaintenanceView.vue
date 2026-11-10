@@ -16,7 +16,7 @@ const form = ref<{ assetId: string; type: MaintenanceOrder['type']; description:
 
 const assetName = (id: string) => store.state.assets.find(asset => asset.id === id)?.name ?? id
 const open = computed(() => store.state.maintenanceOrders.filter(order => order.status !== 'Concluída'))
-const canAct = computed(() => ['Administrador', 'Gestor', 'Manutenção', 'Líder de produção'].includes(ui.role))
+const canAct = computed(() => ['Admin', 'Gestor', 'Manutenção', 'Líder de produção'].includes(ui.role))
 const assets = computed(() => store.state.assets.map(asset => ({
   ...asset,
   days: daysUntil(asset.nextPreventive),

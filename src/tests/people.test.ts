@@ -236,7 +236,7 @@ describe('pessoas', () => {
     const state = createSeedState()
     const lucas = companyAccessOf(state, 'u16', 'tenant-roboflex-sul')
     expect(lucas.employed).toBe(false)
-    expect(lucas.profileNames).toContain('Administrador')
+    expect(lucas.profileNames).toContain('Admin')
     expect(companyAccessOf(state, 'u16', TENANT).employed).toBe(true)
     const joao = state.users.find(entry => entry.name.startsWith('João'))!
     const persons = state.persons.length

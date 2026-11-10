@@ -188,8 +188,8 @@ function baseState(): ErpState {
     identityLinks: [],
     projectParticipations: [],
     users: [
-      { id: 'u-master', name: 'Mestre da plataforma', role: 'Administrador', sector: 'Plataforma', shift: 'Administrativo', pin: '9000', email: 'plataforma@thalamus.local', active: true, platformMaster: true },
-      { id: 'u16', name: 'Lucas Lima', role: 'Administrador', sector: 'Diretoria industrial', shift: 'Administrativo', pin: '0000', email: 'lucas.lima@roboflex.com.br', positionId: 'pos-dir', active: true },
+      { id: 'u-master', name: 'Mestre da plataforma', role: 'Admin', sector: 'Plataforma', shift: 'Administrativo', pin: '9000', email: 'plataforma@thalamus.local', active: true, platformMaster: true },
+      { id: 'u16', name: 'Lucas Lima', role: 'Admin', sector: 'Diretoria industrial', shift: 'Administrativo', pin: '0000', email: 'lucas.lima@roboflex.com.br', positionId: 'pos-dir', active: true },
       { id: 'u1', name: 'Marina Souza', role: 'Gestor', sector: 'Diretoria industrial', shift: 'Administrativo', pin: '1111', email: 'marina@roboflex.com.br', active: true },
       { id: 'u1', name: 'Marina Souza', role: 'Gestor', sector: 'Diretoria industrial', shift: 'Administrativo', pin: '1111', email: 'marina@roboflex.com.br', active: true },
       { id: 'u12', name: 'Camila Nunes', role: 'Comercial', sector: 'Comercial', shift: 'Administrativo', pin: '1212', email: 'camila@roboflex.com.br', positionId: 'pos-com', active: true },
@@ -682,8 +682,8 @@ export function createSeedState(): ErpState {
   }))
   s.accessProfiles.push(
     {
-      id: 'profile-zontec-admin', tenantId: 'tenant-roboflex-sul', code: 'administrador', name: 'Administrador',
-      description: 'Acesso administrativo da Zontec, atribuído à mão.', system: true, functionalityIds: FUNCTIONALITIES.map(entry => entry.id), simulatedRole: 'Administrador',
+      id: 'profile-zontec-admin', tenantId: 'tenant-roboflex-sul', code: 'admin', name: 'Admin',
+      description: 'Acesso administrativo da Zontec, atribuído à mão.', system: true, functionalityIds: FUNCTIONALITIES.map(entry => entry.id), simulatedRole: 'Admin',
     },
     {
       id: 'profile-zontec-eng', tenantId: 'tenant-roboflex-sul', code: 'engenharia', name: 'Engenharia',

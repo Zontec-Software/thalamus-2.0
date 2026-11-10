@@ -84,7 +84,7 @@ const sales = computed(() => partner.value ? clientSalesBase(store.state, partne
 const receipts = computed(() => partner.value ? supplierReceiptBase(store.state, partner.value.id) : undefined)
 const portraits = computed(() => partner.value ? homologationsOf(store.state, partner.value.id) : [])
 const pendingAbc = computed(() => partner.value?.abcSuggestions.filter(entry => entry.status === 'Pendente') ?? [])
-const canDecideAbc = computed(() => ui.role === 'Comercial' || ui.role === 'Administrador')
+const canDecideAbc = computed(() => ui.role === 'Comercial' || ui.role === 'Admin')
 const show = (role: PartnerRoleName) => !!partner.value?.roles.includes(role)
 const blankNote = 'Opcional. Com o CNPJ completo, o nome, o estado e a cidade vêm da Receita.'
 const sameDocument = (next: string, previous: string) => next.trim() === previous.trim() || (onlyDigits(next).length >= 11 && onlyDigits(next) === onlyDigits(previous))

@@ -72,7 +72,7 @@ export const productFeature = (action: string): FunctionalityId => `produtos.${a
 const budgetFeature = (action: string): FunctionalityId => `orcamentos.${action}`
 
 const roleModuleGrants: Record<Role, string[]> = {
-  Administrador: MODULES,
+  Admin: MODULES,
   Gestor: MODULES,
   Comercial: ['CRM', 'Vendas', 'Expedição', 'Produtos', 'Parceiros', 'Locação', 'Garantia'],
   Engenharia: ['Produtos', 'Serviços', 'Ativos', 'Postos', 'Projetos', 'Parceiros', 'Patrimônio'],
@@ -115,7 +115,7 @@ const roleDetailedGrants: Partial<Record<Role, FunctionalityId[]>> = {
 }
 
 const profileDescription: Record<Role, string> = {
-  Administrador: 'Perfil do sistema com todas as funcionalidades.',
+  Admin: 'Perfil do sistema com todas as funcionalidades.',
   Gestor: 'Consulta ampla e decisões gerenciais.',
   Comercial: 'Relacionamento, propostas, vendas e expedição.',
   Engenharia: 'Produtos, estruturas, postos, serviços, ativos e projetos.',
@@ -135,12 +135,12 @@ export const profileCode = (role: Role) => role.toLowerCase().normalize('NFD').r
 
 /**
  * Perfis da demonstração da Roboflex, para testar a visualização.
- * Um sistema zerado não recebe esta lista: a empresa nova nasce só com o Administrador,
+ * Um sistema zerado não recebe esta lista: a empresa nova nasce só com o Admin,
  * e os demais perfis são criados na tela de acessos.
  */
 export function seededProfiles(tenantId = 'tenant-roboflex'): AccessProfile[] {
   return (Object.keys(roleModuleGrants) as Role[]).map(role => {
-    const functionalityIds = role === 'Administrador'
+    const functionalityIds = role === 'Admin'
       ? FUNCTIONALITIES.map(entry => entry.id)
       : roleModuleGrants[role].map(moduleFeature)
     functionalityIds.push(...(roleDetailedGrants[role] ?? []))
@@ -150,7 +150,7 @@ export function seededProfiles(tenantId = 'tenant-roboflex'): AccessProfile[] {
       code: profileCode(role),
       name: role,
       description: profileDescription[role],
-      system: role === 'Administrador',
+      system: role === 'Admin',
       functionalityIds,
       simulatedRole: role,
     }
@@ -181,4 +181,4 @@ export function syncAccessCatalog(state: { functionalities: Functionality[]; acc
 }
 
 /** Compatibilidade do motor do mockup; na API real estas decisões usam funcionalidades do perfil. */
-export const hasFullAccess = (role: Role) => role === 'Administrador' || role === 'Gestor'
+export const hasFullAccess = (role: Role) => role === 'Admin' || role === 'Gestor'

@@ -404,7 +404,7 @@ function linkInvoice(id: string) {
 const waitingFor = (kind: string) => {
   const feature: FunctionalityId = kind === 'Saldo excedido' ? 'orcamentos.liberar_saldo' : 'orcamentos.excecao.tratar'
   const names = store.state.accessProfiles.filter(profile => profile.tenantId === ui.activeTenantId && !profile.system && profileCan(profile, feature)).map(profile => profile.name)
-  return names.length ? `Aguardando ${names.join(' ou ')}` : 'Aguardando o Administrador da empresa'
+  return names.length ? `Aguardando ${names.join(' ou ')}` : 'Aguardando o Admin da empresa'
 }
 
 /* ---------- Categorias, responsável e setores utilizadores ---------- */

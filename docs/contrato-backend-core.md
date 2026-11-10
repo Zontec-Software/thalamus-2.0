@@ -18,7 +18,7 @@ Endpoints acrescentados para o sistema oficial: `GET /api/internal/session` (int
 
 ## Regras
 
-1. `Administrador` é perfil de sistema por empresa: código reservado, não apagável, sem remoção de funcionalidades e com todas as funcionalidades presentes e futuras. O catálogo nasce no código de cada módulo. Ao criar a empresa, o Core copia o catálogo atual para esse perfil. Perfis como Financeiro e Gestor não vêm prontos: o administrador da empresa os cria.
+1. `Admin` é perfil de sistema por empresa: código reservado, não apagável, sem remoção de funcionalidades e com todas as funcionalidades presentes e futuras. O catálogo nasce no código de cada módulo. Ao criar a empresa, o Core copia o catálogo atual para esse perfil. Perfis como Financeiro e Gestor não vêm prontos: o administrador da empresa os cria.
 2. O usuário mestre é identidade da plataforma, sem tenant. Ele cadastra empresas, grupos econômicos e o vínculo Omie (chave e segredo em cofre). Não recebe funcionalidade operacional do ERP.
 3. Perfil é atribuído por empresa. Usuário sem perfil na empresa não acessa dados dela. Cargo e setor descrevem a pessoa; não autorizam a ação.
 4. Ações usam funcionalidades, não o nome do perfil. Exemplos: `orcamentos.consultar`, `orcamentos.gerir`, `orcamentos.liberar_saldo`, `organizacao.acessos.gerir`.
@@ -26,7 +26,7 @@ Endpoints acrescentados para o sistema oficial: `GET /api/internal/session` (int
 6. Permissão de grupo econômico só permite as ações declaradas de consulta/exportação consolidada; não concede mutação operacional em empresas.
 7. Token contém `user_id`, `active_tenant_id`, perfil(is), funcionalidades efetivas e `permission_version`. O mestre omite o tenant. Cada serviço valida assinatura, tenant e versão.
 8. Alterar um perfil ou uma atribuição incrementa `permission_version`, revoga cache de autorização e cria auditoria.
-9. Impersonação é exclusiva do Administrador da empresa, exige justificativa e auditoria na API real. O seletor do mockup é somente visualização de teste.
+9. Impersonação é exclusiva do Admin da empresa, exige justificativa e auditoria na API real. O seletor do mockup é somente visualização de teste.
 
 ## Endpoints mínimos
 

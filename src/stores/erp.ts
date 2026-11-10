@@ -26,7 +26,7 @@ import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NewActivityFile, NewActivityInput, NonConformity, Resource, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v66'
+const STORAGE_KEY = 'thalamus-erp-v67'
 
 /** Versões anteriores ficam no navegador e estouram a cota. Não há migração: a chave atual é a única que vale. */
 function forgetOlderSaves() {
@@ -103,7 +103,7 @@ export const useErpStore = defineStore('erp', () => {
     ui.previewProfileId = null
     ui.sessionUserId = master.id
     ui.activeTenantId = ''
-    ui.role = 'Administrador'
+    ui.role = 'Admin'
     ui.userName = master.name
   }
 
@@ -116,15 +116,15 @@ export const useErpStore = defineStore('erp', () => {
     ui.previewProfileId = null
     ui.sessionUserId = user.id
     ui.activeTenantId = nextTenantId
-    ui.role = 'Administrador'
+    ui.role = 'Admin'
     ui.userName = user.name
   }
 
   function previewProfile(profileId: string | null) {
-    if (!isAccessAdministrator()) throw new Error('Somente o Administrador pode visualizar outro perfil')
+    if (!isAccessAdministrator()) throw new Error('Somente o Admin pode visualizar outro perfil')
     const profile = profileId ? state.accessProfiles.find(entry => entry.id === profileId) : undefined
     ui.previewProfileId = profileId
-    ui.role = profile ? profile.simulatedRole ?? 'Operador' : 'Administrador'
+    ui.role = profile ? profile.simulatedRole ?? 'Operador' : 'Admin'
     ui.userName = profile ? `Lucas Lima · visualizando ${profile.name}` : activeUser()?.name ?? 'Lucas Lima'
   }
 
@@ -132,7 +132,7 @@ export const useErpStore = defineStore('erp', () => {
     if (!can('organizacao.acessos.gerir')) throw new Error('Sem permissão para gerir acessos')
     const existing = state.accessProfiles.find(entry => entry.id === input.id)
     if (!existing) throw new Error('Perfil não encontrado')
-    if (existing.system) throw new Error('O perfil Administrador é mantido pelo sistema e sempre possui todas as funcionalidades')
+    if (existing.system) throw new Error('O perfil Admin é mantido pelo sistema e sempre possui todas as funcionalidades')
     existing.name = input.name.trim() || existing.name
     existing.description = input.description.trim()
     existing.functionalityIds = [...new Set(input.functionalityIds)]
@@ -371,7 +371,7 @@ export const useErpStore = defineStore('erp', () => {
   const recordProjectResult = bind(enterprise.recordProjectResult, 'Resultado registrado')
   const budgetRole = (feature: FunctionalityId): Role => {
     requireFeature(feature)
-    return 'Administrador'
+    return 'Admin'
   }
   const createBudget = (input: { categoryId: string; period: string; amount: number; reason?: string }) =>
     run(() => budget.setBudget(state, tenantId(), input.categoryId, input.period, input.amount, input.reason ?? 'Planejamento inicial', actor(), budgetRole('orcamentos.planejamento.gerir')), 'Orçamento anual informado')
@@ -566,7 +566,7 @@ export const useErpStore = defineStore('erp', () => {
         requireFeature(feature)
         // O domínio legado ainda recebe Role; a autorização real já foi feita
         // pela funcionalidade específica antes de executar a regra.
-        return action(actor(), 'Administrador')
+        return action(actor(), 'Admin')
       }
       return action(actor(), ui.role)
     }, success)

@@ -97,7 +97,7 @@ Quando Suprimentos for oficializado, ele lê Fornecedores pela API do Comercial 
 
 ## Dados reais
 
-- O oficial sobe com banco vazio. `php artisan core:install-master` cria o mestre; o mestre cadastra a empresa e o Administrador. O restante entra pela tela.
+- O oficial sobe com banco vazio. `php artisan core:install-master` cria o mestre; o mestre cadastra a empresa e o Admin. O restante entra pela tela.
 - Não há seed de demonstração no oficial nem `localStorage` como fonte de dado.
 - Toda tela tem estado vazio com o botão para cadastrar o primeiro item.
 - A API do Omie é chamada pela API do módulo dono do dado, com a chave do cofre do core. Enquanto a chamada real não existe, a tela diz que a sincronização está pendente; não finge sucesso.

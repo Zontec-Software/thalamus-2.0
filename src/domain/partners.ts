@@ -295,7 +295,7 @@ export function registerAnnualBilling(state: ErpState, partnerId: string, year: 
 }
 
 export function decideAbcSuggestion(state: ErpState, partnerId: string, suggestionId: string, approve: boolean, role: Role, actor: string) {
-  if (role !== 'Comercial' && role !== 'Administrador') throw new DomainError('A reclassificação ABC é do Coordenador Comercial')
+  if (role !== 'Comercial' && role !== 'Admin') throw new DomainError('A reclassificação ABC é do Coordenador Comercial')
   const partner = findPartner(state, partnerId)
   const suggestion = partner.abcSuggestions.find(entry => entry.id === suggestionId)
   if (!suggestion || suggestion.status !== 'Pendente') throw new DomainError('Sugestão não encontrada ou já decidida')

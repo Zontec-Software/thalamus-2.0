@@ -13,7 +13,7 @@ export interface NewCompanyInput {
   adminEmail: string
 }
 
-/** Empresa nova de um sistema sem cenário de demonstração: só o Administrador, com o catálogo inteiro. */
+/** Empresa nova de um sistema sem cenário de demonstração: só o Admin, com o catálogo inteiro. */
 export function provisionCompany(state: ErpState, input: NewCompanyInput) {
   const legalName = input.legalName.trim()
   const tradeName = input.tradeName.trim() || legalName
@@ -31,18 +31,18 @@ export function provisionCompany(state: ErpState, input: NewCompanyInput) {
   state.accessProfiles.push({
     id: profileId,
     tenantId,
-    code: profileCode('Administrador'),
-    name: 'Administrador',
+    code: profileCode('Admin'),
+    name: 'Admin',
     description: 'Perfil do sistema desta empresa, com todas as funcionalidades.',
     system: true,
     functionalityIds: FUNCTIONALITIES.map(entry => entry.id),
-    simulatedRole: 'Administrador',
+    simulatedRole: 'Admin',
   })
   const userId = `u-${tenantId}-admin`
   const admin = {
     id: userId,
     name: adminName,
-    role: 'Administrador' as const,
+    role: 'Admin' as const,
     sector: 'Administração',
     shift: 'Administrativo' as const,
     pin: '0000',

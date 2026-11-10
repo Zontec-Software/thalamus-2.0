@@ -78,7 +78,7 @@ Princípios:
 3. **Repositório por módulo.** Cada módulo da home tem `-web` e `-api`. Cada API tem o próprio schema na mesma instância MySQL. Todo dado de negócio pertence a uma empresa (`tenant_id`). Módulo não consulta o schema alheio; pede o dado à API daquele módulo.
 4. **Um processo por papel.** HTTP, workers e scheduler são deployments diferentes da mesma imagem.
 5. **Estado fora do pod.** Banco, Redis e armazenamento de objetos guardam o que precisa sobreviver a um reinício.
-6. **Autenticação própria.** Usuários, perfis, empresas, grupos econômicos e sessão nascem no schema `t2_core`, no `thalamus2-core/api`. As outras APIs validam o token nele. Perfis concedem funcionalidades e podem ser atribuídos em conjunto; Administrador é imutável e sempre recebe tudo.
+6. **Autenticação própria.** Usuários, perfis, empresas, grupos econômicos e sessão nascem no schema `t2_core`, no `thalamus2-core/api`. As outras APIs validam o token nele. Perfis concedem funcionalidades e podem ser atribuídos em conjunto; Admin é imutável e sempre recebe tudo.
 
 O modelo completo de tenant, grupo econômico, autorização consolidada e propagação de contexto está em `docs/multitenancy.md`.
 
@@ -294,7 +294,7 @@ Node 22 LTS no build também cobre o Vite 8, que pede Node 20.19 ou mais.
 | Logs | JSON na saída padrão, com `request_id`, usuário, módulo e id externo. Coleta pelo stack de logs do Rancher |
 | Erros | Sentry no frontend e na API, com a versão publicada |
 | Métricas | Prometheus e Grafana do Rancher Monitoring: latência e erro por rota, tamanho e falha de fila por módulo, eventos Omie pendentes |
-| Filas | Painel do Horizon, visível para o perfil Administrador |
+| Filas | Painel do Horizon, visível para o perfil Admin |
 | Alertas | Fila de falhas do Omie acima de zero por 15 minutos, scheduler sem execução, erro 5xx acima de 1%, backup do dia ausente |
 | Recursos | `requests` e `limits` em todo deployment, `PodDisruptionBudget` em produção e HPA na API e no frontend |
 | Runbooks | Em `thalamus2-infra/runbooks`: publicar, voltar versão, restaurar backup, reprocessar a fila do Omie, trocar segredo |

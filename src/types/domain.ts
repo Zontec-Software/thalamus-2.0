@@ -299,7 +299,7 @@ export interface ItemCatalog {
   fiscalSync?: FiscalSync
 }
 
-export type Role = 'Administrador' | 'Gestor' | 'Comercial' | 'Engenharia' | 'PCP' | 'Compras' | 'Almoxarifado' | 'Líder de produção' | 'Operador' | 'Qualidade' | 'Expedição' | 'Manutenção' | 'Assistência' | 'Financeiro'
+export type Role = 'Admin' | 'Gestor' | 'Comercial' | 'Engenharia' | 'PCP' | 'Compras' | 'Almoxarifado' | 'Líder de produção' | 'Operador' | 'Qualidade' | 'Expedição' | 'Manutenção' | 'Assistência' | 'Financeiro'
 
 /** Identificador estável de uma ação de negócio autorizável, por exemplo `orcamentos.ler`. */
 export type FunctionalityId = string
@@ -366,7 +366,7 @@ export interface OmieConnection {
   accountLabel: string
 }
 
-/** Perfil reutilizável dentro de uma empresa. Apenas o Administrador é perfil de sistema imutável. */
+/** Perfil reutilizável dentro de uma empresa. Apenas o Admin é perfil de sistema imutável. */
 export interface AccessProfile {
   id: string
   tenantId: string

@@ -57,23 +57,23 @@ export const UNIT_CONTEXTS: UnitContext[] = ['Compra', 'Produção', 'Estoque', 
 export const BRANCHES = ['Filial · Itabira', 'Filial · Vitória']
 export const MATRIZ = 'Matriz · Contagem'
 
-/** Quem edita cada camada. Administrador e Gestor editam tudo. */
+/** Quem edita cada camada. Admin e Gestor editam tudo. */
 export const EDITORS: Record<CatalogLayer, Role[]> = {
-  nucleo: ['Administrador', 'Gestor', 'Engenharia'],
-  estoque: ['Administrador', 'Gestor', 'Almoxarifado', 'Engenharia', 'Compras'],
-  unidades: ['Administrador', 'Gestor', 'Almoxarifado', 'Engenharia', 'Compras'],
-  manufatura: ['Administrador', 'Gestor', 'Engenharia', 'PCP'],
-  ferramental: ['Administrador', 'Gestor', 'Engenharia', 'PCP', 'Manutenção'],
-  comercial: ['Administrador', 'Gestor', 'Comercial'],
-  fiscal: ['Administrador', 'Gestor', 'Financeiro'],
-  midia: ['Administrador', 'Gestor', 'Engenharia', 'Comercial'],
-  projetos: ['Administrador', 'Gestor', 'Engenharia'],
-  ciclo: ['Administrador', 'Gestor', 'Engenharia'],
+  nucleo: ['Admin', 'Gestor', 'Engenharia'],
+  estoque: ['Admin', 'Gestor', 'Almoxarifado', 'Engenharia', 'Compras'],
+  unidades: ['Admin', 'Gestor', 'Almoxarifado', 'Engenharia', 'Compras'],
+  manufatura: ['Admin', 'Gestor', 'Engenharia', 'PCP'],
+  ferramental: ['Admin', 'Gestor', 'Engenharia', 'PCP', 'Manutenção'],
+  comercial: ['Admin', 'Gestor', 'Comercial'],
+  fiscal: ['Admin', 'Gestor', 'Financeiro'],
+  midia: ['Admin', 'Gestor', 'Engenharia', 'Comercial'],
+  projetos: ['Admin', 'Gestor', 'Engenharia'],
+  ciclo: ['Admin', 'Gestor', 'Engenharia'],
 }
 
 /** A homologação é por papel, não por pessoa. */
 export const APPROVER: Partial<Record<Role, ApprovalRole[]>> = {
-  Administrador: ['fiscal', 'pcp', 'comercial', 'tecnica'],
+  Admin: ['fiscal', 'pcp', 'comercial', 'tecnica'],
   Gestor: ['fiscal', 'pcp', 'comercial', 'tecnica'],
   Financeiro: ['fiscal'],
   Engenharia: ['pcp', 'tecnica'],

@@ -17,7 +17,7 @@ const levelBusy = ref('')
 const draft = ref('')
 const form = reactive({ name: '', level: '', cbo: '', mission: '', requirements: '', salary: '' })
 
-const canPay = computed(() => ui.role === 'Administrador' || ui.role === 'Gestor' || ui.role === 'Financeiro')
+const canPay = computed(() => ui.role === 'Admin' || ui.role === 'Gestor' || ui.role === 'Financeiro')
 const levels = computed(() => store.state.jobLevels.filter(entry => entry.tenantId === ui.activeTenantId).sort((left, right) => left.rank - right.rank || left.name.localeCompare(right.name, 'pt-BR')))
 function levelText(name: string) {
   const index = levels.value.findIndex(entry => entry.name === name)

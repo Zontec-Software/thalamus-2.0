@@ -18,7 +18,7 @@ const ui = useUiStore()
 const router = useRouter()
 const { sources } = useCrmLists()
 const clients = computed(() => store.state.partners.filter(entry => roleIsOpen(entry, 'Cliente')))
-const sellers = computed(() => store.state.users.filter(entry => !entry.platformMaster && (entry.role === 'Comercial' || entry.role === 'Gestor' || entry.role === 'Administrador')))
+const sellers = computed(() => store.state.users.filter(entry => !entry.platformMaster && (entry.role === 'Comercial' || entry.role === 'Gestor' || entry.role === 'Admin')))
 
 const blank = () => ({
   tenantId: CRM_COMPANIES.some(company => company.id === ui.activeTenantId) ? ui.activeTenantId : CRM_COMPANIES[0].id,

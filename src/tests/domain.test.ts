@@ -35,10 +35,10 @@ const stageOf = (state: ErpState, id: string) => orderStage(state, state.salesOr
 const opsOf = (state: ErpState, id: string) => state.productionOrders.filter(op => op.salesOrderId === id)
 
 describe('cenário de demonstração', () => {
-  it('semeia perfis por funcionalidade e mantém Administrador com todo o catálogo', () => {
+  it('semeia perfis por funcionalidade e mantém Admin com todo o catálogo', () => {
     const state = createSeedState()
     const administrator = state.accessProfiles.find(entry => entry.system)!
-    expect(administrator.name).toBe('Administrador')
+    expect(administrator.name).toBe('Admin')
     expect(administrator.functionalityIds).toEqual(FUNCTIONALITIES.map(entry => entry.id))
     expect(profileCan(administrator, 'organizacao.acessos.gerir')).toBe(true)
     const financeiro = state.accessProfiles.find(entry => entry.name === 'Financeiro')!
@@ -90,12 +90,12 @@ describe('cenário de demonstração', () => {
     expect(productLifeTabs(state, abs)).toEqual(['active', 'review'])
   })
 
-  it('abre uma empresa zerada só com o Administrador e o catálogo do código', () => {
+  it('abre uma empresa zerada só com o Admin e o catálogo do código', () => {
     const state = createSeedState()
     const created = provisionCompany(state, { legalName: 'Nova Indústria Ltda.', tradeName: 'Nova', document: '11.111.111/0001-11', city: 'Campinas', adminName: 'Ana Admin', adminEmail: 'ana@nova.example' })
     const profiles = state.accessProfiles.filter(entry => entry.tenantId === created.tenantId)
     expect(profiles).toHaveLength(1)
-    expect(profiles[0]).toMatchObject({ system: true, name: 'Administrador' })
+    expect(profiles[0]).toMatchObject({ system: true, name: 'Admin' })
     expect(profiles[0].functionalityIds).toEqual(FUNCTIONALITIES.map(entry => entry.id))
     expect(state.omieConnections.find(entry => entry.tenantId === created.tenantId)?.status).toBe('Não configurada')
     const groupId = saveEconomicGroup(state, { id: '', name: 'Grupo Norte', description: '', tenantIds: ['tenant-roboflex', created.tenantId] })
@@ -349,13 +349,13 @@ describe('orçamento integrado por categoria e período', () => {
 
   it('administrador opera os dois lados do orçamento', () => {
     const state = createSeedState()
-    expect(state.users.find(entry => entry.name === 'Lucas Lima')?.role).toBe('Administrador')
+    expect(state.users.find(entry => entry.name === 'Lucas Lima')?.role).toBe('Admin')
     const administrator = state.accessProfiles.find(entry => entry.system)!
     expect(administrator.functionalityIds).toContain('modulo.injecao.consultar')
     expect(state.userProfileAssignments.some(entry => entry.userId === 'u16' && entry.profileId === administrator.id)).toBe(true)
-    expect(setBudget(state, TENANT, 'BC-OPER', '2027', 1000, 'Planejamento inicial', 'Lucas Lima', 'Administrador').amount).toBe(1000)
+    expect(setBudget(state, TENANT, 'BC-OPER', '2027', 1000, 'Planejamento inicial', 'Lucas Lima', 'Admin').amount).toBe(1000)
     const exception = state.budgetExceptions.find(entry => entry.kind === 'Saldo excedido' && entry.status === 'Pendente')!
-    decideBudgetException(state, TENANT, exception.id, true, 'Acesso total', 'Lucas Lima', 'Administrador')
+    decideBudgetException(state, TENANT, exception.id, true, 'Acesso total', 'Lucas Lima', 'Admin')
     expect(exception.status).toBe('Autorizada')
     expect(() => setBudget(state, TENANT, 'BC-OPER', '2028', 1000, 'Planejamento inicial', 'Marina Souza', 'Gestor')).toThrow('Somente o Financeiro')
     expect(() => decideBudgetException(state, TENANT, state.budgetExceptions.find(entry => entry.kind === 'Sem categoria' && entry.status === 'Pendente')!.id, false, 'Não', 'Marina Souza', 'Gestor')).toThrow('Somente o Financeiro')
@@ -570,7 +570,7 @@ describe('orçamento integrado por categoria e período', () => {
     const exception = state.budgetExceptions.find(entry => entry.kind === 'Saldo excedido')!
     expect(seesBudgetException(state, exception, 'u14', 'Financeiro')).toBe(true)
     expect(seesBudgetException(state, exception, 'u5', 'Líder de produção')).toBe(false)
-    expect(seesBudgetException(state, exception, 'u16', 'Administrador')).toBe(true)
+    expect(seesBudgetException(state, exception, 'u16', 'Admin')).toBe(true)
     const unlinked = state.budgetExceptions.find(entry => entry.kind === 'Sem vínculo')
     if (unlinked) {
       const category = state.budgetCategories.find(entry => entry.id === unlinked.categoryIds[0])
