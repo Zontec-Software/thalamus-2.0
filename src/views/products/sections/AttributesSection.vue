@@ -45,7 +45,7 @@ function save() {
         <div v-for="def in defs" :key="def.key" class="field">
           <label>{{ def.label }}<span v-if="def.required" class="required-mark" title="Obrigatório para homologar">*</span><small v-if="def.unit" class="cell-sub"> ({{ def.unit }})</small></label>
           <select v-if="def.kind === 'Lista'" v-model="values[def.key]" :disabled="lockedAxis(def.key)" :class="{ missing: def.required && !values[def.key] }">
-            <option value="">—</option>
+            <option value="">Nenhum</option>
             <option v-for="option in def.options" :key="option" :value="option">{{ option }}</option>
           </select>
           <input v-else v-model="values[def.key]" :inputmode="def.kind === 'Número' ? 'decimal' : 'text'" :class="{ missing: def.required && !values[def.key] }" />

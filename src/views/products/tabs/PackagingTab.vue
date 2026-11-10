@@ -45,7 +45,7 @@ const volume = (row: PackagingLevel) => row.lengthCm * row.widthCm * row.heightC
           <div class="field"><label>Unidades base</label><input v-model.number="row.units" type="number" min="1" step="1" :disabled="row.level === 'Unidade'" /></div>
           <div class="field"><label>GTIN do nível</label><input v-model="row.gtin" inputmode="numeric" placeholder="EAN-13 ou DUN-14" /></div>
           <div class="field wide"><label>Material de embalagem</label>
-            <select v-model="row.packageItemId"><option value="">—</option><option v-for="entry in packages" :key="entry.id" :value="entry.id">{{ entry.code }} · {{ entry.name }}</option></select>
+            <select v-model="row.packageItemId"><option value="">Nenhum</option><option v-for="entry in packages" :key="entry.id" :value="entry.id">{{ entry.code }} · {{ entry.name }}</option></select>
           </div>
           <div class="field"><label>Peso bruto (kg)</label><input v-model.number="row.weightKg" type="number" min="0" step="0.01" /></div>
           <div class="field"><label>C × L × A (cm)</label>

@@ -75,7 +75,7 @@ function finishReturn(contract: RentalContract) {
   <article v-if="creating" class="card">
     <div class="section-head"><div><h2>Nova proposta de locação</h2><p>Bem e condições podem ser definidos depois, antes da aprovação.</p></div></div>
     <div class="form-grid">
-      <div class="field"><label>Cliente</label><select v-model="draft.partnerId"><option value="">Escolha</option><option v-for="partner in customers" :key="partner.id" :value="partner.id">{{ partner.name }}</option></select></div>
+      <div class="field"><label>Cliente</label><select v-model="draft.partnerId"><option v-for="partner in customers" :key="partner.id" :value="partner.id">{{ partner.name }}</option></select></div>
       <div class="field"><label>Observação</label><input v-model="draft.note" /></div>
       <div class="field"><label>Início</label><input v-model="draft.startsOn" type="date" /></div>
       <div class="field"><label>Fim previsto</label><input v-model="draft.endsOn" type="date" /></div>
@@ -119,10 +119,10 @@ function finishReturn(contract: RentalContract) {
             <td colspan="7">
               <div class="inline-form">
                 <div class="form-grid">
-                  <div class="field"><label>Bem</label><select v-model="terms.assetId"><option :value="undefined">Escolha</option><option v-for="asset in rentableAssets" :key="asset.id" :value="asset.id">{{ asset.name }} · {{ asset.status ?? 'Operando' }}</option></select></div>
+                  <div class="field"><label>Bem</label><select v-model="terms.assetId"><option v-for="asset in rentableAssets" :key="asset.id" :value="asset.id">{{ asset.name }} · {{ asset.status ?? 'Operando' }}</option></select></div>
                   <div class="field"><label>Valor</label><input v-model.number="terms.amount" type="number" min="0" /></div>
-                  <div class="field"><label>Cobrança</label><select v-model="terms.billing"><option :value="undefined">Escolha</option><option v-for="billing in RENTAL_BILLINGS" :key="billing">{{ billing }}</option></select></div>
-                  <div class="field"><label>Condição de pagamento</label><select v-model="terms.paymentTerms"><option :value="undefined">Escolha</option><option v-for="option in paymentTerms" :key="option">{{ option }}</option></select></div>
+                  <div class="field"><label>Cobrança</label><select v-model="terms.billing"><option v-for="billing in RENTAL_BILLINGS" :key="billing">{{ billing }}</option></select></div>
+                  <div class="field"><label>Condição de pagamento</label><select v-model="terms.paymentTerms"><option v-for="option in paymentTerms" :key="option">{{ option }}</option></select></div>
                 </div>
                 <div class="filter-row"><button class="button" @click="saveTerms(contract)">Salvar condições</button><button class="button secondary" @click="editing = ''">Fechar</button></div>
               </div>

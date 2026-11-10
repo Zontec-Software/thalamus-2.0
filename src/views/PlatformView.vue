@@ -173,13 +173,11 @@ function openCompany(id: string) {
         <div class="field"><label>Nome fantasia</label><input v-model="company.tradeName" class="filter" :disabled="!identified" /></div>
         <div class="field"><label>Estado<span class="required-mark" title="Obrigatório">*</span></label>
           <select v-model="company.state" class="filter" :disabled="!identified" required @change="onState">
-            <option value="">Selecione</option>
             <option v-for="state in states" :key="state.uf" :value="state.uf">{{ state.name }}</option>
           </select>
         </div>
         <div class="field"><label>Cidade<span class="required-mark" title="Obrigatório">*</span></label>
           <select v-model="company.city" class="filter" :disabled="!identified || !company.state" required>
-            <option value="">Selecione</option>
             <option v-for="city in cities" :key="city" :value="city">{{ city }}</option>
           </select>
         </div>

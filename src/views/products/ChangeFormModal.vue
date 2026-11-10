@@ -56,7 +56,7 @@ function submit() {
           <span v-if="!form.itemIds.length" class="cell-sub">Nenhum produto ainda.</span>
         </div>
         <div class="filter-row">
-          <select v-model="pick.itemId" class="filter grow"><option value="">Incluir produto…</option><option v-for="item in candidates" :key="item.id" :value="item.id">{{ item.code }} · {{ item.name }}</option></select>
+          <select v-model="pick.itemId" class="filter grow"><option v-for="item in candidates" :key="item.id" :value="item.id">{{ item.code }} · {{ item.name }}</option></select>
           <button class="button secondary small" type="button" :disabled="!pick.itemId" @click="addItem">Incluir</button>
         </div>
       </div>

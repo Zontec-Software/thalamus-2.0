@@ -602,10 +602,10 @@ function inactivate(reason: string) {
         <div class="field"><label>Finalidade</label><select v-model="form.purpose" :disabled="consulting"><option v-for="purpose in ADDRESS_PURPOSES" :key="purpose">{{ purpose }}</option></select></div>
         <template v-if="form.origin === 'Brasil'">
           <div class="field"><label>Estado</label>
-            <select v-model="form.state" :disabled="consulting" @change="onFormState"><option value="">Selecione</option><option v-for="state in BRAZIL_STATES" :key="state.uf" :value="state.uf">{{ state.name }}</option></select>
+            <select v-model="form.state" :disabled="consulting" @change="onFormState"><option v-for="state in BRAZIL_STATES" :key="state.uf" :value="state.uf">{{ state.name }}</option></select>
           </div>
           <div class="field"><label>Cidade</label>
-            <select v-model="form.city" :disabled="consulting || !form.state"><option value="">Selecione</option><option v-for="city in formCities" :key="city">{{ city }}</option></select>
+            <select v-model="form.city" :disabled="consulting || !form.state"><option v-for="city in formCities" :key="city">{{ city }}</option></select>
           </div>
         </template>
         <template v-else>
@@ -639,10 +639,10 @@ function inactivate(reason: string) {
       <div class="field"><label>Finalidade</label><select v-model="address.purpose"><option v-for="purpose in ADDRESS_PURPOSES" :key="purpose">{{ purpose }}</option></select></div>
       <template v-if="!partner?.country || partner.country === 'Brasil'">
         <div class="field"><label>Estado</label>
-          <select v-model="address.state" @change="onAddressState"><option value="">Selecione</option><option v-for="state in BRAZIL_STATES" :key="state.uf" :value="state.uf">{{ state.name }}</option></select>
+          <select v-model="address.state" @change="onAddressState"><option v-for="state in BRAZIL_STATES" :key="state.uf" :value="state.uf">{{ state.name }}</option></select>
         </div>
         <div class="field wide"><label>Cidade</label>
-          <select v-model="address.city" :disabled="!address.state"><option value="">Selecione</option><option v-for="city in addressCities" :key="city">{{ city }}</option></select>
+          <select v-model="address.city" :disabled="!address.state"><option v-for="city in addressCities" :key="city">{{ city }}</option></select>
         </div>
       </template>
       <template v-else>

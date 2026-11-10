@@ -31,8 +31,8 @@ function submit() {
     <form id="key-change" @submit.prevent="submit">
       <div class="field"><label>Valor atual</label><input :value="current()" disabled /></div>
       <div class="field"><label>Novo valor</label>
-        <select v-if="field === 'ncm'" v-model="form.to" required><option value="" disabled>Escolha na tabela oficial</option><option v-for="entry in NCM_TABLE" :key="entry.code" :value="entry.code">{{ entry.code }} · {{ entry.name }}</option></select>
-        <select v-else-if="field === 'class'" v-model="form.to" required><option value="" disabled>Escolha a classificação</option><option v-for="entry in classOptions(store.state)" :key="entry.id" :value="entry.id">{{ entry.label }}</option></select>
+        <select v-if="field === 'ncm'" v-model="form.to" required><option v-for="entry in NCM_TABLE" :key="entry.code" :value="entry.code">{{ entry.code }} · {{ entry.name }}</option></select>
+        <select v-else-if="field === 'class'" v-model="form.to" required><option v-for="entry in classOptions(store.state)" :key="entry.id" :value="entry.id">{{ entry.label }}</option></select>
         <input v-else v-model="form.to" required />
       </div>
       <div class="form-grid">

@@ -55,8 +55,8 @@ function link() {
   <h3 class="drawer-title">Vincular a projeto</h3>
   <form class="filter-row" @submit.prevent="link">
     <fieldset class="layer filter-row" :disabled="disabled">
-      <select v-model="form.projectId" class="filter" required @change="form.milestoneId = ''"><option value="" disabled>Projeto…</option><option v-for="project in open" :key="project.id" :value="project.id">{{ project.id }} · {{ project.name }}</option></select>
-      <select v-model="form.milestoneId" class="filter" :disabled="!form.projectId"><option value="">Atividade da EAP…</option><option v-for="milestone in milestones" :key="milestone.id" :value="milestone.id">{{ milestone.title }}</option></select>
+      <select v-model="form.projectId" class="filter" required @change="form.milestoneId = ''"><option v-for="project in open" :key="project.id" :value="project.id">{{ project.id }} · {{ project.name }}</option></select>
+      <select v-model="form.milestoneId" class="filter" :disabled="!form.projectId"><option v-for="milestone in milestones" :key="milestone.id" :value="milestone.id">{{ milestone.title }}</option></select>
       <input v-model="form.note" class="filter grow" placeholder="Por que o produto está no projeto" />
       <button class="button small" type="submit">Vincular</button>
     </fieldset>

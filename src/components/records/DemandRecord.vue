@@ -114,7 +114,7 @@ function openOrigin() {
         <div class="field"><label>Prioridade</label><select v-model="form.priority"><option>Baixa</option><option>Normal</option><option>Alta</option><option>Urgente</option></select></div>
         <div class="field"><label>Responsável</label><select v-model="form.assigneeRole"><option>Compras</option><option>Almoxarifado</option><option>Manutenção</option></select><small>{{ form.assigneeRole === 'Almoxarifado' ? 'Há saldo livre: o almoxarifado entrega' : 'Sem saldo: segue para compras' }}</small></div>
         <div class="field"><label>Origem</label><select v-model="form.origin" @change="form.originId = ''"><option>Manual</option><option>Projeto</option><option>Assistência</option><option>Manutenção</option><option>OP</option><option>Estoque mínimo</option></select></div>
-        <div v-if="origins.length" class="field"><label>Vínculo</label><select v-model="form.originId"><option value="">Selecione…</option><option v-for="entry in origins" :key="entry.id" :value="entry.id">{{ entry.label }}</option></select></div>
+        <div v-if="origins.length" class="field"><label>Vínculo</label><select v-model="form.originId"><option v-for="entry in origins" :key="entry.id" :value="entry.id">{{ entry.label }}</option></select></div>
       </div>
       <div class="field"><label>Observações</label><textarea v-model="form.notes" rows="2"></textarea></div>
       <div class="drawer-actions">

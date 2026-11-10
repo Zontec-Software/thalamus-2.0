@@ -172,7 +172,6 @@ function addLine() {
             <tr v-if="isDraft && !disabled" class="add-row">
               <td colspan="2">
                 <select v-model="line.componentId" class="filter" style="width:100%">
-                  <option value="" disabled>Incluir componente ativo…</option>
                   <option v-for="entry in candidates" :key="entry.id" :value="entry.id">{{ entry.code }} · {{ entry.name }}</option>
                 </select>
               </td>

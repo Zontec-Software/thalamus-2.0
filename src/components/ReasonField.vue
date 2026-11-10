@@ -16,7 +16,6 @@ watch([choice, detail], ([option, text]) => {
 
 <template>
   <select v-model="choice" class="filter" :class="{ grow: choice !== 'Outro' }">
-    <option value="" disabled>Motivo da alteração</option>
     <option v-for="reason in BUDGET_REASONS" :key="reason">{{ reason }}</option>
   </select>
   <input v-if="choice === 'Outro'" v-model="detail" class="filter grow" placeholder="Descreva o motivo" />

@@ -102,9 +102,9 @@ const monthly = (asset: Asset) => asset.acquisitionValue && asset.usefulLifeYear
       </div>
       <div v-if="requesting" class="inline-form">
         <div class="form-grid">
-          <div class="field"><label>Bem</label><select v-model="movement.assetId"><option value="">Escolha</option><option v-for="asset in assets" :key="asset.id" :value="asset.id">{{ asset.patrimonyCode ?? asset.id }} · {{ asset.name }} ({{ facilityName(asset.facilityId) }})</option></select></div>
+          <div class="field"><label>Bem</label><select v-model="movement.assetId"><option v-for="asset in assets" :key="asset.id" :value="asset.id">{{ asset.patrimonyCode ?? asset.id }} · {{ asset.name }} ({{ facilityName(asset.facilityId) }})</option></select></div>
           <div class="field"><label>Motivo</label><select v-model="movement.reason"><option v-for="reason in MOVEMENT_REASONS" :key="reason">{{ reason }}</option></select></div>
-          <div v-if="needsTarget" class="field"><label>Destino</label><select v-model="movement.toFacilityId"><option value="">Escolha</option><option v-for="facility in facilities.filter(entry => entry.status === 'Ativo')" :key="facility.id" :value="facility.id">{{ facility.code }} · {{ facility.name }}</option></select></div>
+          <div v-if="needsTarget" class="field"><label>Destino</label><select v-model="movement.toFacilityId"><option v-for="facility in facilities.filter(entry => entry.status === 'Ativo')" :key="facility.id" :value="facility.id">{{ facility.code }} · {{ facility.name }}</option></select></div>
           <div class="field"><label>Observação</label><input v-model="movement.note" :placeholder="movement.reason === 'Baixa' || movement.reason === 'Outro' ? 'Obrigatória' : ''" /></div>
         </div>
         <div class="filter-row"><button class="button" @click="request">Solicitar</button><button class="button secondary" @click="requesting = false">Cancelar</button></div>
@@ -137,7 +137,7 @@ const monthly = (asset: Asset) => asset.acquisitionValue && asset.usefulLifeYear
     <p class="hint">Contagem por instalação. Sem divergência, concilia; com divergência, fica pendente até cada bem ter tratamento.</p>
     <article v-if="canManage" class="card">
       <div class="filter-row">
-        <select v-model="inventoryFacility" class="filter"><option value="">Escolha a instalação</option><option v-for="facility in facilities" :key="facility.id" :value="facility.id">{{ facility.code }} · {{ facility.name }}</option></select>
+        <select v-model="inventoryFacility" class="filter"><option v-for="facility in facilities" :key="facility.id" :value="facility.id">{{ facility.code }} · {{ facility.name }}</option></select>
         <button class="button" :disabled="!inventoryFacility" @click="store.openInventory(inventoryFacility)"><Plus :size="15" /> Abrir inventário</button>
       </div>
     </article>
@@ -158,7 +158,6 @@ const monthly = (asset: Asset) => asset.acquisitionValue && asset.usefulLifeYear
             <td>
               <div v-if="inventory.status === 'Em contagem' && canManage" class="filter-row">
                 <select class="filter" :value="line.found === false ? 'nao' : line.condition ?? ''" @change="(event) => { const value = (event.target as HTMLSelectElement).value; if (value === 'nao') count(inventory, line.assetId, false); else if (value) count(inventory, line.assetId, true, value as AssetCondition) }">
-                  <option value="">Contar</option>
                   <option v-for="condition in ASSET_CONDITIONS" :key="condition" :value="condition">Encontrado · {{ condition }}</option>
                   <option value="nao">Não encontrado</option>
                 </select>

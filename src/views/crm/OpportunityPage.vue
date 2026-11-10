@@ -291,7 +291,7 @@ function newProposal() {
               <button type="button" class="button secondary small" :disabled="hearing === 'action'" @click="hear('action')"><Mic :size="13" /> {{ hearing === 'action' ? 'Ouvindo…' : 'Gravar áudio' }}</button>
               <span class="cell-sub">Nesta demonstração a gravação vira um texto pronto. O Google Agenda não é chamado.</span>
             </div>
-            <div v-if="action.kind === 'Tarefa'" class="field"><label>Setor</label><select v-model="action.sector"><option value="">Escolher setor</option><option v-for="sector in sectors" :key="sector.id" :value="sector.name">{{ sector.name }}</option></select><small>A tarefa liga esta oportunidade a outro setor.</small></div>
+            <div v-if="action.kind === 'Tarefa'" class="field"><label>Setor</label><select v-model="action.sector"><option v-for="sector in sectors" :key="sector.id" :value="sector.name">{{ sector.name }}</option></select><small>A tarefa liga esta oportunidade a outro setor.</small></div>
             <div v-if="action.kind === 'Demanda'" class="form-grid">
               <div class="field"><label>Material, se houver</label><select v-model="action.itemId"><option value="">Só o custo informado</option><option v-for="item in materials" :key="item.id" :value="item.id">{{ item.code }} · {{ item.name }}</option></select></div>
               <div class="field"><label>Quantidade</label><input v-model.number="action.quantity" type="number" min="1" /></div>

@@ -133,7 +133,7 @@ function openOrder(id: string) {
       </div>
       <div v-if="proposal.status === 'Em aprovação' && !canApproveDiscount" class="notice warning">Desconto de {{ proposal.discount }}% acima do limite de {{ DISCOUNT_APPROVAL_LIMIT }}%. Aguardando aprovação de outra pessoa{{ proposal.approvalRequestedBy ? `; pedido por ${proposal.approvalRequestedBy}` : '' }}.</div>
       <div v-if="rejecting" class="inline-form row">
-        <select v-if="proposal.status === 'Enviada'" v-model="rejection" class="filter"><option value="">Motivo</option><option v-for="reason in refusalReasons" :key="reason">{{ reason }}</option></select>
+        <select v-if="proposal.status === 'Enviada'" v-model="rejection" class="filter"><option v-for="reason in refusalReasons" :key="reason">{{ reason }}</option></select>
         <input v-if="proposal.status === 'Enviada'" v-model="rejectionDetail" class="filter grow" placeholder="Detalhe (opcional)" />
         <input v-else v-model="rejection" class="filter grow" placeholder="Por que o desconto não foi aprovado" />
         <button class="button danger small" :disabled="!rejection.trim()" @click="reject">{{ proposal.status === 'Enviada' ? 'Registrar recusa' : 'Devolver' }}</button>
@@ -176,7 +176,6 @@ function openOrder(id: string) {
       <div v-if="draft" class="inline-form row">
         <select v-model="newLine.kind" class="filter" @change="newLine.id = ''"><option value="item">Produto</option><option value="service">Serviço</option></select>
         <select v-model="newLine.id" class="filter grow">
-          <option value="">Escolha…</option>
           <template v-if="newLine.kind === 'item'"><option v-for="item in products" :key="item.id" :value="item.id">{{ store.itemLabel(item.id) }}</option></template>
           <template v-else><option v-for="service in services" :key="service.id" :value="service.id">{{ service.name }} · {{ fmtCurrency(service.price) }}</option></template>
         </select>

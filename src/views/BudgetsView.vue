@@ -667,7 +667,7 @@ watch([year, screen], () => { splitCategoryId.value = '' })
           <td><span class="status" :class="entry.status === 'Pendente' ? 'warning' : entry.status === 'Autorizada' || entry.status === 'Resolvida' ? 'success' : 'danger'">{{ entry.status }}</span></td>
           <td>
             <div v-if="entry.status === 'Pendente' && canResolve(entry.kind)" class="row-actions">
-              <select v-if="entry.kind === 'Sem vínculo'" v-model="decisionLink[entry.id]" class="filter"><option value="" disabled>Documento do Thalamus</option><option v-for="item in documents" :key="item.module + item.id" :value="`${item.module}|${item.id}`">{{ item.label }}</option></select>
+              <select v-if="entry.kind === 'Sem vínculo'" v-model="decisionLink[entry.id]" class="filter"><option v-for="item in documents" :key="item.module + item.id" :value="`${item.module}|${item.id}`">{{ item.label }}</option></select>
               <select v-else-if="entry.kind !== 'Saldo excedido'" v-model="decisionCategory[entry.id]" class="filter"><option :value="undefined" disabled>Categoria correta</option><option v-for="item in usableCategories" :key="item.id" :value="item.id">{{ item.code }} · {{ item.name }}</option></select>
               <input v-if="entry.kind !== 'Sem vínculo'" v-model="decisionNotes[entry.id]" class="filter" placeholder="Justificativa" />
               <button class="button small" @click="entry.kind === 'Sem vínculo' ? linkInvoice(entry.id) : store.decideBudgetException(entry.id, true, decisionNotes[entry.id] || '', decisionCategory[entry.id])">{{ entry.kind === 'Saldo excedido' ? 'Liberar' : entry.kind === 'Sem vínculo' ? 'Vincular' : 'Reclassificar e lançar' }}</button>
@@ -703,7 +703,7 @@ watch([year, screen], () => { splitCategoryId.value = '' })
             </td>
             <td>
               <select v-if="canManage && splittable(row.category)" class="filter" :value="row.category.responsibleUserId ?? ''" @change="assignCategory(row.category, ($event.target as HTMLSelectElement).value, row.category.executorSectorId ?? '')">
-                <option value="">Pessoa</option>
+                <option value="">Nenhuma pessoa</option>
                 <option v-for="user in companyUsers" :key="user.id" :value="user.id">{{ user.name }}</option>
               </select>
               <span v-else class="cell-sub">{{ row.category.responsibleUserId ? userName(row.category.responsibleUserId) : '—' }}</span>
@@ -717,7 +717,7 @@ watch([year, screen], () => { splitCategoryId.value = '' })
             </td>
             <td>
               <select v-if="canManage && splittable(row.category)" class="filter" :value="row.category.executorSectorId ?? ''" @change="assignCategory(row.category, row.category.responsibleUserId ?? '', ($event.target as HTMLSelectElement).value)">
-                <option value="">Setor</option>
+                <option value="">Nenhum setor</option>
                 <option v-for="sector in store.state.sectors" :key="sector.id" :value="sector.id">{{ sector.name }}</option>
               </select>
               <span v-else class="cell-sub">{{ row.category.executorSectorId ? sectorName(row.category.executorSectorId) : '—' }}</span>
@@ -950,7 +950,7 @@ watch([year, screen], () => { splitCategoryId.value = '' })
           <tr v-if="canManage && freeSectors.length">
             <td>
               <select v-model="addSectorId" class="filter">
-                <option value="">Setor</option>
+                <option value="">Nenhum setor</option>
                 <option v-for="sector in freeSectors" :key="sector.id" :value="sector.id">{{ sector.name }}</option>
               </select>
             </td>

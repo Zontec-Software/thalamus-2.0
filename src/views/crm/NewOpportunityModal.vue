@@ -123,7 +123,7 @@ function create() {
       <div class="field"><label>Vendedor</label><select v-model="form.ownerId"><option v-for="seller in sellers" :key="seller.id" :value="seller.id">{{ seller.name }}</option></select><small>Começa com quem está logado.</small></div>
       <div class="field">
         <label>Cliente</label>
-        <select v-model="form.partnerId"><option value="">Escolher…</option><option v-for="client in clients" :key="client.id" :value="client.id">{{ client.name }}</option></select>
+        <select v-model="form.partnerId"><option v-for="client in clients" :key="client.id" :value="client.id">{{ client.name }}</option></select>
         <small><button type="button" class="link" @click="registering = !registering">{{ registering ? 'Cancelar cadastro' : 'Cadastrar cliente' }}</button></small>
       </div>
       <div class="field"><label>Origem</label><select v-model="form.source"><option v-for="source in sources" :key="source">{{ source }}</option></select></div>

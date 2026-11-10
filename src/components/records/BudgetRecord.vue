@@ -122,7 +122,7 @@ function sectorsOf(categoryId: string) {
       <h3 class="drawer-title">Lançamentos</h3>
       <div v-for="entry in entries" :key="entry.id" class="list-row static">
         <div><strong>{{ entry.kind === 'Realizado pago' ? (entry.invoiceNumber ? `NF ${entry.invoiceNumber}` : 'Nota do Omie') : entry.sourceId }} · {{ entry.description }}</strong><span>{{ entry.kind }} · {{ entry.sourceModule }} · {{ entry.status }}<template v-if="entry.kind === 'Realizado pago'"> · {{ invoiceOrigin(entry) }}</template><template v-if="entry.categoryId !== category.id"> · {{ categoryName(entry.categoryId) }}</template><template v-if="entry.projectId"> · projeto {{ entry.projectId }}</template></span>
-          <div v-if="pendingLink(entry) && canManage" class="row-actions"><select v-model="links[entry.id]" class="filter"><option value="" disabled>Documento do Thalamus</option><option v-for="item in documents" :key="item.module + item.id" :value="`${item.module}|${item.id}`">{{ item.label }}</option></select><button class="button small" @click="saveLink(entry)">Vincular</button></div>
+          <div v-if="pendingLink(entry) && canManage" class="row-actions"><select v-model="links[entry.id]" class="filter"><option v-for="item in documents" :key="item.module + item.id" :value="`${item.module}|${item.id}`">{{ item.label }}</option></select><button class="button small" @click="saveLink(entry)">Vincular</button></div>
         </div><b>{{ fmtCurrency(entry.status === 'Retido' ? entry.heldAmount ?? 0 : entry.kind === 'Previsão' ? entry.openAmount : entry.amount) }}</b>
       </div>
       <p v-if="!entries.length" class="empty-note">Nenhuma previsão ou pagamento neste período.</p>

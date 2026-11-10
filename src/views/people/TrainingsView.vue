@@ -59,7 +59,7 @@ function complete(training: Training) {
   <article v-if="creating" class="card">
     <div class="section-head"><div><h2>Registrar treinamento</h2><p>Sem data de realização, fica pendente.</p></div></div>
     <div class="form-grid">
-      <div class="field"><label>Pessoa</label><select v-model="form.personId"><option value="">Escolha</option><option v-for="person in persons" :key="person.id" :value="person.id">{{ person.fullName }}</option></select></div>
+      <div class="field"><label>Pessoa</label><select v-model="form.personId"><option v-for="person in persons" :key="person.id" :value="person.id">{{ person.fullName }}</option></select></div>
       <div class="field"><label>Treinamento</label><input v-model="form.name" placeholder="NR-12, operação da injetora…" /></div>
       <div class="field"><label>Tipo</label><select v-model="form.kind"><option v-for="kind in TRAINING_KINDS" :key="kind">{{ kind }}</option></select></div>
       <div class="field"><label>Certificado</label><input v-model="form.evidence" placeholder="Nome do arquivo" /><small>O arquivo real vai para o armazenamento do sistema oficial.</small></div>

@@ -236,7 +236,7 @@ function create() {
       <button class="button secondary small" @click="bulk('approve')">Aprovar no meu papel</button>
       <button class="button secondary small" @click="askReason = 'block'">Bloquear</button>
       <button class="button secondary small" @click="askReason = 'obsolete'">Obsoletar</button>
-      <select v-model="reclassTo" class="filter"><option value="">Reclassificar em…</option><option v-for="entry in classes" :key="entry.id" :value="entry.id">{{ entry.label }}</option></select>
+      <select v-model="reclassTo" class="filter"><option v-for="entry in classes" :key="entry.id" :value="entry.id">{{ entry.label }}</option></select>
       <button class="button secondary small" :disabled="!reclassTo" @click="bulk('reclassify')">Aplicar</button>
       <button class="button ghost small" style="color:#C5D4E8" @click="picked = []">Limpar seleção</button>
     </div>
@@ -306,7 +306,7 @@ function create() {
         <div class="field"><label>Unidade base</label><input v-model="draft.unit" required /></div>
       </div>
       <div class="field"><label>Classificação</label>
-        <select v-model="draft.classId" required><option value="" disabled>Escolha um nó</option><option v-for="entry in classes" :key="entry.id" :value="entry.id">{{ entry.label }}</option></select>
+        <select v-model="draft.classId" required><option v-for="entry in classes" :key="entry.id" :value="entry.id">{{ entry.label }}</option></select>
         <small>O código sai sequencial e sem significado. A classificação é que organiza.</small>
       </div>
       <div v-if="similar.length" class="notice warning">

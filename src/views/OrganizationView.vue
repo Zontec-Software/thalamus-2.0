@@ -167,7 +167,6 @@ function createProfile() {
             </span>
             <span v-if="!profiles.some(entry => assigned(user.id, entry.id))" class="cell-sub">Sem perfil</span>
             <select v-if="canEditHere && profiles.some(entry => !assigned(user.id, entry.id))" class="filter chip-add" value="" :aria-label="`Adicionar perfil a ${user.name}`" @change="store.assignProfile(user.id, ($event.target as HTMLSelectElement).value, true); ($event.target as HTMLSelectElement).value = ''">
-              <option value="" disabled>+ Perfil</option>
               <option v-for="profile in profiles.filter(entry => !assigned(user.id, entry.id))" :key="profile.id" :value="profile.id">{{ profile.name }}</option>
             </select>
           </div>
@@ -180,7 +179,6 @@ function createProfile() {
         <option v-for="user in outsiders" :key="user.id" :value="user.id">{{ user.name }} · {{ originName(user.id) }}</option>
       </select>
       <select v-model="grant.profileId" class="filter" aria-label="Perfil a conceder">
-        <option value="">Perfil</option>
         <option v-for="profile in profiles" :key="profile.id" :value="profile.id">{{ profile.name }}</option>
       </select>
       <button class="button small" :disabled="!grant.userId || !grant.profileId" @click="grantAccess">Conceder acesso sem vínculo</button>

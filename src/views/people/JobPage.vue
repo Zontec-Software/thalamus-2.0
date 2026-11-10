@@ -128,8 +128,8 @@ watch(() => route.path, path => {
     <div class="form-grid">
       <div class="field"><label>Título do anúncio</label><input v-model="form.title" /><small>Na efetivação, a pessoa ocupa uma posição do organograma. O cargo é o dessa posição.</small></div>
       <div class="field"><label>Setor</label><select v-model="form.sectorId"><option value="">Quando houver</option><option v-for="entry in store.state.sectors" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
-      <div class="field"><label>Gestor requisitante</label><select v-model="form.requesterId"><option v-for="entry in people" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
-      <div class="field"><label>Responsável</label><select v-model="form.ownerId"><option v-for="entry in people" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+      <div class="field"><label>Gestor requisitante</label><select v-model="form.requesterId"><option value="">Nenhum</option><option v-for="entry in people" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
+      <div class="field"><label>Responsável</label><select v-model="form.ownerId"><option value="">Nenhum</option><option v-for="entry in people" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
       <div class="field"><label>Abertura</label><input v-model="form.openedOn" type="date" /></div>
       <div class="field"><label>Data alvo</label><input v-model="form.targetOn" type="date" /></div>
       <div class="field"><label>Descrição ou justificativa</label><textarea v-model="form.description" rows="2"></textarea></div>

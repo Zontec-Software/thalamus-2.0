@@ -131,7 +131,7 @@ function registerReview() {
       </ol>
       <p v-if="!assignments.length" class="empty-note">Sem vigência registrada. O setor atual continua no cadastro.</p>
       <div class="form-grid">
-        <div class="field"><label>Novo setor</label><select v-model="assignmentForm.sector"><option value="">—</option><option v-for="entry in store.state.sectors" :key="entry.id">{{ entry.name }}</option></select></div>
+        <div class="field"><label>Novo setor</label><select v-model="assignmentForm.sector"><option value="">Nenhum</option><option v-for="entry in store.state.sectors" :key="entry.id">{{ entry.name }}</option></select></div>
         <div class="field"><label>Novo cargo</label><select v-model="assignmentForm.positionId"><option value="">Sem cargo</option><option v-for="entry in positionsOf(assignmentForm.sector)" :key="entry.id" :value="entry.id">{{ entry.name }}</option></select></div>
         <div class="field"><label>Vigência a partir de</label><input v-model="assignmentForm.validFrom" type="date" /></div>
       </div>
