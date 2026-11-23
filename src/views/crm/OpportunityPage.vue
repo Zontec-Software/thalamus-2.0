@@ -1,23 +1,25 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { CalendarPlus, ChevronRight, FilePlus2, Mic, ThumbsDown } from 'lucide-vue-next'
+import { Bot, CalendarPlus, ChevronRight, FilePlus2, Mic, Rocket, ThumbsDown } from 'lucide-vue-next'
 import BaseModal from '../../components/BaseModal.vue'
 import CrumbBack from '../../components/CrumbBack.vue'
 import RecordTimeline from '../../components/records/RecordTimeline.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import { SIMULATED_BRIEFS } from '../../domain/crmBrief'
 import { addDays, today } from '../../domain/engine'
-import { CRM_STAGES, opportunityIsOpen, proposalTotal } from '../../domain/enterprise'
+import { FUNNEL_LABEL, PRODUCT_STAGES, SOLUTION_STAGES, funnelOf, opportunityIsOpen, proposalTotal, stageBlockers } from '../../domain/enterprise'
 import { roleIsOpen } from '../../domain/partners'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import type { CrmActivity, Opportunity } from '../../types/domain'
 import { fmtCurrency, fmtDate, fmtDateTime } from '../../utils/format'
+import ActivityEvidenceModal from './ActivityEvidenceModal.vue'
+import McpRecordModal from './McpRecordModal.vue'
 import { CRM_VERTICALS, DEAL_TYPES, LOSS_REASONS, attentionOf, useCrmLists, useCrmScope } from './shared'
 
 type Tab = 'dados' | 'historico'
-type ActionKind = 'Tarefa' | 'Reunião' | 'E-mail' | 'Ligação' | 'Demanda' | 'PAP' | 'Produto'
+type ActionKind = 'Tarefa' | 'Reunião' | 'Visita' | 'E-mail' | 'Ligação' | 'Demanda' | 'PAP' | 'Produto'
 
 const store = useErpStore()
 const ui = useUiStore()
@@ -27,6 +29,8 @@ const { sellers, tenantName } = useCrmScope()
 
 const opportunity = computed(() => store.state.opportunities.find(entry => entry.id === route.params.id))
 const closed = computed(() => !!opportunity.value && !opportunityIsOpen(opportunity.value))
+const solutions = computed(() => !!opportunity.value && funnelOf(opportunity.value) === 'Soluções')
+const stages = computed(() => solutions.value ? SOLUTION_STAGES : PRODUCT_STAGES)
 const partner = computed(() => store.state.partners.find(entry => entry.id === opportunity.value?.partnerId))
 const clients = computed(() => store.state.partners.filter(entry => roleIsOpen(entry, 'Cliente') || entry.id === opportunity.value?.partnerId))
 const materials = computed(() => store.state.items.filter(entry => entry.type === '01' || entry.type === '02' || entry.type === '07'))
@@ -158,6 +162,32 @@ function guestLine(entry: CrmActivity) {
   return entry.calendar.guests.map(guest => `${guest.name}${guest.email ? ` · ${guest.email}` : ''}`).join(', ')
 }
 
+const discoveryForm = reactive({ pain: '', decider: '', fit: 'A avaliar' as NonNullable<NonNullable<Opportunity['discovery']>['fit']>, scope: '', baseline: '', success: '', risks: '', pilot: '', review: '' })
+const resetDiscovery = () => Object.assign(discoveryForm, { pain: '', decider: '', fit: 'A avaliar', scope: '', baseline: '', success: '', risks: '', pilot: '', review: '', ...(opportunity.value?.discovery ?? {}) })
+watch(() => opportunity.value?.id, resetDiscovery, { immediate: true })
+const discoveryDirty = computed(() => JSON.stringify(discoveryForm) !== JSON.stringify({ pain: '', decider: '', fit: 'A avaliar', scope: '', baseline: '', success: '', risks: '', pilot: '', review: '', ...(opportunity.value?.discovery ?? {}) }))
+const nextBlockers = computed(() => {
+  const entry = opportunity.value
+  if (!entry || !solutions.value || closed.value) return []
+  const next = SOLUTION_STAGES[SOLUTION_STAGES.indexOf(entry.stage) + 1]
+  return next ? stageBlockers({ ...entry, discovery: { ...discoveryForm } }, next) : []
+})
+function saveDiscovery() {
+  if (opportunity.value && store.saveDiscovery(opportunity.value.id, { ...discoveryForm }, undefined)) resetDiscovery()
+}
+const implementation = reactive({ open: false, responsibleId: '', milestone: '' })
+function startImplementation() {
+  if (opportunity.value && store.startImplementation(opportunity.value.id, { responsibleId: implementation.responsibleId, milestone: implementation.milestone })) implementation.open = false
+}
+const evidence = reactive({ activityId: '' })
+const mcpOpen = ref(false)
+function toggle(entry: CrmActivity) {
+  if (!opportunity.value) return
+  if (entry.done) store.toggleActivity(opportunity.value.id, entry.id)
+  else evidence.activityId = entry.id
+}
+const attachmentNames = (entry: CrmActivity) => (entry.attachments ?? []).map(file => file.name).join(', ')
+
 function newProposal() {
   if (!opportunity.value) return
   const created = store.createProposal(opportunity.value.id)
@@ -181,9 +211,9 @@ function newProposal() {
       <div class="item-head">
         <div class="item-photo placeholder">{{ initials }}</div>
         <div class="item-head-main">
-          <span class="eyebrow">{{ opportunity.id }} · {{ opportunity.dealType ?? 'Venda' }} · {{ partner?.vertical ?? 'Sem vertical' }} · {{ opportunity.source }}</span>
+          <span class="eyebrow">{{ opportunity.id }} · {{ FUNNEL_LABEL[funnelOf(opportunity)] }} · {{ opportunity.dealType ?? 'Venda' }} · {{ partner?.vertical ?? 'Sem vertical' }} · {{ opportunity.source }}</span>
           <h2>{{ store.partnerName(opportunity.partnerId) }}</h2>
-          <p class="cell-sub">{{ opportunity.title }}</p>
+          <p class="cell-sub">{{ opportunity.title }}<template v-if="opportunity.solutionIds?.length"> · {{ opportunity.solutionIds.join(' + ') }}</template></p>
           <div class="meta">
             <RouterLink :to="`/parceiros/${opportunity.partnerId}`">{{ store.partnerName(opportunity.partnerId) }}</RouterLink>
             <span>{{ partner?.document }}</span>
@@ -195,6 +225,7 @@ function newProposal() {
         </div>
         <div class="actions" data-tour="opp-actions">
           <StatusBadge :value="opportunity.stage" />
+          <button v-if="solutions && opportunity.stage === 'Conquistado'" class="button small" @click="implementation.open = true"><Rocket :size="13" /> Iniciar implantação</button>
           <template v-if="!closed">
             <button class="button small" @click="newProposal"><FilePlus2 :size="13" /> Criar proposta</button>
             <button class="button secondary small" @click="losing = true"><ThumbsDown :size="13" /> Marcar como perdida</button>
@@ -204,7 +235,7 @@ function newProposal() {
 
       <div v-if="opportunity.stage === 'Perdido'" class="notice danger">Perdida: {{ opportunity.lossReason }}</div>
       <div v-else class="stage-stepper" data-tour="opp-stages">
-        <button v-for="(stage, index) in CRM_STAGES" :key="stage" class="stage-step as-button" :class="{ done: index < CRM_STAGES.indexOf(opportunity.stage), current: stage === opportunity.stage }" :disabled="closed || stage === 'Ganho'" :title="stage === 'Ganho' ? 'Conquistada ao aceitar a proposta' : `Mover para ${stage}`" @click="move(stage)">
+        <button v-for="(stage, index) in stages" :key="stage" class="stage-step as-button" :class="{ done: index < stages.indexOf(opportunity.stage), current: stage === opportunity.stage }" :disabled="closed || stage === 'Ganho' || stage === 'Conquistado' || stage === 'Implantação'" :title="stage === 'Ganho' || stage === 'Conquistado' ? 'Conquistada ao aceitar a proposta' : stage === 'Implantação' ? 'Começa pelo botão Iniciar implantação' : `Mover para ${stage}`" @click="move(stage)">
           <i></i><span>{{ stage }}</span>
         </button>
       </div>
@@ -244,7 +275,7 @@ function newProposal() {
             <div class="field"><label>Telefone</label><input :value="form.phone || '—'" disabled /></div>
             <div class="field"><label>E-mail</label><input :value="form.email || '—'" disabled /></div>
             <div class="field"><label>Vendedor</label><select v-model="form.ownerId" :disabled="closed"><option v-for="seller in sellers" :key="seller.id" :value="seller.id">{{ seller.name }}</option></select></div>
-            <div class="field"><label>Tipo</label><select v-model="form.dealType" :disabled="closed"><option v-for="type in DEAL_TYPES" :key="type">{{ type }}</option></select></div>
+            <div class="field"><label>Tipo</label><select v-model="form.dealType" :disabled="closed || solutions"><option v-for="type in DEAL_TYPES" :key="type">{{ type }}</option></select></div>
             <div class="field"><label>Origem</label><select v-model="form.source" :disabled="closed"><option v-for="source in sources" :key="source">{{ source }}</option></select></div>
             <div class="field"><label>Vertical</label><select v-model="form.vertical" :disabled="closed"><option value="">Não informada</option><option v-for="vertical in CRM_VERTICALS" :key="vertical">{{ vertical }}</option></select><small>Grava no cadastro do cliente.</small></div>
           </div>
@@ -258,6 +289,24 @@ function newProposal() {
           <button class="button secondary" :disabled="!dirty" @click="reset">Descartar</button>
           <button class="button" :disabled="!dirty" @click="save">Salvar</button>
         </div>
+
+        <section v-if="solutions" class="person-section" data-tour="opp-discovery">
+          <h3>Discovery</h3>
+          <p class="hint">Diagnóstico compartilhado com a pré-venda técnica. Cada fase pede o que já deveria ter sido levantado: de Discovery para Cálculo de custo, dor, decisor, linha de base e critério de sucesso; a Demonstração pede o piloto.</p>
+          <div v-if="opportunity.implementation" class="notice">Implantação iniciada em {{ fmtDate(opportunity.implementation.startedAt) }}. Responsável: <b>{{ opportunity.implementation.responsibleName }}</b>. Primeiro marco: {{ opportunity.implementation.milestone }}.</div>
+          <div class="form-grid">
+            <div class="field"><label>Dor do cliente</label><textarea v-model="discoveryForm.pain" rows="2" :disabled="closed"></textarea></div>
+            <div class="field"><label>Decisor</label><input v-model="discoveryForm.decider" :disabled="closed" /></div>
+            <div class="field"><label>Aderência</label><select v-model="discoveryForm.fit" :disabled="closed"><option>A avaliar</option><option>Tier 1</option><option>Tier 2</option><option>Fora do perfil</option></select></div>
+            <div class="field"><label>Escopo</label><input v-model="discoveryForm.scope" :disabled="closed" /></div>
+            <div class="field"><label>Linha de base</label><input v-model="discoveryForm.baseline" :disabled="closed" placeholder="Como é hoje, com número" /></div>
+            <div class="field"><label>Critério de sucesso</label><input v-model="discoveryForm.success" :disabled="closed" placeholder="Como saberemos que deu certo" /></div>
+            <div class="field"><label>Riscos</label><input v-model="discoveryForm.risks" :disabled="closed" /></div>
+            <div class="field"><label>Piloto</label><input v-model="discoveryForm.pilot" :disabled="closed" placeholder="Obrigatório para a Demonstração" /></div>
+          </div>
+          <p v-if="nextBlockers.length" class="cell-sub risk-text">Para a próxima fase falta: {{ nextBlockers.join(', ') }}.</p>
+          <div v-if="!closed" class="save-bar"><button class="button" :disabled="!discoveryDirty" @click="saveDiscovery">Salvar Discovery</button></div>
+        </section>
 
         <section class="person-section">
           <h3>Propostas</h3>
@@ -277,10 +326,14 @@ function newProposal() {
 
         <section class="person-section" data-tour="opp-activities">
           <h3>Ações</h3>
+          <div v-if="!closed" class="action-row" style="margin-bottom:10px">
+            <button class="button secondary small" data-tour="opp-mcp" @click="mcpOpen = true"><Bot :size="13" /> Registrar pelo ChatGPT</button>
+            <span class="cell-sub">Simulado: o ChatGPT grava pelo MCP, com a data efetiva e as fontes da Agenda e do Meet.</span>
+          </div>
           <div v-if="!closed" class="inline-form">
             <div class="inline-form row" style="margin:0; border:0; padding:0; background:transparent">
               <select v-model="action.kind" class="filter" aria-label="Tipo de ação">
-                <option>Tarefa</option><option>Reunião</option><option>Demanda</option><option>E-mail</option><option>Ligação</option><option>PAP</option><option>Produto</option>
+                <option>Tarefa</option><option>Reunião</option><option>Visita</option><option>Demanda</option><option>E-mail</option><option>Ligação</option><option>PAP</option><option>Produto</option>
               </select>
               <input v-model="action.text" class="filter grow" :placeholder="activityPlaceholder" />
               <input v-model="action.date" class="filter" type="date" />
@@ -306,11 +359,16 @@ function newProposal() {
             </div>
           </div>
           <article v-for="entry in activities" :key="entry.id" class="list-row check-line" :class="{ muted: entry.done }">
-            <input type="checkbox" :checked="entry.done" :aria-label="entry.done ? 'Reabrir ação' : 'Concluir ação'" @change="store.toggleActivity(opportunity.id, entry.id)" />
+            <input type="checkbox" :checked="entry.done" :disabled="closed" :aria-label="entry.done ? 'Reabrir ação' : 'Concluir ação com evidência'" @click.prevent="toggle(entry)" />
             <div>
               <strong>{{ entry.text }}</strong>
               <span>{{ entry.type }} · {{ fmtDateTime(entry.at) }}<template v-if="entry.sector"> · {{ entry.sector }}</template><template v-if="entry.createdBy"> · {{ entry.createdBy }}</template></span>
+              <span v-if="entry.done && entry.completedAt">Aconteceu em {{ fmtDate(entry.completedAt) }}<template v-if="entry.registeredAt && entry.registeredAt !== entry.completedAt">, registrada em {{ fmtDate(entry.registeredAt) }}</template><template v-if="entry.origin === 'mcp'"> · origem ChatGPT via MCP</template></span>
               <p v-if="entry.details" class="cell-sub">{{ entry.details }}</p>
+              <p v-if="entry.summary" class="cell-sub">Resultado: {{ entry.summary }}</p>
+              <p v-if="entry.participants" class="cell-sub">Participantes: {{ entry.participants }}</p>
+              <p v-for="reference in entry.references ?? []" :key="reference.externalId" class="cell-sub">{{ reference.provider === 'agenda' ? 'Google Agenda' : 'Google Meet' }} (simulado): {{ reference.title }}. {{ reference.content }}</p>
+              <p v-if="attachmentNames(entry)" class="cell-sub">Anexos: {{ attachmentNames(entry) }}</p>
               <p v-if="entry.calendar" class="cell-sub">Agenda Google de {{ entry.calendar.ownerName }} (simulado). Convidados: {{ guestLine(entry) }}.</p>
             </div>
             <StatusBadge :value="entry.done ? 'Concluída' : entry.at.slice(0, 10) < today() ? 'Vencido' : 'Agendada'" />
@@ -335,6 +393,16 @@ function newProposal() {
       </div>
     </article>
 
+    <ActivityEvidenceModal :open="!!evidence.activityId" :opportunity-id="opportunity.id" :activity-id="evidence.activityId" @close="evidence.activityId = ''" />
+    <McpRecordModal :open="mcpOpen" :opportunity-id="opportunity.id" @close="mcpOpen = false" />
+    <BaseModal :open="implementation.open" title="Iniciar implantação" :subtitle="`${opportunity.id} · escolha quem conduz e o primeiro marco`" width="480px" @close="implementation.open = false">
+      <div class="field"><label>Responsável</label><select v-model="implementation.responsibleId"><option value="">Escolha</option><option v-for="user in store.state.users.filter(entry => entry.active !== false && !entry.platformMaster)" :key="user.id" :value="user.id">{{ user.name }}</option></select></div>
+      <div class="field"><label>Primeiro marco</label><input v-model="implementation.milestone" placeholder="Ex.: kickoff com o cliente" /></div>
+      <template #footer>
+        <button class="button secondary" @click="implementation.open = false">Cancelar</button>
+        <button class="button" @click="startImplementation">Iniciar</button>
+      </template>
+    </BaseModal>
     <BaseModal :open="losing" title="Marcar como perdida" :subtitle="`${opportunity.id} · as propostas em aberto serão recusadas`" width="460px" @close="losing = false">
       <div class="field"><label>Motivo</label><select v-model="loss.reason"><option v-for="reason in lossReasons" :key="reason">{{ reason }}</option></select></div>
       <div class="field"><label>Detalhe</label><input v-model="loss.detail" placeholder="Opcional" /></div>

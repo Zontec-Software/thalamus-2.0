@@ -25,7 +25,7 @@ Os dados são fictícios e ficam salvos no navegador. Para voltar ao cenário in
 
 - **Cadastros:** Produtos com camadas por tipo, Pessoas, catálogo de Serviços e Ativos.
 - **Suprimentos:** Demandas, Compras e Almoxarifado, incluindo recebimento parcial e estorno de separação.
-- **Comercial:** CRM, propostas multilinha, pedidos de Venda e Expedição.
+- **Comercial:** CRM com duas trilhas (Produtos Roboflex e Soluções Zontec), meta por faturamento de competência, rotina de esforço por perfil com supervisão, carteira, canais, propostas multilinha, pedidos de Venda e Expedição. Notas fiscais, Agenda, Meet e ChatGPT/MCP são simulados.
 - **Operações:** Planejamento, Produção, Qualidade e Tablet com revisão congelada na OP.
 - **Serviços:** Manutenção preventiva/corretiva e Assistência Técnica pós-venda.
 - **Gestão:** Indicadores, Projetos e tarefas por papel.

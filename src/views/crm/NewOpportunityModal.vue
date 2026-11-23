@@ -8,7 +8,8 @@ import { addDays, today } from '../../domain/engine'
 import { CLIENT_VERTICALS, roleIsOpen } from '../../domain/partners'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
-import type { OpportunityDeal } from '../../types/domain'
+import { CRM_FUNNELS, FUNNEL_LABEL, solutionOptions } from '../../domain/enterprise'
+import type { OpportunityDeal, OpportunityFunnel } from '../../types/domain'
 import { CRM_COMPANIES, CRM_SOURCES, CRM_VERTICALS, DEAL_TYPES, useCrmLists } from './shared'
 
 const props = defineProps<{ open: boolean }>()
@@ -18,7 +19,7 @@ const ui = useUiStore()
 const router = useRouter()
 const { sources } = useCrmLists()
 const clients = computed(() => store.state.partners.filter(entry => roleIsOpen(entry, 'Cliente')))
-const sellers = computed(() => store.state.users.filter(entry => !entry.platformMaster && (entry.role === 'Comercial' || entry.role === 'Gestor' || entry.role === 'Admin')))
+const sellers = computed(() => store.state.users.filter(entry => !entry.platformMaster && (entry.role === 'Comercial' || entry.role === 'Supervisão comercial' || entry.role === 'Gestor' || entry.role === 'Admin')))
 
 const blank = () => ({
   tenantId: CRM_COMPANIES.some(company => company.id === ui.activeTenantId) ? ui.activeTenantId : CRM_COMPANIES[0].id,
@@ -30,6 +31,8 @@ const blank = () => ({
   expectedClose: addDays(today(), 30),
   notes: '',
   title: '',
+  funnel: 'Produtos' as OpportunityFunnel,
+  solution: '',
 })
 const form = reactive(blank())
 const brief = ref('')
@@ -37,6 +40,17 @@ const registering = ref(false)
 const hearing = ref(false)
 const clientDraft = reactive({ legalName: '', document: '', contact: '', phone: '', email: '' })
 const chosen = computed(() => store.state.partners.find(entry => entry.id === form.partnerId))
+const catalog = computed(() => solutionOptions(store.state, form.tenantId))
+watch(() => form.funnel, funnel => {
+  if (funnel === 'Soluções') {
+    form.dealType = 'Recorrente'
+    if (CRM_COMPANIES.some(company => company.id === 'tenant-roboflex-sul')) form.tenantId = 'tenant-roboflex-sul'
+    form.solution ||= catalog.value[0] ?? ''
+  } else {
+    form.dealType = 'Venda'
+    form.solution = ''
+  }
+})
 
 watch(() => props.open, open => {
   if (!open) return
@@ -99,6 +113,8 @@ function create() {
     email: person?.email,
     segment: form.vertical || chosen.value?.vertical,
     temperature: 'Frio',
+    funnel: form.funnel,
+    solutionIds: form.funnel === 'Soluções' ? [form.solution] : undefined,
   })
   if (!created || created === true) return
   if (form.partnerId && form.vertical && form.vertical !== chosen.value?.vertical) store.setPartnerVertical(form.partnerId, form.vertical)
@@ -108,7 +124,7 @@ function create() {
 </script>
 
 <template>
-  <BaseModal :open="open" title="Nova oportunidade" subtitle="Nasce fria, em Novo contato. O relato pode ser escrito ou falado: nesta demonstração a gravação e a leitura dos campos são simuladas." width="680px" @close="emit('close')">
+  <BaseModal :open="open" title="Nova oportunidade" subtitle="Nasce fria, na primeira fase da trilha. O relato pode ser escrito ou falado: nesta demonstração a gravação e a leitura dos campos são simuladas." width="680px" @close="emit('close')">
     <div class="field">
       <label>Relato</label>
       <textarea v-model="brief" rows="3" placeholder="Conte o negócio. A leitura preenche os campos que reconhecer."></textarea>
@@ -119,6 +135,8 @@ function create() {
       </div>
     </div>
     <div class="form-grid">
+      <div class="field"><label>Trilha</label><select v-model="form.funnel"><option v-for="funnel in CRM_FUNNELS" :key="funnel" :value="funnel">{{ FUNNEL_LABEL[funnel] }}</option></select><small>{{ form.funnel === 'Soluções' ? 'Começa em Prospecção, com Discovery.' : 'Começa em Novo contato.' }}</small></div>
+      <div v-if="form.funnel === 'Soluções'" class="field"><label>Solução</label><select v-model="form.solution"><option v-for="solution in catalog" :key="solution">{{ solution }}</option></select><small>Catálogo de Cadastros gerais.</small></div>
       <div class="field"><label>Empresa</label><select v-model="form.tenantId"><option v-for="company in CRM_COMPANIES" :key="company.id" :value="company.id">{{ company.label }}</option></select></div>
       <div class="field"><label>Vendedor</label><select v-model="form.ownerId"><option v-for="seller in sellers" :key="seller.id" :value="seller.id">{{ seller.name }}</option></select><small>Começa com quem está logado.</small></div>
       <div class="field">
@@ -127,7 +145,7 @@ function create() {
         <small><button type="button" class="link" @click="registering = !registering">{{ registering ? 'Cancelar cadastro' : 'Cadastrar cliente' }}</button></small>
       </div>
       <div class="field"><label>Origem</label><select v-model="form.source"><option v-for="source in sources" :key="source">{{ source }}</option></select></div>
-      <div class="field"><label>Tipo</label><select v-model="form.dealType"><option v-for="type in DEAL_TYPES" :key="type">{{ type }}</option></select></div>
+      <div class="field"><label>Tipo</label><select v-model="form.dealType" :disabled="form.funnel === 'Soluções'"><option v-for="type in DEAL_TYPES" :key="type">{{ type }}</option></select></div>
       <div class="field"><label>Vertical</label><select v-model="form.vertical"><option value="">Não informada</option><option v-for="vertical in CRM_VERTICALS" :key="vertical">{{ vertical }}</option></select><small>Fica no cadastro do cliente.</small></div>
       <div class="field"><label>Previsão de fechamento</label><input v-model="form.expectedClose" type="date" /></div>
       <div class="field"><label>Título</label><input v-model="form.title" placeholder="Se vazio, usa o nome do cliente" /></div>
@@ -149,7 +167,7 @@ function create() {
     </div>
     <template #footer>
       <button class="button secondary" @click="emit('close')">Cancelar</button>
-      <button class="button" :disabled="!form.partnerId || !form.ownerId" @click="create">Criar e abrir</button>
+      <button class="button" :disabled="!form.partnerId || !form.ownerId || (form.funnel === 'Soluções' && !form.solution)" @click="create">Criar e abrir</button>
     </template>
   </BaseModal>
 </template>

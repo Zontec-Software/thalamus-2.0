@@ -4,6 +4,8 @@ import * as catalog from '../domain/catalog'
 import * as extensions from '../domain/catalogExtensions'
 import * as engine from '../domain/engine'
 import * as enterprise from '../domain/enterprise'
+import * as crmEffort from '../domain/crmEffort'
+import * as crmRoutine from '../domain/crmRoutine'
 import * as engineering from '../domain/engineering'
 import * as budget from '../domain/budget'
 import type { BudgetApproachId } from '../domain/budget'
@@ -26,7 +28,7 @@ import { MockOmieGateway } from '../services/omie/mockOmieGateway'
 import type { AccessProfile, ApprovalRole, FiscalSnapshot, FunctionalityId, MaintenanceOrder, NewActivityFile, NewActivityInput, NonConformity, Resource, Role, SalesOrder, UnitConversion } from '../types/domain'
 import { useUiStore } from './ui'
 
-const STORAGE_KEY = 'thalamus-erp-v67'
+const STORAGE_KEY = 'thalamus-erp-v68'
 
 /** Versões anteriores ficam no navegador e estouram a cota. Não há migração: a chave atual é a única que vale. */
 function forgetOlderSaves() {
@@ -315,7 +317,7 @@ export const useErpStore = defineStore('erp', () => {
   const advanceProposal = (id: string) => run(() => {
     if (state.proposals.find(entry => entry.id === id)?.status === 'Em aprovação') requireFeature('crm.desconto.aprovar')
     return enterprise.advanceProposal(state, id, actor())
-  }, proposal => proposal.status === 'Aceita' ? `${proposal.id} aceita: pedido ${proposal.salesOrderId} criado` : `${proposal.id}: ${proposal.status}`)
+  }, proposal => proposal.status === 'Aceita' ? (proposal.salesOrderId ? `${proposal.id} aceita: pedido ${proposal.salesOrderId} criado` : proposal.rentalContractId ? `${proposal.id} aceita: ${proposal.rentalContractId} segue para Locação` : `${proposal.id} aceita: implantação habilitada`) : `${proposal.id}: ${proposal.status}`)
   const rejectProposal = (id: string, reason: string) => run(() => {
     if (state.proposals.find(entry => entry.id === id)?.status === 'Em aprovação') requireFeature('crm.desconto.aprovar')
     return enterprise.rejectProposal(state, id, reason, actor())
@@ -325,6 +327,34 @@ export const useErpStore = defineStore('erp', () => {
   const confirmSalesOrder = bind(enterprise.confirmSalesOrder, order => `${order.id} confirmado${order.omieId ? ` e enviado ao Omie (${order.omieId})` : ''}`)
   const changeSalesOrderLine = bind(enterprise.changeSalesOrderLine, 'Linha do pedido alterada')
   const cancelSalesOrder = bind(enterprise.cancelSalesOrder, order => `${order.id} cancelado`)
+
+  /* Rotina comercial por perfil. A permissão é conferida aqui e o escopo (próprio, equipe, grupo) também. */
+  const crmViewer = (): crmEffort.CrmViewer => ({ userId: ui.sessionUserId, team: can('crm.equipe.consultar'), all: can('crm.equipe.consultar') && (can('crm.consultar_consolidado') || isAccessAdministrator()) })
+  const crmSellers = (tenantIds: string[]) => crmEffort.sellersInScope(state, tenantIds, crmViewer())
+  const saveDiscovery = bind(enterprise.saveDiscovery, 'Discovery salvo')
+  const startImplementation = bind(enterprise.startImplementation, opportunity => `${opportunity.id}: implantação iniciada`)
+  const completeActivity = bind(enterprise.completeActivity, 'Atividade concluída com evidência')
+  const approveSalesGoal = (tenant: string, year: number) => as(name => enterprise.approveSalesGoal(state, tenant, year, name), 'Meta aprovada: vale para o faturamento', 'crm.meta.aprovar')
+  const reviewEffort = (id: string, decision: 'validate' | 'return', reason = '') => run(() => {
+    requireFeature('crm.evidencia.revisar')
+    const record = state.effortRecords.find(entry => entry.id === id)
+    if (record && !crmEffort.canSeeSeller(state, [record.tenantId], crmViewer(), record.ownerId)) throw new Error('Este vendedor não está no seu escopo')
+    return crmEffort.reviewEffort(state, id, decision, reason, ui.sessionUserId, actor())
+  }, record => record.review === 'approved' ? 'Evidência validada: entra no placar' : 'Evidência devolvida ao vendedor')
+  const correctEffort = (id: string, note: string) => run(() => crmEffort.correctEffort(state, id, note, ui.sessionUserId, actor()), 'Evidência corrigida e reenviada para conferência')
+  const saveSellerLink = (input: Parameters<typeof crmEffort.saveSellerLink>[1]) => as(name => crmEffort.saveSellerLink(state, input, name), 'Vínculo comercial salvo', 'crm.regua.gerir')
+  const saveEffortRule = (input: Parameters<typeof crmEffort.saveEffortRule>[1]) => as(name => crmEffort.saveEffortRule(state, input, name), 'Régua salva com a nova vigência', 'crm.regua.gerir')
+  const assignPartnerOwner = (partnerId: string, ownerId: string, since: string) => as(name => crmRoutine.assignPartnerOwner(state, partnerId, ownerId, since, name), 'Responsável da carteira atualizado', 'crm.carteira.gerir')
+  const setCommercialClass = (partnerId: string, commercialClass: Parameters<typeof crmRoutine.setCommercialClass>[2]) => as(name => crmRoutine.setCommercialClass(state, partnerId, commercialClass, name), 'Classe comercial atualizada', 'crm.carteira.gerir')
+  const createChannelCase = (input: Parameters<typeof crmRoutine.createChannelCase>[1]) => as(name => crmRoutine.createChannelCase(state, input, name), record => `${record.id} registrado`, 'modulo.crm.gerir')
+  const answerChannelCase = (id: string, answer: string) => as(name => crmRoutine.answerChannelCase(state, id, answer, name), 'Atendimento respondido', 'modulo.crm.gerir')
+  const linkChannelOrder = (caseId: string, orderId: string) => as(name => crmRoutine.linkChannelOrder(state, caseId, orderId, name), 'Atendimento ligado ao pedido', 'modulo.crm.gerir')
+  /** O ChatGPT grava no nome do vendedor logado. O vendedor só registra na própria oportunidade; a supervisão, em qualquer da equipe. */
+  const registerActivityViaMcp = (input: crmRoutine.McpActivityInput) => run(() => {
+    const opportunity = state.opportunities.find(entry => entry.id === input.opportunityId)
+    if (opportunity && opportunity.ownerId !== ui.sessionUserId && !can('crm.equipe.consultar')) throw new Error('Você só registra nas suas oportunidades')
+    return crmRoutine.registerActivityViaMcp(state, input, actor())
+  }, result => result.reused ? 'Este registro já existia: nada foi duplicado' : 'Registro gravado a partir do ChatGPT. Agenda, Meet e MCP ainda são simulados.')
   const confirmDelivery = (orderId: string, receiver: string) => run(() => {
     const order = engine.confirmDelivery(state, orderId, receiver, actor())
     aftersales.openWarranty(state, order, actor())
@@ -763,7 +793,7 @@ export const useErpStore = defineStore('erp', () => {
     savePackaging, createChange, requestOpportunityChange, updateChange, openChangeRevision, moveChange, resolveFiscalConflict, pushFiscal, simulateOmieFiscal,
     createDemand, attendDemand, attendDemandFromStock, contractService, completeDemand, cancelDemand,
     createPurchaseOrder, selectQuote, cancelPurchaseOrder, advancePurchaseOrder,
-    createOpportunity, updateOpportunity, setSalesGoal, moveOpportunity, advanceOpportunity, loseOpportunity, addActivity, addActivityAttachment, toggleActivity,
+    createOpportunity, updateOpportunity, setSalesGoal, saveDiscovery, startImplementation, completeActivity, approveSalesGoal, reviewEffort, correctEffort, saveSellerLink, saveEffortRule, assignPartnerOwner, setCommercialClass, createChannelCase, answerChannelCase, linkChannelOrder, registerActivityViaMcp, crmViewer, crmSellers, moveOpportunity, advanceOpportunity, loseOpportunity, addActivity, addActivityAttachment, toggleActivity,
     createProposal, updateProposal, addProposalLine, updateProposalLine, removeProposalLine, advanceProposal, rejectProposal,
     cancelProposal, reviseProposal, confirmSalesOrder, changeSalesOrderLine, cancelSalesOrder, confirmDelivery,
     receivePurchase, decideReceipt, setWarrantyPolicy, approveWarrantyPolicy, setWarrantyStatus,

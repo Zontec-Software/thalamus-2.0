@@ -2,7 +2,7 @@ import type { ErpState } from './engine'
 import { DEFAULT_TENANT, DomainError, log, nextId, now } from './engine'
 import type { OmieEntity, OmieEntitySource, RegistryEntry, RegistryKind } from '../types/domain'
 
-export const REGISTRY_KINDS: RegistryKind[] = ['Unidade', 'Moeda', 'Condição de pagamento', 'Origem de oportunidade', 'Motivo de perda', 'Motivo de recusa']
+export const REGISTRY_KINDS: RegistryKind[] = ['Unidade', 'Moeda', 'Condição de pagamento', 'Origem de oportunidade', 'Motivo de perda', 'Motivo de recusa', 'Solução Zontec']
 
 export const OMIE_ENTITIES: OmieEntity[] = ['Cliente', 'Fornecedor', 'Pedido de venda', 'Pedido de compra', 'Produto', 'Categoria financeira', 'Centro de custo', 'Faturamento']
 

@@ -1,7 +1,7 @@
 import type { ErpState } from './engine'
 import { DomainError, lineNeed, log, nextId, now, today } from './engine'
 import { assertGtin, canApprove, canEdit, catalogOf, commit, editable, editorsLabel, findItem, hasRouting, isKitVirtual, isTooling, openBomVersion, track, type Change } from './catalog'
-import { releaseRevision } from './enterprise'
+import { opportunityIsOpen, releaseRevision } from './enterprise'
 import { assertResourceChoice, keptCompatibleResources } from './resources'
 import { assertRoutingService } from './services'
 import type {
@@ -368,7 +368,7 @@ export function createChange(state: ErpState, input: ChangeInput, actor: string,
 export function requestChangeForOpportunity(state: ErpState, opportunityId: string, actor: string) {
   const opportunity = state.opportunities.find(entry => entry.id === opportunityId)
   if (!opportunity) throw new DomainError('Oportunidade não encontrada')
-  if (opportunity.stage === 'Ganho' || opportunity.stage === 'Perdido') throw new DomainError('Oportunidade encerrada não pede mudança')
+  if (!opportunityIsOpen(opportunity)) throw new DomainError('Oportunidade encerrada não pede mudança')
   const itemIds = (opportunity.itemIds ?? []).filter(id => {
     const item = state.items.find(entry => entry.id === id)
     return !!item && (hasRouting(item) || isKitVirtual(item) || isTooling(item))

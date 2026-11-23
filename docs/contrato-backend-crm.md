@@ -56,9 +56,41 @@ Repositório `thalamus2-comercial`: API em `api/` (schema `t2_comercial`) e tela
 
 - **Grupo:** `?group=1` usa `readableTenantIds('crm.consultar_consolidado')` da sessão. A linha de outra empresa vem com `tenant_id` e `own=false`, sem histórico. Toda escrita continua no tenant ativo; registro de outra empresa responde 404.
 
+## Revisão da rotina comercial (pacote CRM, novembro de 2026)
+
+Referência no mockup: `src/domain/enterprise.ts` (trilhas, Discovery, aceite por trilha, implantação), `src/domain/crmEffort.ts` (esforço), `src/domain/crmRoutine.ts` (faturamento, carteira, canais, MCP), `src/domain/crmMigration.ts` (migração) e `src/tests/crm.test.ts`.
+
+| Recurso novo | Campos principais |
+| --- | --- |
+| `opportunities` (acréscimos) | trilha (`Produtos`, `Soluções`, derivada da etapa), soluções de interesse, Discovery (escopo, dor, decisor, prazo), `implementation_started_at`, tipo `Recorrente` |
+| `activities` (acréscimos) | tipo `Visita` e `Recompra`, resumo, participantes, `completed_at` (a data da interação), `registered_at`, referências, anexos (até 5 de 10 MB), `origin` (`mcp`), `idempotency_key`, próxima ação |
+| `seller-links` | conta do core, empresa, perfil (`carteira`, `abertura`, `canais`), equipe, início |
+| `effort-rules` | empresa, perfil, vigência, quatro indicadores, `green_at`, dias de cobertura por classe |
+| `effort-records` | empresa, vendedor, tipo, dia, nota, situação (`recorded`, `pending`, `approved`, `returned`), motivo, histórico, `source` único |
+| `partner-owners` | cliente, responsável, de, até (vigências) e `commercial_class` no cliente |
+| `sale-invoices` | empresa, pedido, número, chave fiscal, emissão, valor, unidade (MRR, Implantação, Venda avulsa), situação, conciliação, intercompany, devolução |
+| `sales-goals` (acréscimo) | versão, quem salvou, quem aprovou, dia de corte |
+| `channel-cases` | empresa, canal, parceiro, identificador externo, responsável, prazo, resposta, pedido |
+
+Funcionalidades novas (todas a registrar no `FunctionalityCatalog.php` do core, com o perfil `Supervisão comercial`): `crm.equipe.consultar`, `crm.evidencia.revisar`, `crm.regua.gerir`, `crm.meta.aprovar`, `crm.carteira.gerir`.
+
+Regras novas:
+
+12. Trilha Produtos: Novo contato, Qualificação, Levantamento, Proposta, Negociação, Ganho. Trilha Soluções: Prospecção, Discovery, Cálculo de custo, Proposta, Demonstração, Conquistado, Implantação. Só as fases em aberto entram no funil; Conquistado e Implantação contam como ganho.
+13. Sem Discovery completo (escopo, dor, decisor, prazo e ao menos uma solução), a oportunidade de Soluções não passa de Discovery. Conquistado só vem do aceite; Implantação só por `startImplementation`.
+14. Aceite: Soluções → Conquistado, sem pedido. Locação → contrato de locação, sem pedido. Produtos → um pedido, com canal e dono da conta. Aceite repetido é idempotente.
+15. Meta de faturamento só vale depois de aprovada; quem salvou não aprova. Realizado por competência: nota autorizada, conciliada, sem duplicata (empresa + chave fiscal), sem intercompany, sem devolução e emitida até o dia de corte. Sem conciliação é "sem conciliação", nunca zero.
+16. Esforço: a data da interação define a semana (segunda a domingo); pendente e devolvida ficam fora do placar; ninguém revisa o próprio registro; devolver exige motivo; o evento de origem é idempotente por `source`. Semana verde com 3 de 4 indicadores. A régua muda por vigência e a semana usa a vigente nela.
+17. Carteira: cliente sem responsável vigente vai para a triagem; trocar o responsável fecha a vigência anterior na véspera. Classes A1, A2, B, C1, C2 e A classificar.
+18. Pedido de canal mantém o dono da conta e só se liga a atendimento do mesmo cliente e canal; dedupe por empresa + canal + identificador externo.
+19. Registro via MCP é idempotente por chave, ou por vendedor + provedor + identificador externo; conclui a tarefa existente preservando prazo e anexos; o autor é "ChatGPT via MCP · usuário".
+20. Anexos: até 5 arquivos de 10 MB (pdf, png, jpg, jpeg, webp, txt, csv, docx, xlsx, pptx, mp3, m4a, wav).
+
+Simulação no mockup (vira integração real): notas fiscais e conciliação (Omie), Agenda do Google e Meet, ChatGPT/MCP, armazenamento de anexos e os valores de partida da régua. Sem regra aprovada ainda: meta de parceiros ativos do perfil de canais ("A calibrar") e a régua de cobertura por classe.
+
 ## Pendente para o oficial
 
-Revisado no mockup em novembro de 2026 e ainda não levado ao `thalamus2-comercial`: novas etapas e listas, aprovação de desconto, vencimento, versão e cancelamento da proposta, pedido nascido no Thalamus (hoje o oficial grava `PropostaAceita` no outbox), e `crm.desconto.aprovar` no `FunctionalityCatalog.php` do core.
+Revisado no mockup em novembro de 2026 e ainda não levado ao `thalamus2-comercial`: novas etapas e listas, aprovação de desconto, vencimento, versão e cancelamento da proposta, pedido nascido no Thalamus (hoje o oficial grava `PropostaAceita` no outbox), e `crm.desconto.aprovar` no `FunctionalityCatalog.php` do core. Do pacote da rotina comercial, tudo acima. A lista de alterações por repositório está em `docs/pendencias-oficial-crm.md`.
 
 ## Entrega oficial
 

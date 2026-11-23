@@ -58,6 +58,11 @@ export const FUNCTIONALITIES: Functionality[] = [
   functionality('orcamentos.consultar_consolidado', 'Orçamentos', 'consultar_consolidado', 'Consultar consolidado de grupo', 'Consulta orçamento das empresas autorizadas do grupo econômico.'),
   functionality('crm.consultar_consolidado', 'CRM', 'consultar_consolidado', 'Consultar CRM do grupo', 'Vê oportunidades das empresas autorizadas do grupo. O lançamento continua na empresa.'),
   functionality('crm.desconto.aprovar', 'CRM', 'aprovar_desconto', 'Aprovar desconto da proposta', 'Aprova a proposta com desconto acima do limite. Quem pediu não aprova.'),
+  functionality('crm.equipe.consultar', 'CRM', 'consultar_equipe', 'Consultar a equipe comercial', 'Vê a rotina, as evidências e o faturamento de todos os vendedores da equipe. Sem esta chave, o vendedor vê só o próprio.'),
+  functionality('crm.evidencia.revisar', 'CRM', 'revisar_evidencia', 'Validar ou devolver evidência', 'Valida ou devolve, com motivo, a evidência de esforço do vendedor. Ninguém revisa a própria.'),
+  functionality('crm.regua.gerir', 'CRM', 'gerir_regua', 'Gerir régua e vínculo comercial', 'Define as metas semanais por perfil, com vigência, e o perfil e a equipe de cada vendedor.'),
+  functionality('crm.meta.aprovar', 'CRM', 'aprovar_meta', 'Aprovar meta comercial', 'Aprova a versão da meta que vale para o faturamento. Quem gravou a meta não aprova.'),
+  functionality('crm.carteira.gerir', 'CRM', 'gerir_carteira', 'Gerir carteira de clientes', 'Faz a triagem de contatos sem responsável, troca o responsável com vigência e define a classe comercial.'),
   functionality('recebimento.bloqueio.decidir', 'Recebimento', 'decidir_bloqueio', 'Decidir recebimento bloqueado', 'Aceita com ressalva ou devolve o que ficou bloqueado na conferência.'),
   functionality('locacao.contrato.aprovar', 'Locação', 'aprovar_contrato', 'Aprovar contrato de locação', 'Ativa o contrato e libera a saída do bem. Quem propôs não aprova.'),
   functionality('garantia.regra.aprovar', 'Garantia', 'aprovar_regra', 'Aprovar regra de garantia', 'Aprova prazo e cobertura. Sem regra aprovada, a garantia nasce pendente.'),
@@ -75,6 +80,7 @@ const roleModuleGrants: Record<Role, string[]> = {
   Admin: MODULES,
   Gestor: MODULES,
   Comercial: ['CRM', 'Vendas', 'Expedição', 'Produtos', 'Parceiros', 'Locação', 'Garantia'],
+  'Supervisão comercial': ['CRM', 'Vendas', 'Expedição', 'Produtos', 'Parceiros', 'Locação', 'Garantia'],
   Engenharia: ['Produtos', 'Serviços', 'Ativos', 'Postos', 'Projetos', 'Parceiros', 'Patrimônio'],
   PCP: ['Painel', 'Fluxo do pedido', 'Vendas', 'Produtos', 'Postos', 'Planejamento', 'Ordens de produção', 'Demandas', 'Injeção', 'Montagem', 'Indicadores', 'Parceiros'],
   Compras: ['Painel', 'Demandas', 'Compras', 'Almoxarifado', 'Orçamentos', 'Produtos', 'Parceiros', 'Recebimento'],
@@ -88,6 +94,8 @@ const roleModuleGrants: Record<Role, string[]> = {
   Financeiro: ['Orçamentos', 'DRE', 'Projetos', 'Indicadores', 'Produtos', 'Parceiros'],
 }
 
+const CRM_SUPERVISION: FunctionalityId[] = ['crm.equipe.consultar', 'crm.evidencia.revisar', 'crm.regua.gerir', 'crm.meta.aprovar', 'crm.carteira.gerir']
+
 const roleDetailedGrants: Partial<Record<Role, FunctionalityId[]>> = {
   Gestor: [
     productFeature('nucleo.gerir'), productFeature('estoque.gerir'), productFeature('manufatura.gerir'), productFeature('ferramental.gerir'),
@@ -96,7 +104,7 @@ const roleDetailedGrants: Partial<Record<Role, FunctionalityId[]>> = {
     productFeature('homologar.tecnica'), productFeature('excecao_campo_chave.decidir'), productFeature('revisao.liberar'),
     budgetFeature('planejamento.gerir'), budgetFeature('categorias.gerir'), budgetFeature('excecao.tratar'), budgetFeature('excecao.vincular'),
     budgetFeature('liberar_saldo'), budgetFeature('alerta.reconhecer'), budgetFeature('consultar_consolidado'), 'organizacao.consultar_consolidado',
-    'crm.consultar_consolidado', 'crm.desconto.aprovar', 'recebimento.bloqueio.decidir', 'locacao.contrato.aprovar', 'garantia.regra.aprovar',
+    'crm.consultar_consolidado', 'crm.desconto.aprovar', ...CRM_SUPERVISION, 'recebimento.bloqueio.decidir', 'locacao.contrato.aprovar', 'garantia.regra.aprovar',
     'patrimonio.movimentacao.aprovar', 'integracao.fonte.decidir',
   ],
   Engenharia: [
@@ -107,6 +115,7 @@ const roleDetailedGrants: Partial<Record<Role, FunctionalityId[]>> = {
   Compras: [productFeature('estoque.gerir'), budgetFeature('alerta.reconhecer'), 'recebimento.bloqueio.decidir'],
   Almoxarifado: [productFeature('estoque.gerir')],
   Comercial: [productFeature('comercial.gerir'), productFeature('midia.gerir'), productFeature('homologar.comercial')],
+  'Supervisão comercial': [productFeature('comercial.gerir'), productFeature('homologar.comercial'), ...CRM_SUPERVISION],
   Manutenção: [productFeature('ferramental.gerir')],
   Financeiro: [
     productFeature('fiscal.gerir'), productFeature('homologar.fiscal'), budgetFeature('planejamento.gerir'), budgetFeature('categorias.gerir'),
@@ -118,6 +127,7 @@ const profileDescription: Record<Role, string> = {
   Admin: 'Perfil do sistema com todas as funcionalidades.',
   Gestor: 'Consulta ampla e decisões gerenciais.',
   Comercial: 'Relacionamento, propostas, vendas e expedição.',
+  'Supervisão comercial': 'Equipe comercial: valida evidências, define a régua, aprova a meta e cuida da carteira.',
   Engenharia: 'Produtos, estruturas, postos, serviços, ativos e projetos.',
   PCP: 'Planejamento e acompanhamento da produção.',
   Compras: 'Demandas, compras, estoque e orçamento.',

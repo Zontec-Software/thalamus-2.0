@@ -5,6 +5,7 @@ import { Columns3, Plus } from 'lucide-vue-next'
 import BaseModal from '../../components/BaseModal.vue'
 import StatusBadge from '../../components/StatusBadge.vue'
 import { today } from '../../domain/engine'
+import { funnelOf, opportunityIsOpen, opportunityIsWon } from '../../domain/enterprise'
 import { useErpStore } from '../../stores/erp'
 import type { Opportunity } from '../../types/domain'
 import { fmtCurrency, fmtDate, fmtDateTime } from '../../utils/format'
@@ -28,9 +29,9 @@ function touched(entry: Opportunity) {
 }
 function haystack(entry: Opportunity) {
   const flags = attentionOf(entry, today())
-  const life = entry.stage === 'Ganho' ? 'conquistada conquista' : entry.stage === 'Perdido' ? 'perdida' : 'em aberto aberta'
+  const life = opportunityIsWon(entry) ? 'conquistada conquista' : entry.stage === 'Perdido' ? 'perdida' : 'em aberto aberta'
   return [
-    entry.id, entry.title, entry.stage, entry.temperature, entry.source, entry.segment, entry.statusNote, entry.lossReason, entry.notes, entry.nextAction, entry.dealType,
+    entry.id, entry.title, entry.stage, entry.temperature, entry.source, entry.segment, entry.statusNote, entry.lossReason, entry.notes, entry.nextAction, entry.dealType, funnelOf(entry), ...(entry.solutionIds ?? []),
     store.partnerName(entry.partnerId), partner(entry)?.document, partner(entry)?.vertical, store.userName(entry.ownerId), tenantName(entry.tenantId),
     fmtDate(entry.expectedClose), entry.createdAt ? fmtDate(entry.createdAt) : '', fmtCurrency(entry.value), String(entry.value), life, ...flags,
   ].join(' ').toLowerCase()
@@ -70,6 +71,7 @@ const arrow = (key: typeof opportunityList.sort) => opportunityList.sort === key
           <label v-for="column in OPPORTUNITY_COLUMNS" :key="column.id"><input v-model="opportunityList.columns" type="checkbox" :value="column.id" /> {{ column.label }}</label>
         </div>
       </div>
+      <RouterLink to="/crm/funil" class="button secondary"><Columns3 :size="14" /> Kanban</RouterLink>
       <button class="button" data-tour="new-record" @click="creating = true"><Plus :size="14" /> Nova oportunidade</button>
     </div>
 
@@ -107,7 +109,7 @@ const arrow = (key: typeof opportunityList.sort) => opportunityList.sort === key
           <td v-if="shown('temperature')"><StatusBadge :value="entry.temperature ?? 'Morno'" /></td>
           <td v-if="shown('source')">{{ entry.source }}</td>
           <td v-if="shown('segment')">{{ partner(entry)?.vertical ?? entry.segment ?? '—' }}</td>
-          <td v-if="shown('close')" :class="{ 'risk-text': entry.stage !== 'Ganho' && entry.stage !== 'Perdido' && entry.expectedClose < today() }">{{ fmtDate(entry.expectedClose) }}</td>
+          <td v-if="shown('close')" :class="{ 'risk-text': opportunityIsOpen(entry) && entry.expectedClose < today() }">{{ fmtDate(entry.expectedClose) }}</td>
           <td v-if="shown('created')">{{ entry.createdAt ? fmtDate(entry.createdAt) : '—' }}</td>
           <td v-if="shown('tenant')">{{ tenantName(entry.tenantId) }}</td>
         </tr>

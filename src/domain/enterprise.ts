@@ -1,15 +1,16 @@
 import { APPROVER, currentPrice, hasRouting, requiredApprovals } from './catalog'
 import { explodeKitLines } from './catalogExtensions'
 import { hasFullAccess } from './access'
+import { currentOwnerOf, effortFromActivity, effortFromProposalSent, withdrawActivityEffort } from './crmEffort'
 import * as budgetDomain from './budget'
 import type { ErpState } from './engine'
 import { addDays, addSyncLog, applyDueRevisions, assertUsable, availableQty, consumeStock, DEFAULT_TENANT, DomainError, getItem, getOp, log, nextId, now, omieBlock, receiveStock, salesOrderStatus, today } from './engine'
 import { assertClientOpen, assertPurchaseAllowed, assertSupplierOpen } from './partners'
 import { fieldVisitService } from './services'
 import { assertResourceChoice } from './resources'
-import { warrantyCoverage } from './aftersales'
+import { createRental, warrantyCoverage } from './aftersales'
 import type {
-  ActivityAttachment, ActivityGuest, Asset, Budget, CrmActivity, Demand, Item, NewActivityFile, NewActivityInput, Opportunity, Project, Proposal, ProposalLine,
+  ActivityAttachment, ActivityGuest, Asset, Budget, CrmActivity, Demand, Item, NewActivityFile, NewActivityInput, Opportunity, OpportunityFunnel, Project, Proposal, ProposalLine,
   PurchaseOrder, Receipt, ReceiptCheck, Role, TechnicalServiceOrder, User,
 } from '../types/domain'
 
@@ -360,30 +361,101 @@ export function undoPick(state: ErpState, opId: string, actor: string) {
 
 /* ---------- CRM ---------- */
 
-export const CRM_STAGES: Opportunity['stage'][] = ['Novo contato', 'Qualificação', 'Levantamento', 'Proposta', 'Negociação', 'Ganho']
+/** Trilha Produtos Roboflex. */
+export const PRODUCT_STAGES: Opportunity['stage'][] = ['Novo contato', 'Qualificação', 'Levantamento', 'Proposta', 'Negociação', 'Ganho']
+/** Trilha Soluções Zontec. Conquistado e Implantação já são pós-venda: só as fases abertas entram no pipeline. */
+export const SOLUTION_STAGES: Opportunity['stage'][] = ['Prospecção', 'Discovery', 'Cálculo de custo', 'Proposta', 'Demonstração', 'Conquistado', 'Implantação']
+export const CRM_STAGES = PRODUCT_STAGES
+export const CRM_FUNNELS: OpportunityFunnel[] = ['Produtos', 'Soluções']
+export const FUNNEL_LABEL: Record<OpportunityFunnel, string> = { Produtos: 'Produtos Roboflex', Soluções: 'Soluções Zontec' }
 export const CRM_TEMPERATURES: NonNullable<Opportunity['temperature']>[] = ['Quente', 'Morno', 'Frio']
-const STAGE_PROBABILITY: Record<Opportunity['stage'], number> = { 'Novo contato': 10, Qualificação: 20, Levantamento: 35, Proposta: 55, Negociação: 75, Ganho: 100, Perdido: 0 }
+const STAGE_PROBABILITY: Record<Opportunity['stage'], number> = {
+  'Novo contato': 10, Qualificação: 20, Levantamento: 35, Proposta: 55, Negociação: 75, Ganho: 100, Perdido: 0,
+  Prospecção: 10, Discovery: 25, 'Cálculo de custo': 40, Demonstração: 75, Conquistado: 100, Implantação: 100,
+}
+/** Catálogo de partida das soluções Zontec. A lista em uso vem de Cadastros gerais. */
+export const ZONTEC_SOLUTIONS = ['Laundry', 'LifeGuard', 'Asset Control', 'Guard Enterprise']
+export const SOLUTION_REGISTRY_KIND = 'Solução Zontec' as const
 
-export const opportunityIsOpen = (entry: Pick<Opportunity, 'stage'>) => entry.stage !== 'Ganho' && entry.stage !== 'Perdido'
+export const funnelOf = (entry: Pick<Opportunity, 'funnel'>): OpportunityFunnel => entry.funnel ?? 'Produtos'
+export const stagesOf = (funnel: OpportunityFunnel) => funnel === 'Soluções' ? SOLUTION_STAGES : PRODUCT_STAGES
+/** Fases de oportunidade conquistada. Daqui em diante é pedido, contrato ou implantação, não mais pipeline. */
+export const opportunityIsWon = (entry: Pick<Opportunity, 'stage'>) => entry.stage === 'Ganho' || entry.stage === 'Conquistado' || entry.stage === 'Implantação'
+export const opportunityIsOpen = (entry: Pick<Opportunity, 'stage'>) => !opportunityIsWon(entry) && entry.stage !== 'Perdido'
+/** Fases em que o vendedor ainda trabalha: sem as de conquista e sem Perdido. */
+export const openStagesOf = (funnel: OpportunityFunnel) => stagesOf(funnel).filter(stage => !opportunityIsWon({ stage }))
+
+/** Soluções ativas do catálogo da empresa. Sem lista cadastrada, vale a de partida. */
+export function solutionOptions(state: Pick<ErpState, 'registry'>, tenantId = DEFAULT_TENANT) {
+  const list = state.registry.filter(entry => entry.tenantId === tenantId && entry.kind === SOLUTION_REGISTRY_KIND && entry.status === 'Ativo').map(entry => entry.description)
+  return list.length ? list : ZONTEC_SOLUTIONS
+}
 
 type OpportunityInput = Pick<Opportunity, 'partnerId' | 'title' | 'ownerId' | 'value' | 'expectedClose' | 'source' | 'nextAction'>
-  & Partial<Pick<Opportunity, 'contact' | 'segment' | 'itemIds' | 'quantity' | 'notes' | 'observation' | 'tenantId' | 'mrr' | 'temperature' | 'statusNote' | 'phone' | 'email' | 'dealType'>>
+  & Partial<Pick<Opportunity, 'contact' | 'segment' | 'itemIds' | 'quantity' | 'notes' | 'observation' | 'tenantId' | 'mrr' | 'temperature' | 'statusNote' | 'phone' | 'email' | 'dealType' | 'funnel' | 'solutionIds' | 'channel'>>
 
 export function createOpportunity(state: ErpState, input: OpportunityInput, actor: string) {
   if (!input.title.trim()) throw new DomainError('Dê um título à oportunidade')
   if (!input.partnerId) throw new DomainError('Escolha o cliente')
   assertClientOpen(state, input.partnerId)
+  const funnel = input.funnel ?? 'Produtos'
+  if (funnel === 'Soluções') {
+    const catalog = solutionOptions(state, input.tenantId ?? DEFAULT_TENANT)
+    const chosen = input.solutionIds ?? []
+    if (!chosen.length) throw new DomainError('Escolha a solução do catálogo Zontec')
+    if (chosen.some(solution => !catalog.includes(solution))) throw new DomainError('A solução precisa estar no catálogo')
+    if (new Set(chosen).size !== chosen.length) throw new DomainError('A solução foi escolhida duas vezes')
+  } else if (input.solutionIds?.length) throw new DomainError('Solução do catálogo é da trilha Soluções Zontec')
+  const stage = stagesOf(funnel)[0]
   const opportunity: Opportunity = {
-    id: `OPP-${String(state.counters.OPP = (state.counters.OPP ?? 26043) + 1)}`, stage: 'Novo contato', probability: 10, temperature: 'Frio', mrr: 0, dealType: 'Venda', activities: [], createdAt: now(), ...input,
+    id: `OPP-${String(state.counters.OPP = (state.counters.OPP ?? 26043) + 1)}`, stage, probability: STAGE_PROBABILITY[stage], temperature: 'Frio', mrr: 0,
+    dealType: funnel === 'Soluções' ? 'Recorrente' : 'Venda', activities: [], createdAt: now(), ...input, funnel,
   }
   state.opportunities.unshift(opportunity)
-  log(state, 'CRM', actor, `Oportunidade criada: ${opportunity.title} (${money(opportunity.value)})`, undefined, opportunity.id)
+  log(state, 'CRM', actor, `Oportunidade criada${funnel === 'Soluções' ? ' na trilha Soluções Zontec' : ''}: ${opportunity.title} (${money(opportunity.value)})`, undefined, opportunity.id)
   return opportunity
+}
+
+/** Diagnóstico de Discovery, compartilhado com a pré-venda. Só na trilha Soluções. */
+export function saveDiscovery(state: ErpState, id: string, discovery: NonNullable<Opportunity['discovery']>, solutionIds: string[] | undefined, actor: string) {
+  const opportunity = find(state.opportunities, id, 'Oportunidade')
+  if (funnelOf(opportunity) !== 'Soluções') throw new DomainError('Discovery é da trilha Soluções Zontec')
+  if (!opportunityIsOpen(opportunity)) throw new DomainError('Oportunidade encerrada não pode ser editada')
+  if (solutionIds) {
+    const catalog = solutionOptions(state, opportunity.tenantId ?? DEFAULT_TENANT)
+    if (!solutionIds.length || solutionIds.some(solution => !catalog.includes(solution))) throw new DomainError('Escolha ao menos uma solução do catálogo')
+    opportunity.solutionIds = [...new Set(solutionIds)]
+  }
+  opportunity.discovery = { ...opportunity.discovery, ...discovery }
+  log(state, 'CRM', actor, 'Discovery atualizado', undefined, id)
+  return opportunity
+}
+
+/** O que falta para entrar na fase pedida. Vazio quando pode avançar. */
+export function stageBlockers(opportunity: Opportunity, stage: Opportunity['stage']) {
+  const problems: string[] = []
+  if (funnelOf(opportunity) !== 'Soluções') return problems
+  const index = SOLUTION_STAGES.indexOf(stage)
+  const discovery = opportunity.discovery ?? {}
+  if (index >= SOLUTION_STAGES.indexOf('Cálculo de custo')) {
+    if (!discovery.pain?.trim()) problems.push('dor do cliente')
+    if (!discovery.decider?.trim()) problems.push('decisor')
+    if (!discovery.baseline?.trim()) problems.push('linha de base')
+    if (!discovery.success?.trim()) problems.push('critério de sucesso')
+  }
+  if (stage === 'Demonstração' && !discovery.pilot?.trim()) problems.push('plano de demonstração ou piloto')
+  return problems
 }
 
 export function updateOpportunity(state: ErpState, id: string, patch: Partial<OpportunityInput>, actor: string) {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
   if (!opportunityIsOpen(opportunity)) throw new DomainError('Oportunidade encerrada não pode ser editada')
+  if (patch.funnel && patch.funnel !== funnelOf(opportunity)) throw new DomainError('A trilha não muda depois da criação')
+  if (patch.solutionIds) {
+    if (funnelOf(opportunity) !== 'Soluções') throw new DomainError('Solução do catálogo é da trilha Soluções Zontec')
+    const catalog = solutionOptions(state, opportunity.tenantId ?? DEFAULT_TENANT)
+    if (!patch.solutionIds.length || patch.solutionIds.some(solution => !catalog.includes(solution))) throw new DomainError('Escolha ao menos uma solução do catálogo')
+  }
   Object.assign(opportunity, patch)
   log(state, 'CRM', actor, 'Dados da oportunidade atualizados', undefined, id)
   return opportunity
@@ -392,8 +464,12 @@ export function updateOpportunity(state: ErpState, id: string, patch: Partial<Op
 export function moveOpportunity(state: ErpState, id: string, stage: Opportunity['stage'], actor: string) {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
   if (!opportunityIsOpen(opportunity)) throw new DomainError('Oportunidade já encerrada')
-  if (stage === 'Ganho') throw new DomainError('A oportunidade é ganha ao aceitar uma proposta')
+  if (stage === 'Ganho' || stage === 'Conquistado') throw new DomainError('A oportunidade é ganha ao aceitar uma proposta')
+  if (stage === 'Implantação') throw new DomainError('A implantação começa depois do aceite, com responsável e marco')
   if (stage === 'Perdido') throw new DomainError('Use "Marcar como perdida" e informe o motivo')
+  if (!stagesOf(funnelOf(opportunity)).includes(stage)) throw new DomainError(`${stage} não é fase da trilha ${FUNNEL_LABEL[funnelOf(opportunity)]}`)
+  const blockers = stage === opportunity.stage ? [] : stageBlockers(opportunity, stage)
+  if (blockers.length) throw new DomainError(`Para entrar em ${stage}, preencha no Discovery: ${blockers.join(', ')}`)
   opportunity.stage = stage
   opportunity.probability = STAGE_PROBABILITY[stage]
   log(state, 'CRM', actor, `Etapa alterada para ${stage}`, undefined, id)
@@ -402,15 +478,34 @@ export function moveOpportunity(state: ErpState, id: string, stage: Opportunity[
 
 export function advanceOpportunity(state: ErpState, id: string, actor: string) {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
-  const next = CRM_STAGES[CRM_STAGES.indexOf(opportunity.stage) + 1]
-  if (!next || next === 'Ganho') throw new DomainError('Para ganhar, aceite a proposta do cliente')
+  const open = openStagesOf(funnelOf(opportunity))
+  const next = open[open.indexOf(opportunity.stage) + 1]
+  if (!next) throw new DomainError('Para ganhar, aceite a proposta do cliente')
   return moveOpportunity(state, id, next, actor)
+}
+
+/** Depois do aceite, a Zontec começa a implantação com um responsável e o primeiro marco. */
+export function startImplementation(state: ErpState, id: string, input: { responsibleId: string; milestone: string; startedAt?: string }, actor: string) {
+  const opportunity = find(state.opportunities, id, 'Oportunidade')
+  if (funnelOf(opportunity) !== 'Soluções') throw new DomainError('Implantação é da trilha Soluções Zontec')
+  if (opportunity.stage === 'Implantação') throw new DomainError('A implantação já começou')
+  if (opportunity.stage !== 'Conquistado') throw new DomainError('A implantação começa depois do aceite da proposta')
+  const responsible = state.users.find(entry => entry.id === input.responsibleId)
+  if (!responsible) throw new DomainError('Escolha o responsável pela implantação')
+  if (!input.milestone.trim()) throw new DomainError('Informe o primeiro marco da implantação')
+  const startedAt = input.startedAt ?? today()
+  if (startedAt < (opportunity.wonAt ?? startedAt)) throw new DomainError('A implantação não começa antes do aceite')
+  if (startedAt > today()) throw new DomainError('Informe uma data que já aconteceu')
+  opportunity.implementation = { startedAt, responsibleId: responsible.id, responsibleName: responsible.name, milestone: input.milestone.trim() }
+  opportunity.stage = 'Implantação'
+  log(state, 'CRM', actor, `Implantação iniciada com ${responsible.name}: ${input.milestone.trim()}`, undefined, id)
+  return opportunity
 }
 
 export function loseOpportunity(state: ErpState, id: string, reason: string, actor: string) {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
   if (!reason.trim()) throw new DomainError('Informe o motivo da perda')
-  if (opportunity.stage === 'Ganho') throw new DomainError('Oportunidade ganha não pode ser perdida')
+  if (opportunityIsWon(opportunity)) throw new DomainError('Oportunidade ganha não pode ser perdida')
   if (opportunity.stage === 'Perdido') throw new DomainError('Oportunidade já perdida')
   opportunity.stage = 'Perdido'
   opportunity.probability = 0
@@ -439,13 +534,39 @@ export function setSalesGoal(state: ErpState, tenantId: string, year: number, am
   const total = months.reduce((sum, value) => sum + value, 0)
   if (!(total > 0)) throw new DomainError('Informe a meta anual')
   const current = state.salesGoals.find(entry => entry.tenantId === tenantId && entry.year === year)
-  if (current) Object.assign(current, { amount: total, monthlyAmounts: [...months] })
-  else state.salesGoals.push({ tenantId, year, amount: total, monthlyAmounts: [...months] })
-  log(state, 'CRM', actor, `Meta ${year} de ${tenantId}: ${money(total)}`)
+  if (current) Object.assign(current, { amount: total, monthlyAmounts: [...months], savedBy: actor, approvedBy: undefined, approvedAt: undefined })
+  else state.salesGoals.push({ tenantId, year, amount: total, monthlyAmounts: [...months], savedBy: actor })
+  log(state, 'CRM', actor, `Meta ${year} de ${tenantId}: ${money(total)} · aguarda aprovação da gestão`)
   return state.salesGoals.find(entry => entry.tenantId === tenantId && entry.year === year)!
 }
 
+/** A meta de trabalho só vale para o faturamento depois de aprovada por outra pessoa. */
+export function approveSalesGoal(state: ErpState, tenantId: string, year: number, actor: string) {
+  const goal = state.salesGoals.find(entry => entry.tenantId === tenantId && entry.year === year)
+  if (!goal) throw new DomainError('Não há meta gravada para esta empresa e ano')
+  if (goal.approvedBy) throw new DomainError('A meta já está aprovada')
+  if (goal.savedBy && goal.savedBy === actor) throw new DomainError('Quem gravou a meta não a aprova')
+  goal.approvedBy = actor
+  goal.approvedAt = now()
+  log(state, 'CRM', actor, `Meta ${year} de ${tenantId} aprovada: ${money(goal.amount)}`)
+  return goal
+}
+
 const ACTIVITY_FILE_LIMIT = 450_000
+/** Regra do sistema oficial: até 5 arquivos por registro, de até 10 MB, nestes formatos. Na demonstração o conteúdo só cabe abaixo de `ACTIVITY_FILE_LIMIT`. */
+export const ACTIVITY_MAX_FILES = 5
+export const ACTIVITY_FILE_BYTES = 10 * 1024 * 1024
+export const ACTIVITY_FILE_FORMATS = ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'txt', 'csv', 'docx', 'xlsx', 'pptx', 'mp3', 'm4a', 'wav']
+
+/** Confere quantidade, formato e tamanho de arquivos de um registro, somando os que já existem. */
+export function assertActivityFiles(files: Pick<NewActivityFile, 'name' | 'size'>[], existing = 0) {
+  if (existing + files.length > ACTIVITY_MAX_FILES) throw new DomainError(`Cada registro aceita até ${ACTIVITY_MAX_FILES} arquivos`)
+  for (const file of files) {
+    const extension = file.name.trim().split('.').at(-1)?.toLowerCase() ?? ''
+    if (!ACTIVITY_FILE_FORMATS.includes(extension)) throw new DomainError(`Formato não aceito: ${file.name}`)
+    if (file.size > ACTIVITY_FILE_BYTES) throw new DomainError(`O arquivo deve ter até 10 MB: ${file.name}`)
+  }
+}
 
 function storedFile(state: ErpState, file: NewActivityFile, at: string): ActivityAttachment {
   const name = file.name.trim()
@@ -490,11 +611,13 @@ export function addActivity(state: ErpState, id: string, input: NewActivityInput
   const opportunity = find(state.opportunities, id, 'Oportunidade')
   if (!input.text.trim()) throw new DomainError(input.type === 'Reunião' ? 'Informe o título da reunião' : 'Descreva a atividade')
   const at = input.at
+  assertActivityFiles(input.attachments ?? [])
   const activity: CrmActivity = {
     id: nextId(state, 'ACT'), at, type: input.type, text: input.text.trim(), done: false, createdBy: actor,
     details: input.details?.trim() || undefined,
     sector: input.sector?.trim() || undefined,
     attachments: (input.attachments ?? []).map(file => storedFile(state, file, at)),
+    origin: 'manual', registeredAt: today(), ownerId: opportunity.ownerId,
   }
   if (input.type === 'Reunião') {
     const { creator, guests } = meetingCalendar(state, opportunity, actorUserId)
@@ -510,23 +633,73 @@ export function addActivity(state: ErpState, id: string, input: NewActivityInput
 export function addActivityAttachment(state: ErpState, id: string, activityId: string, file: NewActivityFile, actor: string) {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
   const activity = find(opportunity.activities, activityId, 'Atividade')
+  assertActivityFiles([file], activity.attachments?.length ?? 0)
   const attachment = storedFile(state, file, now())
   activity.attachments = [...(activity.attachments ?? []), attachment]
   log(state, 'CRM', actor, `Anexo em ${activity.text}: ${attachment.name}`, undefined, id)
   return activity
 }
 
+function refreshNextAction(opportunity: Opportunity) {
+  const pending = opportunity.activities.filter(entry => !entry.done).sort((a, b) => a.at.localeCompare(b.at))[0]
+  opportunity.nextAction = pending?.text ?? 'Definir próxima ação'
+}
+
 export function toggleActivity(state: ErpState, id: string, activityId: string, actor: string) {
   const opportunity = find(state.opportunities, id, 'Oportunidade')
   const activity = find(opportunity.activities, activityId, 'Atividade')
   activity.done = !activity.done
+  if (activity.done) {
+    activity.completedAt = today()
+    activity.registeredAt = today()
+  } else {
+    activity.completedAt = undefined
+    withdrawActivityEffort(state, id, activityId)
+  }
   if (activity.done && activity.type === 'Reunião') {
     const hasGoogle = activity.attachments?.some(file => file.source === 'google')
     if (!hasGoogle) activity.attachments = [...(activity.attachments ?? []), ...googleMeetArtifacts(state, now())]
   }
-  const pending = opportunity.activities.filter(entry => !entry.done).sort((a, b) => a.at.localeCompare(b.at))[0]
-  opportunity.nextAction = pending?.text ?? 'Definir próxima ação'
+  if (activity.done) effortFromActivity(state, opportunity, activity)
+  refreshNextAction(opportunity)
   log(state, 'CRM', actor, `${activity.type} ${activity.done ? 'concluída' : 'reaberta'}: ${activity.text}`, undefined, id)
+  return activity
+}
+
+/**
+ * Conclui a ação com a data em que aconteceu, os participantes e o resultado.
+ * A data da interação define a semana de esforço; o dia do registro fica à parte.
+ */
+export function completeActivity(
+  state: ErpState, id: string, activityId: string,
+  input: { occurredOn: string; participants?: string; summary: string; nextStep?: string; attachments?: NewActivityFile[] },
+  actor: string,
+) {
+  const opportunity = find(state.opportunities, id, 'Oportunidade')
+  const activity = find(opportunity.activities, activityId, 'Atividade')
+  if (activity.done) throw new DomainError('A ação já está concluída')
+  if (!input.summary.trim()) throw new DomainError('Registre o resultado para concluir')
+  if (!input.occurredOn || input.occurredOn > today()) throw new DomainError('Informe uma data em que a ação já aconteceu')
+  if ((activity.type === 'Reunião' || activity.type === 'Visita') && !input.participants?.trim()) throw new DomainError('Informe os participantes')
+  if (activity.type === 'Recompra' && !input.nextStep?.trim()) throw new DomainError('Informe o próximo passo da recompra')
+  assertActivityFiles(input.attachments ?? [], activity.attachments?.length ?? 0)
+  const extra = (input.attachments ?? []).map(file => storedFile(state, file, now()))
+  Object.assign(activity, {
+    done: true, completedAt: input.occurredOn, registeredAt: today(), summary: input.summary.trim(),
+    participants: input.participants?.trim() || undefined, attachments: [...(activity.attachments ?? []), ...extra],
+  })
+  if (activity.type === 'Reunião' && !activity.attachments?.some(file => file.source === 'google')) activity.attachments = [...(activity.attachments ?? []), ...googleMeetArtifacts(state, now())]
+  effortFromActivity(state, opportunity, activity)
+  if (input.nextStep?.trim()) {
+    const next: CrmActivity = {
+      id: nextId(state, 'ACT'), at: `${addDays(today(), 3)}T09:00:00.000Z`, type: 'Tarefa', text: input.nextStep.trim(), done: false, createdBy: actor,
+      origin: 'manual', registeredAt: today(), ownerId: opportunity.ownerId,
+    }
+    opportunity.activities.unshift(next)
+    activity.nextActivityId = next.id
+  }
+  refreshNextAction(opportunity)
+  log(state, 'CRM', actor, `${activity.type} concluída: ${activity.text}`, undefined, id)
   return activity
 }
 
@@ -562,26 +735,39 @@ export function deliveryLead(state: ErpState, item: Item): number {
   return production + Math.max(0, ...components)
 }
 
-export function createProposal(state: ErpState, opportunityId: string, actor: string) {
-  const opportunity = find(state.opportunities, opportunityId, 'Oportunidade')
-  if (!opportunityIsOpen(opportunity)) throw new DomainError('Oportunidade encerrada')
-  const quantity = opportunity.quantity ?? 1
-  const lines: ProposalLine[] = (opportunity.itemIds ?? []).map(itemId => {
-    const item = getItem(state, itemId)
-    assertUsable(item, 'venda')
-    return { itemId, description: item.variant ? `${item.name} · ${item.variant}` : item.name, quantity, unitPrice: listPrice(item) }
-  })
-  const leadDays = Math.max(14, ...lines.map(line => deliveryLead(state, getItem(state, line.itemId!))))
-  const proposal: Proposal = {
-    id: `PROP-${String(state.counters.PROP = (state.counters.PROP ?? 26019) + 1)}`, opportunityId, partnerId: opportunity.partnerId, lines,
-    discount: 0, validUntil: addDays(today(), 15), suggestedDate: addDays(today(), leadDays + 7), status: 'Rascunho', createdAt: now(), paymentTerms: '28 dias',
-    version: 1, createdBy: actor,
-  }
-  state.proposals.unshift(proposal)
-  if (CRM_STAGES.indexOf(opportunity.stage) < CRM_STAGES.indexOf('Proposta')) {
+/** Criar ou enviar a proposta leva a oportunidade até a fase Proposta da sua trilha, sem pular para trás. */
+function moveToProposalStage(opportunity: Opportunity) {
+  const stages = stagesOf(funnelOf(opportunity))
+  if (stages.indexOf(opportunity.stage) < stages.indexOf('Proposta')) {
     opportunity.stage = 'Proposta'
     opportunity.probability = STAGE_PROBABILITY.Proposta
   }
+}
+
+export function createProposal(state: ErpState, opportunityId: string, actor: string) {
+  const opportunity = find(state.opportunities, opportunityId, 'Oportunidade')
+  if (!opportunityIsOpen(opportunity)) throw new DomainError('Oportunidade encerrada')
+  const solutions = funnelOf(opportunity) === 'Soluções'
+  if (solutions) {
+    const blockers = stageBlockers(opportunity, 'Proposta')
+    if (blockers.length) throw new DomainError(`Para propor, preencha no Discovery: ${blockers.join(', ')}`)
+  }
+  const quantity = opportunity.quantity ?? 1
+  const lines: ProposalLine[] = solutions
+    ? [{ description: `Implantação · ${(opportunity.solutionIds ?? []).join(' + ')}`, quantity: 1, unitPrice: opportunity.value }]
+    : (opportunity.itemIds ?? []).map(itemId => {
+      const item = getItem(state, itemId)
+      assertUsable(item, 'venda')
+      return { itemId, description: item.variant ? `${item.name} · ${item.variant}` : item.name, quantity, unitPrice: listPrice(item) }
+    })
+  const leadDays = solutions ? 30 : Math.max(14, ...lines.map(line => deliveryLead(state, getItem(state, line.itemId!))))
+  const proposal: Proposal = {
+    id: `PROP-${String(state.counters.PROP = (state.counters.PROP ?? 26019) + 1)}`, opportunityId, partnerId: opportunity.partnerId, lines,
+    discount: 0, validUntil: addDays(today(), 15), suggestedDate: addDays(today(), leadDays + 7), status: 'Rascunho', createdAt: now(),
+    paymentTerms: solutions ? 'Mensalidade contratual' : '28 dias', version: 1, createdBy: actor, mrr: solutions ? opportunity.mrr ?? 0 : undefined,
+  }
+  state.proposals.unshift(proposal)
+  moveToProposalStage(opportunity)
   log(state, 'Comercial', actor, `${proposal.id} criada em rascunho`, undefined, opportunityId)
   log(state, 'Comercial', actor, `Proposta criada a partir de ${opportunityId}`, undefined, proposal.id)
   return proposal
@@ -593,9 +779,10 @@ function editableProposal(state: ErpState, id: string) {
   return proposal
 }
 
-export function updateProposal(state: ErpState, id: string, patch: Partial<Pick<Proposal, 'discount' | 'validUntil' | 'suggestedDate' | 'paymentTerms'>>, actor: string) {
+export function updateProposal(state: ErpState, id: string, patch: Partial<Pick<Proposal, 'discount' | 'validUntil' | 'suggestedDate' | 'paymentTerms' | 'mrr'>>, actor: string) {
   const proposal = editableProposal(state, id)
   if (patch.discount !== undefined && (patch.discount < 0 || patch.discount >= 100)) throw new DomainError('Desconto inválido')
+  if (patch.mrr !== undefined && !(patch.mrr >= 0)) throw new DomainError('Mensalidade inválida')
   Object.assign(proposal, patch)
   syncOpportunityValue(state, proposal)
   log(state, 'Comercial', actor, 'Condições da proposta atualizadas', undefined, id)
@@ -641,15 +828,18 @@ export function removeProposalLine(state: ErpState, id: string, index: number, a
 
 function syncOpportunityValue(state: ErpState, proposal: Proposal) {
   const opportunity = state.opportunities.find(entry => entry.id === proposal.opportunityId)
-  if (opportunity && opportunityIsOpen(opportunity)) opportunity.value = Math.round(proposalTotal(proposal))
+  if (opportunity && opportunityIsOpen(opportunity)) {
+    opportunity.value = Math.round(proposalTotal(proposal))
+    if (funnelOf(opportunity) === 'Soluções' && proposal.mrr !== undefined) opportunity.mrr = proposal.mrr
+  }
 }
 
 function sendProposal(state: ErpState, proposal: Proposal, actor: string) {
   proposal.status = 'Enviada'
   const opportunity = state.opportunities.find(entry => entry.id === proposal.opportunityId)
-  if (opportunity && CRM_STAGES.indexOf(opportunity.stage) < CRM_STAGES.indexOf('Proposta')) {
-    opportunity.stage = 'Proposta'
-    opportunity.probability = STAGE_PROBABILITY.Proposta
+  if (opportunity) {
+    moveToProposalStage(opportunity)
+    effortFromProposalSent(state, opportunity, proposal)
   }
   log(state, 'Comercial', actor, `${proposal.id} enviada ao cliente (${money(proposalTotal(proposal))})`, undefined, proposal.opportunityId)
 }
@@ -676,6 +866,9 @@ export function advanceProposal(state: ErpState, id: string, actor: string) {
     expireProposals(state)
     if (proposal.status !== 'Enviada') throw new DomainError('A proposta venceu. Gere uma nova versão com a validade atualizada')
     acceptProposal(state, proposal, actor)
+  } else if (proposal.status === 'Aceita') {
+    // Repetir o aceite não cria outro pedido nem outro contrato: o vínculo é único.
+    return proposal
   } else throw new DomainError('A proposta não pode avançar')
   log(state, 'Comercial', actor, `${proposal.id}: ${proposal.status}`, undefined, proposal.id)
   return proposal
@@ -748,6 +941,11 @@ function releasedRevision(state: ErpState, itemId: string) {
 
 /** O pedido nasce no Thalamus aguardando análise. Com o Omie ligado e a fonte decidida, segue também para lá. */
 function acceptProposal(state: ErpState, proposal: Proposal, actor: string) {
+  // O vínculo é único: aceitar de novo nunca cria outro pedido nem outro contrato.
+  if (proposal.salesOrderId || proposal.rentalContractId) return
+  const target = state.opportunities.find(entry => entry.id === proposal.opportunityId)
+  if (target && funnelOf(target) === 'Soluções') return acceptSolutionProposal(state, proposal, target, actor)
+  if (target?.dealType === 'Locação') return acceptRentalProposal(state, proposal, target, actor)
   const productLines = proposal.lines.filter(line => line.itemId)
   if (!productLines.length) throw new DomainError('A proposta precisa de ao menos um produto')
   for (const line of productLines) assertUsable(getItem(state, line.itemId!), 'venda')
@@ -770,10 +968,44 @@ function acceptProposal(state: ErpState, proposal: Proposal, actor: string) {
     lines: orderLines.map(line => ({ ...line, revision: releasedRevision(state, line.itemId) })),
     promisedDate: proposal.suggestedDate, priority: 'Normal', value: total, receivedAt: now(), planned: false,
     origin: 'Thalamus', proposalId: proposal.id, opportunityId: proposal.opportunityId, paymentTerms: proposal.paymentTerms,
+    channel: opportunity?.channel ?? 'Direto', accountOwnerId: accountOwnerOf(state, proposal.partnerId, opportunity),
   })
   proposal.salesOrderId = orderId
   log(state, 'Comercial', actor, `${proposal.id} aceita; pedido ${orderId} criado aguardando análise`, orderId)
   if (opportunity) log(state, 'CRM', actor, `Ganha: pedido ${orderId} gerado (${money(total)})`, undefined, opportunity.id)
+}
+
+/** O dono da conta no momento da venda. Sem dono cadastrado na carteira, o vendedor da oportunidade. */
+function accountOwnerOf(state: ErpState, partnerId: string, opportunity?: Opportunity) {
+  const partner = state.partners.find(entry => entry.id === partnerId)
+  return (partner ? currentOwnerOf(partner) : undefined) ?? opportunity?.ownerId
+}
+
+/** Solução Zontec aceita: não gera pedido. A oportunidade fica Conquistada e aguarda responsável e marco de implantação. */
+function acceptSolutionProposal(state: ErpState, proposal: Proposal, opportunity: Opportunity, actor: string) {
+  if (!proposal.lines.length) throw new DomainError('A proposta precisa de ao menos uma linha')
+  ensureCustomer(state, proposal.partnerId)
+  const setup = Math.round(proposalTotal(proposal))
+  proposal.status = 'Aceita'
+  Object.assign(opportunity, { stage: 'Conquistado', probability: 100, value: setup, mrr: proposal.mrr ?? opportunity.mrr ?? 0, wonAt: today() })
+  log(state, 'Comercial', actor, `${proposal.id} aceita; implantação habilitada`, undefined, proposal.id)
+  log(state, 'CRM', actor, `Conquistada: implantação ${money(setup)} e mensalidade ${money(opportunity.mrr ?? 0)}`, undefined, opportunity.id)
+}
+
+/** Locação aceita: não gera pedido. Nasce a proposta de locação, que Contratos ativa com aprovação de outra pessoa. */
+function acceptRentalProposal(state: ErpState, proposal: Proposal, opportunity: Opportunity, actor: string) {
+  if (!proposal.lines.length) throw new DomainError('A proposta precisa de ao menos uma linha')
+  const total = Math.round(proposalTotal(proposal))
+  const contract = createRental(state, {
+    partnerId: proposal.partnerId, opportunityId: opportunity.id, startsOn: proposal.suggestedDate, endsOn: addDays(proposal.suggestedDate, 365),
+    amount: total, paymentTerms: proposal.paymentTerms, note: `Origem: ${proposal.id}`,
+  }, actor)
+  ensureCustomer(state, proposal.partnerId)
+  proposal.status = 'Aceita'
+  proposal.rentalContractId = contract.id
+  Object.assign(opportunity, { stage: 'Ganho', probability: 100, value: total, wonAt: today() })
+  log(state, 'Comercial', actor, `${proposal.id} aceita; ${contract.id} segue para Contratos de locação`, undefined, proposal.id)
+  log(state, 'CRM', actor, `Ganha: ${contract.id} aguarda aprovação em Locação (${money(total)})`, undefined, opportunity.id)
 }
 
 /* ---------- Pedidos de venda ---------- */

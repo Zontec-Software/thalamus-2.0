@@ -299,7 +299,7 @@ export interface ItemCatalog {
   fiscalSync?: FiscalSync
 }
 
-export type Role = 'Admin' | 'Gestor' | 'Comercial' | 'Engenharia' | 'PCP' | 'Compras' | 'Almoxarifado' | 'Líder de produção' | 'Operador' | 'Qualidade' | 'Expedição' | 'Manutenção' | 'Assistência' | 'Financeiro'
+export type Role = 'Admin' | 'Gestor' | 'Comercial' | 'Supervisão comercial' | 'Engenharia' | 'PCP' | 'Compras' | 'Almoxarifado' | 'Líder de produção' | 'Operador' | 'Qualidade' | 'Expedição' | 'Manutenção' | 'Assistência' | 'Financeiro'
 
 /** Identificador estável de uma ação de negócio autorizável, por exemplo `orcamentos.ler`. */
 export type FunctionalityId = string
@@ -555,6 +555,12 @@ export interface SalesOrder {
   cancelledAt?: string
   cancelReason?: string
   changes?: SalesOrderChange[]
+  /** Canal de venda. Sem isto, Direto. */
+  channel?: SalesChannel
+  /** Chave do pedido no canal (por exemplo, o pedido do marketplace). */
+  externalKey?: string
+  /** Dono da conta no momento da venda. A venda por canal não troca o dono. */
+  accountOwnerId?: string
 }
 
 export interface Shipment {
@@ -1098,6 +1104,15 @@ export interface SupplierHomologation {
  * Cadastro mestre de parceiro. No Omie, cliente e fornecedor são o mesmo registro;
  * Cliente e Fornecedor são papéis deste registro, não cadastros separados.
  */
+export type CommercialClass = 'A1' | 'A2' | 'B' | 'C1' | 'C2' | 'A classificar'
+
+export interface PartnerOwnership {
+  ownerId: string
+  since: string
+  until?: string
+  by?: string
+}
+
 export interface BusinessPartner {
   id: string
   personType: 'Física' | 'Jurídica'
@@ -1121,6 +1136,10 @@ export interface BusinessPartner {
   createdAt: string
   createdBy: string
   audit: { at: string; actor: string; text: string; before?: string; after?: string }[]
+  /** Classe de cobertura da carteira comercial. Define a cadência de contato. */
+  commercialClass?: CommercialClass
+  /** Responsável comercial por vigência. A última sem until é a vigente. */
+  ownerHistory?: PartnerOwnership[]
   abcClass?: 'A' | 'B' | 'C'
   abcDecidedBy?: string
   abcDecidedAt?: string
@@ -1297,9 +1316,25 @@ export interface ActivityCalendar {
 export interface CrmActivity {
   id: string
   at: string
-  type: 'Ligação' | 'E-mail' | 'Reunião' | 'Tarefa'
+  type: 'Ligação' | 'E-mail' | 'Reunião' | 'Tarefa' | 'Visita' | 'Recompra'
   text: string
   done: boolean
+  /** Quando aconteceu, se já foi concluída. A data da interação define a semana de esforço. */
+  completedAt?: string
+  /** Quem trouxe o registro. Sem isto, foi digitado na ficha. */
+  origin?: ActivityOrigin
+  /** Resumo e resultado da interação. */
+  summary?: string
+  participants?: string
+  /** Dia em que o registro entrou no Thalamus; pode ser depois de completedAt. */
+  registeredAt?: string
+  /** Fontes que sustentam o registro (evento da agenda, transcrição). */
+  references?: ActivityReference[]
+  /** Próxima ação combinada na mesma gravação. */
+  nextActivityId?: string
+  /** Repetir a gravação com a mesma chave devolve este registro. */
+  idempotencyKey?: string
+  ownerId?: string
   /** Pauta da reunião. */
   details?: string
   /** Setor que recebe a tarefa. */
@@ -1326,8 +1361,42 @@ export interface NewActivityInput {
 }
 
 export type OpportunityStage = 'Novo contato' | 'Qualificação' | 'Levantamento' | 'Proposta' | 'Negociação' | 'Ganho' | 'Perdido'
+  | 'Prospecção' | 'Discovery' | 'Cálculo de custo' | 'Demonstração' | 'Conquistado' | 'Implantação'
+/** Cada trilha tem as suas fases. Produtos Roboflex e Soluções Zontec. */
+export type OpportunityFunnel = 'Produtos' | 'Soluções'
+export type SalesChannel = 'Direto' | 'Integrador' | 'Revenda' | 'Mercado Livre'
+export type ActivityOrigin = 'manual' | 'mcp'
+export type ActivityProvider = 'agenda' | 'meet'
+
+export interface ActivityReference {
+  provider: ActivityProvider
+  /** Identificador do evento ou da transcrição no provedor. */
+  externalId: string
+  title: string
+  content: string
+}
+
+/** Diagnóstico compartilhado com a pré-venda técnica. */
+export interface OpportunityDiscovery {
+  pain?: string
+  decider?: string
+  fit?: 'A avaliar' | 'Tier 1' | 'Tier 2' | 'Fora do perfil'
+  baseline?: string
+  scope?: string
+  success?: string
+  risks?: string
+  pilot?: string
+  review?: string
+}
+
+export interface OpportunityImplementation {
+  startedAt: string
+  responsibleId: string
+  responsibleName: string
+  milestone: string
+}
 export type OpportunityTemperature = 'Quente' | 'Morno' | 'Frio'
-export type OpportunityDeal = 'Venda' | 'Locação'
+export type OpportunityDeal = 'Venda' | 'Locação' | 'Recorrente'
 
 /** Meta comercial de uma empresa. O grupo só soma as metas; cada empresa grava a sua. */
 export interface SalesGoal {
@@ -1336,6 +1405,13 @@ export interface SalesGoal {
   amount: number
   /** Janeiro a dezembro. Sem isto, cada mês vale um doze avos. */
   monthlyAmounts?: number[]
+  /** Quem gravou a última versão. Não aprova a própria meta. */
+  savedBy?: string
+  /** Versão aprovada pela gestão. Sem aprovação, a meta é de trabalho e não vale para o faturamento. */
+  approvedBy?: string
+  approvedAt?: string
+  /** Dia do mês depois do qual a competência deixa de receber nota. Sem isto, o mês inteiro. */
+  cutoffDay?: number
 }
 
 export interface Opportunity {
@@ -1372,6 +1448,13 @@ export interface Opportunity {
   lossReason?: string
   createdAt?: string
   wonAt?: string
+  /** Trilha comercial. Ausente em dado antigo: Produtos. */
+  funnel?: OpportunityFunnel
+  /** Soluções Zontec do catálogo. A primeira é a principal. Obrigatória na trilha Soluções. */
+  solutionIds?: string[]
+  discovery?: OpportunityDiscovery
+  implementation?: OpportunityImplementation
+  channel?: SalesChannel
 }
 
 export interface ProposalLine {
@@ -1405,6 +1488,10 @@ export interface Proposal {
   approvedBy?: string
   approvedAt?: string
   cancelReason?: string
+  /** Mensalidade (R$/mês) da proposta de solução. O total das linhas é a implantação. */
+  mrr?: number
+  /** Contrato de locação criado no aceite de uma oportunidade de locação. */
+  rentalContractId?: string
 }
 
 export type ProposalStatus = 'Rascunho' | 'Em aprovação' | 'Enviada' | 'Aceita' | 'Recusada' | 'Vencida' | 'Cancelada'
@@ -1807,7 +1894,7 @@ export interface AssetInventory {
 
 /* ---------- Cadastros gerais ---------- */
 
-export type RegistryKind = 'Unidade' | 'Moeda' | 'Condição de pagamento' | 'Origem de oportunidade' | 'Motivo de perda' | 'Motivo de recusa'
+export type RegistryKind = 'Unidade' | 'Moeda' | 'Condição de pagamento' | 'Origem de oportunidade' | 'Motivo de perda' | 'Motivo de recusa' | 'Solução Zontec'
 
 /** Lista compartilhada. Uma opção existe uma vez por empresa e tipo. */
 export interface RegistryEntry {
@@ -1831,4 +1918,111 @@ export interface OmieEntitySource {
   direction: 'Enviar' | 'Receber' | 'Bidirecional'
   decidedBy?: string
   decidedAt?: string
+}
+/* ---------- CRM: rotina por perfil, faturamento por competência e canais ---------- */
+
+export type EffortProfile = 'carteira' | 'abertura' | 'canais'
+export type EffortKind = 'contact' | 'meeting' | 'visit' | 'proposal' | 'repurchase'
+export type EffortReview = 'recorded' | 'pending' | 'approved' | 'returned'
+
+/** Vínculo comercial: qual régua de esforço vale para a conta, a equipe e desde quando. */
+export interface SellerLink {
+  id: string
+  tenantId: string
+  userId: string
+  profile: EffortProfile
+  /** Equipe de comercial acompanhada pela supervisão. Fora dela é canal externo. */
+  team: boolean
+  since: string
+}
+
+export interface EffortIndicatorRule {
+  id: string
+  label: string
+  description: string
+  /** Meta numérica. Percentual vai de 0 a 1. */
+  target: number
+  unit: 'quantidade' | 'percentual'
+}
+
+/** Régua de esforço por perfil e vigência. A vigente é a mais recente com início até a semana. */
+export interface EffortRule {
+  id: string
+  tenantId: string
+  profile: EffortProfile
+  since: string
+  indicators: EffortIndicatorRule[]
+  /** Quantos indicadores cumpridos fazem a semana verde. */
+  greenAt: number
+  /** Dias de cobertura da carteira por classe comercial. */
+  coverageDays: Partial<Record<CommercialClass, number>>
+}
+
+export interface EffortReviewStep {
+  at: string
+  actor: string
+  from: EffortReview
+  to: EffortReview
+  reason?: string
+}
+
+/** Evidência de esforço. Só conta no placar quando está registrada ou validada. */
+export interface EffortRecord {
+  id: string
+  tenantId: string
+  ownerId: string
+  kind: EffortKind
+  /** Dia da interação. Define a semana. */
+  date: string
+  note: string
+  review: EffortReview
+  reason?: string
+  partnerId?: string
+  opportunityId?: string
+  activityId?: string
+  proposalId?: string
+  /** Conta da lista-alvo, para o perfil de abertura. */
+  targetAccount?: boolean
+  prospect?: boolean
+  history: EffortReviewStep[]
+  /** Evita registrar duas vezes a mesma origem. */
+  source?: string
+}
+
+export type InvoiceUnit = 'MRR' | 'Implantação' | 'Venda avulsa'
+
+/** Nota fiscal de saída que o Omie devolve. Simulada: o Omie é dono da nota. */
+export interface SaleInvoice {
+  id: string
+  tenantId: string
+  /** Identidade fiscal. A mesma chave na mesma empresa é a mesma nota. */
+  fiscalKey: string
+  number: string
+  partnerId: string
+  issuedAt: string
+  amount: number
+  status: 'Autorizada' | 'Cancelada' | 'Devolvida'
+  intercompany: boolean
+  /** Conciliada com cliente e pedido. Sem conciliação, a nota não entra. */
+  reconciled: boolean
+  unit: InvoiceUnit
+  ownerId?: string
+  salesOrderId?: string
+  opportunityId?: string
+}
+
+/** Atendimento de canal (marketplace, integrador, revenda), ligado ao cliente e ao pedido. */
+export interface ChannelCase {
+  id: string
+  tenantId: string
+  channel: Exclude<SalesChannel, 'Direto'>
+  partnerId: string
+  externalId: string
+  subject: string
+  handlerId: string
+  arrivedAt: string
+  deadline: string
+  answer?: string
+  answeredAt?: string
+  salesOrderId?: string
 }

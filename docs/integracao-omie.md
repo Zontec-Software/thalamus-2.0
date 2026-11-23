@@ -20,7 +20,7 @@ A tabela `OWNERSHIP` (exibida na tela **Integração Omie**) define o dono de ca
 | Pedido de compra | Thalamus | Thalamus → Omie | Aprovação da requisição |
 | Recebimento / NF-e de entrada | Omie | Omie → Thalamus | A nota é do Omie; a conferência física é do Thalamus e só o aceito entra no saldo |
 | Saldo contábil de estoque | Omie | Bidirecional | Ajustes com motivo + conciliação |
-| Faturamento e NF-e de saída | Omie | Omie → Thalamus | Solicitado na expedição |
+| Faturamento e NF-e de saída | Omie | Omie → Thalamus | Solicitado na expedição. O CRM lê as notas autorizadas e conciliadas, por competência, para medir a meta comercial; duplicata (empresa + chave fiscal), cancelada, devolvida, intercompany, sem conciliação e posterior à data de corte ficam fora. No mockup as notas são simuladas |
 | Contas a pagar e a receber | Omie | Omie → Thalamus | O título nasce e é baixado no Omie. O Thalamus lê o pagamento e o recebimento como realizado do orçamento. A cobrança de assistência vai ao Omie para faturar |
 | Categoria financeira | Thalamus | Bidirecional | Criação ou alteração no Thalamus. Inativar envia conta_inativa. O Omie devolve o que mudou lá |
 | Orçamento anual | Thalamus | Interno | Definido no cadastro; acompanhamento mensal, trimestral, semestral ou anual |

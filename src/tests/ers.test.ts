@@ -216,10 +216,10 @@ describe('patrimônio', () => {
 describe('cadastros gerais', () => {
   it('não duplica opção por tipo, ignorando acento, e mantém ao menos uma ativa', () => {
     const state = createSeedState()
-    expect(registryOptions(state, 'Origem de oportunidade')).toEqual(['Indicação', 'Site', 'Prospecção', 'Cliente existente', 'Outro'])
+    expect(registryOptions(state, 'Origem de oportunidade')).toEqual(['Indicação', 'Site', 'Prospecção', 'Cliente existente', 'Outro', 'Feira', 'Integrador', 'Mercado Livre'])
     expect(() => saveRegistryEntry(state, { kind: 'Origem de oportunidade', code: '99', description: 'indicacao' }, 'Lucas Lima')).toThrow(/já está cadastrado/)
-    saveRegistryEntry(state, { kind: 'Origem de oportunidade', code: '06', description: 'Feira' }, 'Lucas Lima')
-    expect(registryOptions(state, 'Origem de oportunidade')).toContain('Feira')
+    saveRegistryEntry(state, { kind: 'Origem de oportunidade', code: '09', description: 'Evento interno' }, 'Lucas Lima')
+    expect(registryOptions(state, 'Origem de oportunidade')).toContain('Evento interno')
     const coins = state.registry.filter(entry => entry.kind === 'Moeda')
     setRegistryStatus(state, coins[1].id, 'Inativo', 'Lucas Lima')
     expect(() => setRegistryStatus(state, coins[0].id, 'Inativo', 'Lucas Lima')).toThrow(/ao menos uma/)

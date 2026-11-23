@@ -45,6 +45,8 @@ const TONES: Record<string, string> = {
   ignorado: 'neutral', 'Novo contato': 'neutral', Qualificação: 'info', Levantamento: 'info', Negociação: 'warning', Ganho: 'success', Perdido: 'danger',
   'Em aprovação': 'warning', Vencida: 'neutral', 'Aguardando análise': 'warning', Confirmado: 'info', 'Parcialmente expedido': 'info', Entregue: 'success',
   Bloqueado: 'danger', Rejeitada: 'danger', Substituída: 'neutral', Pendente: 'warning', Válido: 'success', Locado: 'info', 'Em contagem': 'info', Conciliado: 'success',
+  Discovery: 'info', 'Cálculo de custo': 'info', Demonstração: 'warning', Conquistado: 'success', Implantação: 'success', Conciliada: 'success', Parcial: 'warning', 'Sem conciliação': 'danger',
+  Validada: 'success', 'Em conferência': 'warning', Devolvida: 'danger', Registrada: 'neutral', Respondido: 'success',
   Conforme: 'success', Divergência: 'warning', Avaria: 'danger', Incompleto: 'warning', Thalamus: 'info', Omie: 'info',
 }
 

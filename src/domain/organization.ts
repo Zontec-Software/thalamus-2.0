@@ -7,7 +7,7 @@ import type { Employment, IdentityLink, JobCatalog, JobLevel, JobPosition, Perso
 /** Campos que não saem da empresa, nem no projeto nem no diretório. */
 export const SENSITIVE_PERSON_KEYS = ['cpf', 'rg', 'cnh', 'birthDate', 'race', 'pcd', 'drugAllergy', 'foodAllergy', 'controlledMedicine', 'address', 'banks', 'family', 'salary'] as const
 
-export const ACCOUNT_ROLES: Role[] = ['Admin', 'Gestor', 'Comercial', 'Engenharia', 'PCP', 'Compras', 'Almoxarifado', 'Líder de produção', 'Operador', 'Qualidade', 'Expedição', 'Manutenção', 'Assistência', 'Financeiro']
+export const ACCOUNT_ROLES: Role[] = ['Admin', 'Gestor', 'Comercial', 'Supervisão comercial', 'Engenharia', 'PCP', 'Compras', 'Almoxarifado', 'Líder de produção', 'Operador', 'Qualidade', 'Expedição', 'Manutenção', 'Assistência', 'Financeiro']
 
 export type PersonView = 'completa' | 'financeira' | 'profissional'
 export type PersonBlock = 'documentos' | 'saude' | 'endereco' | 'familia' | 'salario' | 'banco' | 'profissional'

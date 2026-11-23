@@ -23,6 +23,7 @@ const usedBy: Record<RegistryKind, string> = {
   'Origem de oportunidade': 'CRM: nova oportunidade',
   'Motivo de perda': 'CRM: oportunidade perdida',
   'Motivo de recusa': 'Propostas recusadas',
+  'Solução Zontec': 'CRM: trilha Soluções Zontec e proposta de implantação',
 }
 
 function start(entry?: RegistryEntry) {

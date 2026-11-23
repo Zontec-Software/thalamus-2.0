@@ -5,6 +5,7 @@ import { CheckCircle2 } from 'lucide-vue-next'
 import { hasFullAccess } from '../domain/access'
 import { missingProfile } from '../domain/organization'
 import { allocationOf } from '../domain/budget'
+import { opportunityIsOpen } from '../domain/enterprise'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 import type { Role } from '../types/domain'
@@ -67,7 +68,7 @@ const tasks = computed<Task[]>(() => {
   for (const maintenance of s.maintenanceOrders.filter(entry => entry.status !== 'Concluída')) {
     list.push({ id: maintenance.id, owner: 'Manutenção', title: `${maintenance.id} · ${maintenance.description}`, detail: `${s.assets.find(asset => asset.id === maintenance.assetId)?.name} · ${maintenance.type}`, urgent: maintenance.type === 'Corretiva', action: maintenance.status === 'Aberta' ? 'Iniciar' : 'Concluir', run: () => store.advanceMaintenance(maintenance.id) })
   }
-  for (const opportunity of s.opportunities.filter(entry => entry.stage !== 'Ganho' && entry.stage !== 'Perdido')) {
+  for (const opportunity of s.opportunities.filter(opportunityIsOpen)) {
     list.push({ id: opportunity.id, owner: 'Comercial', title: opportunity.nextAction, detail: `${store.partnerName(opportunity.partnerId)} · ${opportunity.title}`, action: 'Abrir oportunidade', run: () => router.push(`/crm/oportunidade/${opportunity.id}`) })
   }
   for (const demand of s.demands.filter(entry => entry.status === 'Aberta')) {

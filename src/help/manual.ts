@@ -105,7 +105,8 @@ export const MANUAL: ManualChapter[] = [
             rows: [
               ['Admin', 'Todos, inclusive orçamento, categorias e liberação de saldo excedido'],
               ['Gestor', 'Todos, inclusive a liberação de saldo excedido, a consulta consolidada do orçamento e a consulta do acesso do grupo'],
-              ['Comercial', 'CRM, Vendas, Expedição, Produtos'],
+              ['Comercial', 'CRM, Vendas, Expedição, Produtos. No CRM vê e registra só a própria carteira e o próprio esforço'],
+              ['Supervisão comercial', 'CRM da equipe: valida ou devolve evidências, faz a triagem e a classe da carteira, mantém a régua e o vínculo comercial. Não valida o próprio registro nem aprova a meta que salvou'],
               ['Engenharia', 'Produtos, Serviços, Ativos, Projetos'],
               ['PCP', 'Painel, Fluxo do pedido, Vendas, Produtos, Planejamento, Ordens de produção, Demandas, Injeção, Montagem, Indicadores'],
               ['Compras', 'Painel, Demandas, Compras, Almoxarifado, Orçamentos, Produtos'],
@@ -1099,15 +1100,25 @@ export const MANUAL: ManualChapter[] = [
     sections: [
       {
         id: 'crm', title: 'CRM: painel e oportunidades',
-        summary: 'Acompanhar negociações até o aceite.',
-        roles: ['Comercial', 'Gestor'],
+        summary: 'Acompanhar negociações até o aceite, em duas trilhas.',
+        roles: ['Comercial', 'Supervisão comercial', 'Gestor'],
         screens: [
           { label: 'Painel', to: '/crm' },
           { label: 'Oportunidades', to: '/crm/oportunidades' },
+          { label: 'Minhas tarefas', to: '/crm/tarefas' },
+          { label: 'Faturamento', to: '/crm/faturamento' },
+          { label: 'Canais', to: '/crm/canais' },
+          { label: 'Equipe', to: '/crm/equipe' },
         ],
         tour: '/crm',
         blocks: [
-          { kind: 'flow', title: 'Etapas da oportunidade', items: ['Novo contato', 'Qualificação', 'Levantamento', 'Proposta', 'Negociação', 'Ganho'] },
+          { kind: 'flow', title: 'Trilha Produtos Roboflex', items: ['Novo contato', 'Qualificação', 'Levantamento', 'Proposta', 'Negociação', 'Ganho'] },
+          { kind: 'flow', title: 'Trilha Soluções Zontec', items: ['Prospecção', 'Discovery', 'Cálculo de custo', 'Proposta', 'Demonstração', 'Conquistado', 'Implantação'] },
+          { kind: 'p', text: 'A trilha é atributo da oportunidade. Só as fases em aberto entram no funil; **Conquistado** e **Implantação** já são ganho. Na trilha Zontec, o **Discovery** (escopo, dor, decisor, prazo e soluções de interesse) é condição para chegar a Cálculo de custo. O aceite da proposta Zontec leva a Conquistado, sem gerar pedido; **Iniciar implantação** abre a última fase. O aceite de Locação gera o contrato de locação, sem pedido. O de Produtos gera um pedido, com canal e dono da conta.' },
+          { kind: 'p', text: '**Meta é faturamento por competência.** O realizado vem das notas fiscais do Omie (simulado aqui): só entram as autorizadas, conciliadas, sem duplicata (empresa e chave fiscal), sem intercompany, sem devolução e emitidas até a data de corte. Sem conciliação aparece como tal, nunca como zero. A meta só vale depois de aprovada por outra pessoa. As unidades são MRR, Implantação e Venda avulsa. Conquista contratada é outra medida.' },
+          { kind: 'p', text: '**Rotina por perfil.** Cada vendedor tem um vínculo comercial (carteira, abertura de contas ou canais) e uma régua de quatro indicadores, de segunda a domingo; a semana fica verde com três. A data da interação decide a semana. Evidência em conferência ou devolvida fica fora do placar até a supervisão validar, ou até o vendedor corrigir. A régua muda por vigência e as semanas passadas mantêm a que valia. Os valores de partida são sugestão a calibrar com a gestão.' },
+          { kind: 'p', text: '**Concluir uma ação** pede o que aconteceu, com quem e, se houver, anexos (até 5 arquivos de 10 MB; pdf, imagens, txt, csv, docx, xlsx, pptx e áudio mp3, m4a ou wav). **Registrar pelo ChatGPT** é uma simulação do conector MCP: repetir a mesma chave não duplica, uma tarefa já existente é concluída em vez de criar outra e o autor aparece como ChatGPT via MCP. Agenda do Google e Meet também são simulados.' },
+          { kind: 'p', text: '**Carteira e canais.** O cliente tem responsável por vigência (a anterior fica no histórico) e classe comercial A1, A2, B, C1, C2 ou A classificar, que define a cobertura de contato. Cliente sem responsável aparece na triagem da supervisão. O pedido de canal (Mercado Livre, Integrador, Feira) mantém o dono da conta; quem atende o canal não vira dono do cliente, e o pedido só se liga a atendimento do mesmo cliente e canal.' },
           { kind: 'p', text: 'Origem, motivo de perda e motivo de recusa vêm de Cadastros gerais. Perder a oportunidade exige motivo e cancela as propostas em andamento.' },
           { kind: 'p', text: 'O CRM tem duas áreas: painel e oportunidades. A meta anual é da empresa, rateada por mês, e cada mês pode ser alterado. Quem pode consultar o grupo vê a soma, sem gravar a meta no grupo. O funil e a pizza ficam no painel. A temperatura filtra o painel sem abrir a lista.' },
           {
@@ -1129,8 +1140,12 @@ export const MANUAL: ManualChapter[] = [
             kind: 'table', title: 'Abas do CRM',
             head: ['Aba', 'Para que serve'],
             rows: [
-              ['Painel', 'Meta mensal ou anual, funil pela quantidade, pizza por fase, temperatura e o que precisa de atenção.'],
-              ['Oportunidades', 'Uma pesquisa e colunas que se ligam e desligam. A linha mostra temperatura, cliente, ticket e fase. O clique abre um cartão; a ficha completa é um passo a mais.'],
+              ['Painel', 'Faturamento do mês contra a meta aprovada, minha semana, funil pela quantidade, pizza por fase, temperatura e o que precisa de atenção.'],
+              ['Oportunidades', 'Uma pesquisa e colunas que se ligam e desligam. A linha mostra temperatura, cliente, ticket e fase. O clique abre um cartão; a ficha completa é um passo a mais. O quadro mostra uma trilha por vez.'],
+              ['Minhas tarefas', 'A fazer, concluídas, recompras e minhas evidências. Evidência devolvida pode ser corrigida e reenviada.'],
+              ['Faturamento', 'Competências, unidades e as notas dentro e fora do cálculo, com o motivo.'],
+              ['Canais', 'Atendimentos com prazo de resposta, pedidos de canal e parceiros.'],
+              ['Equipe', 'Só para quem acompanha a equipe: semana de cada vendedor, conferência, carteira e régua.'],
             ],
           },
           {
@@ -1740,6 +1755,12 @@ export const MANUAL: ManualChapter[] = [
             head: ['Termo', 'Significado'],
             rows: [
               ['OP', 'Ordem de produção. De injeção (peça) ou de montagem (case).'],
+              ['Trilha', 'Sequência de fases da oportunidade: Produtos Roboflex ou Soluções Zontec.'],
+              ['Discovery', 'Levantamento da necessidade do cliente Zontec: escopo, dor, decisor, prazo e soluções de interesse.'],
+              ['Semana verde', 'Semana em que o vendedor cumpriu três dos quatro indicadores da régua do seu perfil.'],
+              ['Evidência de esforço', 'Registro da interação com o cliente. Só conta no placar quando está registrada ou validada.'],
+              ['Competência', 'Mês de emissão da nota fiscal. É a base do faturamento contra a meta.'],
+              ['Dono da conta', 'Vendedor responsável pelo cliente na vigência. O canal que atende o pedido não muda o dono.'],
               ['Estrutura (BOM)', 'Lista de componentes e quantidades de um produto fabricado.'],
               ['Roteiro', 'Sequência de operações de fabricação, com posto, tempo, preparação, equipe, ferramental e instruções. Faz parte da versão.'],
               ['Versão da estrutura', 'Cada alteração controlada da estrutura e do roteiro (A, B, C…), com vigência.'],

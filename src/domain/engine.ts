@@ -4,6 +4,7 @@ import type {
   OmieCategory, OmiePayment, Proposal, PurchaseOrder, Requisition, RequisitionStatus, Resource, SalesOrder, SalesOrderStatus, Sector, ServiceCatalogItem,
   ShopAlert, StockMovement, SupplierHomologation, SyncLog, TechnicalServiceOrder, Tenant, User, UserProfileAssignment,
   DirectoryAccount, WorkspaceConnection,
+  ChannelCase, EffortRecord, EffortRule, SaleInvoice, SellerLink,
   AssetInventory, AssetMovement, Facility, OmieEntity, OmieEntitySource, Receipt, RegistryEntry, RentalContract, Training, Warranty, WarrantyPolicy,
 } from '../types/domain'
 
@@ -56,6 +57,11 @@ export interface ErpState {
   purchaseOrders: PurchaseOrder[]
   opportunities: Opportunity[]
   salesGoals: SalesGoal[]
+  sellerLinks: SellerLink[]
+  effortRules: EffortRule[]
+  effortRecords: EffortRecord[]
+  saleInvoices: SaleInvoice[]
+  channelCases: ChannelCase[]
   proposals: Proposal[]
   technicalServiceOrders: TechnicalServiceOrder[]
   projects: Project[]

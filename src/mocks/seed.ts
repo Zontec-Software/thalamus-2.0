@@ -5,6 +5,7 @@ import {
 } from '../domain/engine'
 import { defaultCatalog, ensureClassPath, seedPath, withCheckDigit } from '../domain/catalog'
 import { FUNCTIONALITIES, moduleFeature, profileCode, seededProfiles } from '../domain/access'
+import { seedCrmRoutine } from './seedCrm'
 import type { BusinessPartner, Item, PartnerRoleName, RegistryEntry, RegistryKind, RouteStep, SalesOrder } from '../types/domain'
 
 const mp = (id: string, code: string, name: string, stock: number, minimum: number, cost: number, supplier: string, leadTimeDays: number): Item =>
@@ -42,7 +43,7 @@ function bp(input: Pick<BusinessPartner, 'id' | 'name' | 'document' | 'roles' | 
 
 const reg = (kind: RegistryKind, index: number, entry: string): RegistryEntry => {
   const [code, description] = entry.includes(' · ') ? entry.split(' · ') : [String(index + 1).padStart(2, '0'), entry]
-  const prefix: Record<RegistryKind, string> = { Unidade: 'UN', Moeda: 'MO', 'Condição de pagamento': 'CP', 'Origem de oportunidade': 'OR', 'Motivo de perda': 'MP', 'Motivo de recusa': 'MR' }
+  const prefix: Record<RegistryKind, string> = { Unidade: 'UN', Moeda: 'MO', 'Condição de pagamento': 'CP', 'Origem de oportunidade': 'OR', 'Motivo de perda': 'MP', 'Motivo de recusa': 'MR', 'Solução Zontec': 'SZ' }
   return { id: `CG-${prefix[kind]}-${index + 1}`, tenantId: 'tenant-roboflex', kind, code, description, status: 'Ativo' }
 }
 
@@ -323,6 +324,7 @@ function baseState(): ErpState {
       { tenantId: 'tenant-roboflex-sul', year: 2026, amount: 8000000 },
       { tenantId: 'tenant-locacoes', year: 2026, amount: 2400000 },
     ],
+    sellerLinks: [], effortRules: [], effortRecords: [], saleInvoices: [], channelCases: [],
     proposals: [
       { id: 'PROP-26018', opportunityId: 'OPP-26042', partnerId: 'c1', lines: [{ itemId: 'pa-s9-min', description: 'Case Mining · Galaxy Tab S9 FE', quantity: 120, unitPrice: 745 }, { itemId: 'pa-a11-ext', description: 'Case Extreme · Samsung Tab A11', quantity: 24, unitPrice: 520 }, { serviceId: 'sv-campo', description: 'Implantação em campo', quantity: 2, unitPrice: 1200 }], discount: 2, paymentTerms: '28/56 dias', validUntil: '2026-10-25', suggestedDate: '2026-11-28', status: 'Enviada', createdAt: '2026-10-13T14:00:00.000Z' },
       { id: 'PROP-26019', opportunityId: 'OPP-26043', partnerId: 'c5', lines: [{ itemId: 'pa-a11-ext', description: 'Case Extreme · Samsung Tab A11', quantity: 60, unitPrice: 520 }], discount: 0, paymentTerms: '28 dias', validUntil: '2026-11-02', suggestedDate: '2026-11-20', status: 'Rascunho', createdAt: '2026-10-15T10:00:00.000Z' },
@@ -486,9 +488,10 @@ function baseState(): ErpState {
       ...['un · Unidade', 'kg · Quilograma', 'cx · Caixa', 'kit · Kit', 'h · Hora'].map((entry, index) => reg('Unidade', index, entry)),
       ...['BRL · Real', 'USD · Dólar americano'].map((entry, index) => reg('Moeda', index, entry)),
       ...['AV · À vista', '28 · 28 dias', '28/56 · 28/56 dias', '30/60/90 · 30/60/90 dias'].map((entry, index) => reg('Condição de pagamento', index, entry)),
-      ...['Indicação', 'Site', 'Prospecção', 'Cliente existente', 'Outro'].map((entry, index) => reg('Origem de oportunidade', index, entry)),
+      ...['Indicação', 'Site', 'Prospecção', 'Cliente existente', 'Outro', 'Feira', 'Integrador', 'Mercado Livre'].map((entry, index) => reg('Origem de oportunidade', index, entry)),
       ...['Preço', 'Prazo', 'Solução', 'Concorrente', 'Cancelamento', 'Outro'].map((entry, index) => reg('Motivo de perda', index, entry)),
       ...['Preço', 'Prazo', 'Solução', 'Concorrente', 'Outro'].map((entry, index) => reg('Motivo de recusa', index, entry)),
+      ...['Laundry', 'LifeGuard', 'Asset Control', 'Guard Enterprise'].map((entry, index) => reg('Solução Zontec', index, entry)),
     ],
     omieSources: [
       { tenantId: 'tenant-roboflex', entity: 'Cliente', source: 'Thalamus', direction: 'Enviar', decidedBy: 'Lucas Lima', decidedAt: '2026-10-01T12:00:00.000Z' },
@@ -821,6 +824,7 @@ export function createSeedState(): ErpState {
     }]
   }
   prepareOperations(s)
+  seedCrmRoutine(s)
   return s
 }
 

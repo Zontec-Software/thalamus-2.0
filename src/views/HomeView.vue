@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { ChevronRight } from 'lucide-vue-next'
 import { IconSeta } from '../icons/ds'
+import { opportunityIsOpen } from '../domain/enterprise'
 import { showOnFloor } from '../domain/resources'
 import { AREAS, type Area, areaDestination, moduleFeature, navTarget } from '../navigation'
 import { useErpStore } from '../stores/erp'
@@ -29,7 +30,7 @@ const counted = (value: number, one: string, many: string) => value ? { value, l
 
 const badge = (id: string) => {
   const s = store.state
-  if (id === 'comercial') return counted(s.opportunities.filter(entry => entry.stage !== 'Ganho' && entry.stage !== 'Perdido').length, 'oportunidade', 'oportunidades')
+  if (id === 'comercial') return counted(s.opportunities.filter(opportunityIsOpen).length, 'oportunidade', 'oportunidades')
   if (id === 'engenharia') return counted(s.productRevisions.filter(entry => entry.status === 'Rascunho').length, 'revisão aberta', 'revisões abertas')
   if (id === 'suprimentos') return counted(s.requisitions.filter(req => req.status !== 'Recebida').length, 'compra aberta', 'compras abertas')
   if (id === 'operacoes') return counted(s.productionOrders.filter(op => op.status === 'Em produção').length, 'OP rodando', 'OPs rodando')

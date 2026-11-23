@@ -7,10 +7,12 @@ import BaseModal from '../components/BaseModal.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import ReasonModal from './products/ReasonModal.vue'
 import { BRAZIL_STATES, documentError, loadBrazilCities, lookupCnpj, maskCnpj, maskCpf, onlyDigits, validCnpj } from '../domain/brazil'
+import { currentOwnerOf } from '../domain/crmEffort'
+import { COMMERCIAL_CLASSES } from '../domain/crmRoutine'
 import { ADDRESS_PURPOSES, CLIENT_VERTICALS, clientSalesBase, duplicatePartner, homologationsOf, phaseOf, roleStatus, supplierReceiptBase } from '../domain/partners'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
-import type { AddressPurpose, BusinessPartner, PartnerRoleName } from '../types/domain'
+import type { AddressPurpose, BusinessPartner, CommercialClass, PartnerRoleName } from '../types/domain'
 import { fmtCurrency, fmtDate, fmtNumber } from '../utils/format'
 
 type Role = 'Cliente' | 'Fornecedor' | 'Transportadora'
@@ -490,6 +492,19 @@ function inactivate(reason: string) {
               </select>
               <small>A oportunidade usa esta vertical. Ela se escolhe aqui, no cliente.</small>
             </div>
+            <div class="field">
+              <label>Classe comercial</label>
+              <select :value="partner.commercialClass ?? 'A classificar'" :disabled="!store.can('crm.carteira.gerir')" @change="store.setCommercialClass(partner.id, ($event.target as HTMLSelectElement).value as CommercialClass)">
+                <option v-for="entry in COMMERCIAL_CLASSES" :key="entry">{{ entry }}</option>
+              </select>
+              <small>Define a cobertura de contato exigida na régua da carteira. Quem classifica é a supervisão.</small>
+            </div>
+          </div>
+          <div class="field" style="max-width:420px">
+            <label>Responsável pela carteira</label>
+            <p style="margin:0"><b>{{ currentOwnerOf(partner) ? store.userName(currentOwnerOf(partner)) : 'Sem responsável' }}</b></p>
+            <small v-for="entry in partner.ownerHistory ?? []" :key="entry.since + entry.ownerId" style="display:block">{{ store.userName(entry.ownerId) }} · desde {{ fmtDate(entry.since) }}{{ entry.until ? ` até ${fmtDate(entry.until)}` : '' }}</small>
+            <small>A troca se faz em CRM, Equipe, Carteira, e guarda a vigência anterior.</small>
           </div>
           <section class="metrics cols-3">
             <article class="metric"><div class="metric-head">Pedidos em Vendas</div><strong>{{ sales.count }}</strong><small>{{ fmtCurrency(sales.total) }}{{ sales.from ? ` · ${fmtDate(sales.from)} a ${fmtDate(sales.to!)}` : '' }}</small></article>

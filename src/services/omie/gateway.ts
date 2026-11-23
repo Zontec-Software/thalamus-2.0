@@ -36,7 +36,7 @@ export const OWNERSHIP: OmieOwnership[] = [
   { data: 'Nota de custo', owner: 'Omie', direction: 'Omie → Thalamus', trigger: 'A nota entra no realizado. O vínculo com compra, projeto ou ordem é manual até esses módulos enviarem o documento' },
   { data: 'Recebimento / NF-e de entrada', owner: 'Omie', direction: 'Omie → Thalamus', trigger: 'A nota é do Omie; a conferência física é do Thalamus e só o aceito entra no saldo' },
   { data: 'Saldo contábil de estoque', owner: 'Omie', direction: 'Bidirecional', trigger: 'Ajustes com motivo + conciliação' },
-  { data: 'Faturamento e NF-e de saída', owner: 'Omie', direction: 'Omie → Thalamus', trigger: 'Solicitado na expedição' },
+  { data: 'Faturamento e NF-e de saída', owner: 'Omie', direction: 'Omie → Thalamus', trigger: 'Solicitado na expedição. O CRM lê as notas autorizadas e conciliadas por competência para medir a meta; duplicata, cancelada, devolvida e intercompany ficam fora' },
   { data: 'Contas a pagar e a receber (títulos)', owner: 'Omie', direction: 'Omie → Thalamus', trigger: 'Pagamento e recebimento entram no realizado do orçamento; o título não existe no Thalamus' },
   { data: 'Cobrança de assistência', owner: 'Thalamus', direction: 'Thalamus → Omie', trigger: 'Conclusão do chamado cobrável; o Omie fatura' },
 ]

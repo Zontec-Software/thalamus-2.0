@@ -138,8 +138,9 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('demand-links', 'Origem, categoria e período', 'A origem abre a OP, o chamado ou o projeto. O pedido e o orçamento mostram a categoria, o mês e o saldo que esta demanda consome.', 'demand'),
   ],
   '/crm': [
-    t('crm-areas', 'O CRM em duas áreas', 'Painel e Oportunidades. Vendedor e grupo, à direita, filtram as duas.'),
-    t('crm-goal', 'Meta, funil e pizza', 'A meta do ano é rateada por mês e cada mês pode ser ajustado. O funil afunila de cima para baixo e a fase com mais oportunidades fica mais larga. A pizza mostra a mesma distribuição. Temperatura filtra o painel inteiro, sem sair da tela.'),
+    t('crm-areas', 'As áreas do CRM', 'Painel, Oportunidades, Minhas tarefas, Faturamento e Canais. A supervisão também vê Equipe. Trilha, solução, vendedor e grupo, à direita, filtram as telas.'),
+    t('crm-goal', 'Meta é faturamento', 'O realizado vem das notas fiscais do Omie por competência: só nota autorizada, conciliada, sem duplicata nem intercompany e até a data de corte. A meta só vale depois de aprovada por outra pessoa. Sem conciliação aparece como tal, nunca como zero.'),
+    t('crm-week', 'Minha semana', 'Quatro indicadores do seu perfil, de segunda a domingo. A semana é verde com três deles. Registro em conferência ou devolvido não conta até a supervisão decidir ou você corrigir.'),
     t('crm-attention', 'Precisa de atenção', 'Oportunidades sem status, sem próxima ação ou com fechamento vencido. Clique para abrir a ficha e resolver.'),
   ],
   '/crm/oportunidades': [
@@ -147,14 +148,29 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('new-record', 'Nova oportunidade', 'Empresa, vendedor, cliente, origem, tipo, vertical e previsão. Nasce fria. O relato escrito ou o áudio simulado preenchem os campos reconhecidos.'),
   ],
   '/crm/funil': [
-    t('crm-funnel', 'Funil comercial', 'Cada coluna soma o MRR da fase, a receita mensal recorrente. No cartão, o ticket é o valor do negócio. Avançar move uma fase. Conquista só vem pelo aceite da proposta. Clique no cartão para abrir a ficha.'),
+    t('crm-funnel', 'Quadro por trilha', 'Produtos Roboflex e Soluções Zontec têm fases diferentes; escolha a trilha no filtro. Cada coluna soma o MRR da fase. Avançar move uma fase. Conquista só vem pelo aceite da proposta. Clique no cartão para abrir a ficha.'),
+  ],
+  '/crm/tarefas': [
+    t('crm-tasks', 'Minhas tarefas', 'A fazer, concluídas, recompras e as suas evidências de esforço. Concluir pede o que aconteceu, com quem e, se houver, anexos de até 10 MB (no máximo 5). A data da interação define a semana.'),
+  ],
+  '/crm/faturamento': [
+    t('crm-billing', 'Faturamento do mês', 'Meta aprovada, realizado, diferença e unidades (MRR, Implantação e Venda avulsa). Conquista contratada é outra conta e não entra aqui.'),
+    t('crm-billing-months', 'Competências', 'Cada mês mostra o que foi conciliado. As notas fora do cálculo aparecem com o motivo: cancelada, devolvida, duplicata, intercompany, sem conciliação ou após a data de corte.'),
+  ],
+  '/crm/canais': [
+    t('crm-channels', 'Canais', 'Atendimentos com prazo de resposta, pedidos de marketplace e parceiros. O pedido de canal só se liga a atendimento do mesmo cliente e canal, e o dono da conta não muda.'),
+  ],
+  '/crm/equipe': [
+    t('crm-team', 'Equipe', 'Semana de cada vendedor, evidências para validar ou devolver (com motivo), triagem da carteira e a régua por perfil com vigência. Ninguém valida o próprio registro.'),
   ],
   '/crm/agenda': [
     t('crm-agenda', 'Agenda comercial', 'As próximas ações de todas as oportunidades, das atrasadas às dos próximos dias. Reunião mostra de quem é a agenda. Concluir marca a atividade como feita; a linha abre a ficha em Ações.'),
   ],
   '/crm/oportunidade': [
     t('opp-header', 'Ficha da oportunidade', 'Cliente, vendedor e empresa no topo, com os alertas abertos. Criar proposta monta o rascunho com os produtos de interesse. Marcar como perdida pede o motivo e recusa as propostas abertas.'),
-    t('opp-stages', 'A fase anda com o trabalho', 'Clique numa fase para avançar ou voltar. Conquista não é um clique: a oportunidade só é conquistada quando o cliente aceita a proposta.'),
+    t('opp-stages', 'A fase anda com o trabalho', 'Clique numa fase para avançar ou voltar. Conquista não é um clique: a oportunidade só é conquistada quando o cliente aceita a proposta. Na trilha Zontec, depois de Conquistado, Iniciar implantação abre a última fase.'),
+    t('opp-discovery', 'Discovery', 'Escopo, dor, decisor e prazo ficam aqui, com as soluções de interesse. Sem o Discovery completo a oportunidade Zontec não passa para Cálculo de custo.'),
+    t('opp-mcp', 'Registrar pelo ChatGPT', 'Simulação: o registro vem do ChatGPT por MCP. Repetir a mesma chave não duplica, e uma tarefa existente é concluída em vez de criar outra. O autor aparece como ChatGPT via MCP.'),
     t('opp-kpis', 'Apresentação', 'Temperatura, ticket, MRR, CAC e previsão ficam na apresentação e podem ser editados. O status aceita texto ou o áudio simulado.'),
     t('opp-tabs', 'Dados e histórico', 'Dados traz cliente, contato, vendedor, tipo, origem, vertical e a motivação. As propostas mostram número, valor e se estão aprovadas, em análise ou canceladas. Ações reúne tarefa, reunião, demanda, e-mail, ligação, PAP e produto no mesmo campo. O histórico fica na outra subtela.'),
   ],

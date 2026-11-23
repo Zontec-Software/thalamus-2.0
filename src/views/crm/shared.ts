@@ -1,16 +1,16 @@
 import { computed, reactive, watch } from 'vue'
-import { opportunityIsOpen } from '../../domain/enterprise'
+import { funnelOf, opportunityIsOpen, opportunityIsWon } from '../../domain/enterprise'
 import { useErpStore } from '../../stores/erp'
 import { useUiStore } from '../../stores/ui'
 import { registryOptions } from '../../domain/registry'
-import type { Opportunity, Proposal, RegistryKind } from '../../types/domain'
+import type { Opportunity, OpportunityFunnel, Proposal, RegistryKind } from '../../types/domain'
 
 /** Ano e mês do relógio da demonstração (29/10/2026). */
 export const CRM_YEAR = 2026
 export const CRM_MONTH = '2026-10'
 
 /** Valores de partida. A lista em uso vem de Cadastros gerais (`useCrmLists`). */
-export const CRM_SOURCES = ['Indicação', 'Site', 'Prospecção', 'Cliente existente', 'Outro']
+export const CRM_SOURCES = ['Indicação', 'Site', 'Prospecção', 'Cliente existente', 'Feira', 'Integrador', 'Mercado Livre', 'Outro']
 export { CLIENT_VERTICALS as CRM_VERTICALS } from '../../domain/partners'
 export const LOSS_REASONS = ['Preço', 'Prazo', 'Solução', 'Concorrente', 'Cancelamento', 'Outro']
 export const REFUSAL_REASONS = ['Preço', 'Prazo', 'Solução', 'Concorrente', 'Outro']
@@ -31,16 +31,16 @@ export function useCrmLists() {
 }
 
 /** Vendedor e grupo valem para todas as abas do CRM. */
-export const crmScope = reactive({ owner: '', groupId: '' })
+export const crmScope = reactive({ owner: '', groupId: '', funnel: '' as '' | OpportunityFunnel, solution: '' })
 
-export const lifeOf = (entry: Opportunity) => entry.stage === 'Ganho' ? 'won' as const : entry.stage === 'Perdido' ? 'lost' as const : 'open' as const
+export const lifeOf = (entry: Opportunity) => opportunityIsWon(entry) ? 'won' as const : entry.stage === 'Perdido' ? 'lost' as const : 'open' as const
 
 export const CRM_COMPANIES = [
   { id: 'tenant-roboflex', label: 'Roboflex' },
   { id: 'tenant-roboflex-sul', label: 'Zontec' },
   { id: 'tenant-locacoes', label: 'Locações' },
 ] as const
-export const DEAL_TYPES = ['Venda', 'Locação'] as const
+export const DEAL_TYPES = ['Venda', 'Locação', 'Recorrente'] as const
 
 export type OpportunityColumn = 'id' | 'client' | 'stage' | 'owner' | 'temperature' | 'source' | 'segment' | 'close' | 'created' | 'tenant'
 export const OPPORTUNITY_COLUMNS: { id: OpportunityColumn; label: string }[] = [
@@ -107,12 +107,16 @@ export function useCrmScope() {
     return store.state.tenants.filter(entry => entry.groupId === crmScope.groupId && entry.status === 'Ativa').map(entry => entry.id)
   })
   const inScope = (tenantId?: string) => !tenantId || tenantIds.value.includes(tenantId)
-  const opportunities = computed(() => store.state.opportunities.filter(entry => inScope(entry.tenantId) && (!crmScope.owner || entry.ownerId === crmScope.owner)))
+  /** Sem a chave da equipe, o vendedor enxerga só o que é dele. */
+  const canTeam = computed(() => store.can('crm.equipe.consultar'))
+  const owner = computed(() => canTeam.value ? crmScope.owner : ui.sessionUserId)
+  const opportunities = computed(() => store.state.opportunities.filter(entry => inScope(entry.tenantId) && (!owner.value || entry.ownerId === owner.value)
+    && (!crmScope.funnel || funnelOf(entry) === crmScope.funnel) && (!crmScope.solution || !!entry.solutionIds?.includes(crmScope.solution))))
   const opportunityIds = computed(() => new Set(opportunities.value.map(entry => entry.id)))
   const proposals = computed(() => store.state.proposals.filter(entry => opportunityIds.value.has(entry.opportunityId)))
   const sellers = computed(() => [...new Map(store.state.users
-    .filter(entry => !entry.platformMaster && (entry.role === 'Comercial' || entry.role === 'Gestor' || entry.role === 'Admin'))
+    .filter(entry => !entry.platformMaster && (entry.role === 'Comercial' || entry.role === 'Supervisão comercial' || entry.role === 'Gestor' || entry.role === 'Admin') && (canTeam.value || entry.id === ui.sessionUserId))
     .map(entry => [entry.id, entry])).values()])
   const tenantName = (id?: string) => store.state.tenants.find(entry => entry.id === (id ?? ui.activeTenantId))?.tradeName ?? '—'
-  return { canGroup, tenantIds, inScope, opportunities, proposals, sellers, tenantName, grouped: computed(() => tenantIds.value.length > 1) }
+  return { canGroup, canTeam, owner, tenantIds, inScope, opportunities, proposals, sellers, tenantName, grouped: computed(() => tenantIds.value.length > 1) }
 }
