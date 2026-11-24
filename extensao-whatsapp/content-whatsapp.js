@@ -38,6 +38,22 @@ async function onClick() {
   }
 }
 
+/**
+ * Põe o botão à esquerda do ícone de chamada de vídeo do cabeçalho. O WhatsApp Web troca os nomes dos ícones
+ * (video-call, videocall, video-call-refreshed...), por isso a busca usa "video" no data-icon. Se o ícone
+ * não for achado, o botão vai para o fim do cabeçalho, como antes.
+ */
+function placeButton(button, header) {
+  const video = header.querySelector('[data-icon*="video"]')
+  const anchor = video?.closest('[role="button"], button') ?? null
+  if (anchor?.parentNode) {
+    if (button.parentNode === anchor.parentNode && button.nextElementSibling === anchor) return
+    anchor.parentNode.insertBefore(button, anchor)
+    return
+  }
+  if (button.parentNode !== header || header.lastElementChild !== button) header.appendChild(button)
+}
+
 function ensureButton() {
   const head = document.querySelector('#main header')
   const current = document.getElementById(BUTTON_ID)
@@ -45,15 +61,23 @@ function ensureButton() {
     current?.remove()
     return
   }
-  if (current && head.contains(current)) return
-  current?.remove()
+  if (current) {
+    placeButton(current, head)
+    return
+  }
   const button = document.createElement('button')
   button.id = BUTTON_ID
   button.type = 'button'
-  button.textContent = 'Criar oportunidade'
+  const mark = document.createElement('img')
+  mark.className = 'thalamus-mark'
+  mark.alt = ''
+  mark.src = chrome.runtime.getURL('icons/thalamus.png')
+  const label = document.createElement('span')
+  label.textContent = 'Criar oportunidade'
+  button.append(mark, label)
   button.title = 'Cria uma oportunidade no Thalamus (demonstração: usa uma conversa de exemplo)'
   button.addEventListener('click', onClick)
-  head.appendChild(button)
+  placeButton(button, head)
 }
 
 let scheduled = false
