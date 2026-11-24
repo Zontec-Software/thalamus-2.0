@@ -1151,8 +1151,10 @@ export const MANUAL: ManualChapter[] = [
           {
             kind: 'steps', title: 'Trabalhar uma oportunidade',
             items: [
-              'Clique em **Nova oportunidade**. A empresa é Roboflex, Zontec ou Locações. O vendedor começa com quem está logado. O cliente sai do cadastro de parceiros, ou é cadastrado ali mesmo. A oportunidade nasce fria.',
-              'Um relato escrito, ou o áudio simulado, preenche os campos que o texto reconhecer. Nesta demonstração não há serviço de voz nem de IA.',
+              'Clique em **Nova oportunidade**. Abre uma conversa com o assistente do CRM, no canto da tela. Conte o negócio, por texto ou pelo microfone: o assistente acha o cliente no cadastro de parceiros, herda a vertical e o contato, deduz o resto do relato e pergunta só o que faltar. A oportunidade nasce fria, na primeira fase da trilha, com você de vendedor.',
+              'Quando a oportunidade é criada, o assistente avisa e mostra **Ver oportunidade**. O botão abre a ficha e minimiza a conversa. Pelo cabeçalho no canto inferior direito, você reabre a conversa para pedir ajustes ao assistente, ou fecha e edita a ficha por conta própria. Minimizar não perde a conversa; encerrar apaga.',
+              'Nesta demonstração a conversa é de exemplo: o assistente não entende texto livre, o áudio é só um cronômetro e nenhuma oportunidade é criada. Nada disso usa serviço de voz nem de IA.',
+              'Pela extensão do Chrome, o vendedor também pode começar no WhatsApp Web: o botão **Criar oportunidade** no cabeçalho da conversa abre o chat com a conversa anexada. O assistente acha o cliente pelo telefone do contato. Na demonstração a conversa é um exemplo fixo; a instalação está no README da pasta extensao-whatsapp.',
               'A ficha abre na apresentação: marca do cliente, linha do tempo, temperatura, ticket, MRR, CAC, previsão e status. Depois vêm só duas áreas, Dados e Histórico.',
               'Em **Dados**, salve cliente, contato, vendedor, tipo, origem, vertical e motivação. A vertical grava no cadastro do cliente.',
               'As propostas mostram número, valor e se estão aprovadas, em análise ou canceladas. O clique abre a proposta no vendas.',

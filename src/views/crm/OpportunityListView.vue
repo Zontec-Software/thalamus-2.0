@@ -1,3 +1,9 @@
+<style scoped>
+/* A barra de ferramentas fica dentro do cartão, acima da tabela. O estilo global (.list-tools) a põe por cima da faixa de filtros do CRM, onde ela some. */
+.crm-list-tools { position: static; transform: none; justify-content: flex-end; flex-wrap: wrap; padding: 14px 18px 14px; margin-bottom: 4px; }
+.crm-list-tools .grow { flex: 1 1 240px; min-width: 0; }
+</style>
+
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -11,13 +17,13 @@ import type { Opportunity } from '../../types/domain'
 import { fmtCurrency, fmtDate, fmtDateTime } from '../../utils/format'
 import TablePager from '../products/TablePager.vue'
 import { usePager } from '../products/shared'
-import NewOpportunityModal from './NewOpportunityModal.vue'
+import { useOpportunityChatStore } from '../../stores/opportunityChat'
 import { OPPORTUNITY_COLUMNS, attentionOf, opportunityList, useCrmScope, type OpportunityColumn } from './shared'
 
 const store = useErpStore()
 const router = useRouter()
 const { opportunities, tenantName } = useCrmScope()
-const creating = ref(false)
+const chat = useOpportunityChatStore()
 const columnsOpen = ref(false)
 const previewId = ref('')
 
@@ -63,7 +69,7 @@ const arrow = (key: typeof opportunityList.sort) => opportunityList.sort === key
 
 <template>
   <article class="card flush" data-tour="record-list">
-    <div class="list-tools">
+    <div class="list-tools crm-list-tools">
       <input v-model="opportunityList.query" class="filter grow" placeholder="Buscar por cliente, fase, vendedor, temperatura, origem, vertical, empresa, código ou situação" aria-label="Pesquisar oportunidades" />
       <div class="column-menu">
         <button class="button secondary" @click="columnsOpen = !columnsOpen"><Columns3 :size="14" /> Colunas</button>
@@ -72,7 +78,7 @@ const arrow = (key: typeof opportunityList.sort) => opportunityList.sort === key
         </div>
       </div>
       <RouterLink to="/crm/funil" class="button secondary"><Columns3 :size="14" /> Kanban</RouterLink>
-      <button class="button" data-tour="new-record" @click="creating = true"><Plus :size="14" /> Nova oportunidade</button>
+      <button class="button" data-tour="new-record" @click="chat.start()"><Plus :size="14" /> Nova oportunidade</button>
     </div>
 
     <table class="dense">
@@ -137,6 +143,4 @@ const arrow = (key: typeof opportunityList.sort) => opportunityList.sort === key
       <button class="button" @click="router.push(`/crm/oportunidade/${previewId}`)">Abrir oportunidade</button>
     </template>
   </BaseModal>
-
-  <NewOpportunityModal :open="creating" @close="creating = false" />
 </template>

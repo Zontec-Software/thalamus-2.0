@@ -145,7 +145,7 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
   ],
   '/crm/oportunidades': [
     t('record-list', 'Todas as oportunidades', 'Uma pesquisa só, em qualquer coluna ou situação. A descrição da linha é temperatura, cliente, ticket e fase. Clique abre um cartão com flag, ticket, CAC e a última atualização. Abrir oportunidade entra na ficha.'),
-    t('new-record', 'Nova oportunidade', 'Empresa, vendedor, cliente, origem, tipo, vertical e previsão. Nasce fria. O relato escrito ou o áudio simulado preenchem os campos reconhecidos.'),
+    t('new-record', 'Nova oportunidade', 'Abre uma conversa com o assistente: conte o negócio por texto ou áudio, e ele acha o cliente, preenche a oportunidade e pergunta só o que faltar. Dá para minimizar a conversa sem perdê-la. Nesta demonstração as respostas são de exemplo.'),
   ],
   '/crm/funil': [
     t('crm-funnel', 'Quadro por trilha', 'Produtos Roboflex e Soluções Zontec têm fases diferentes; escolha a trilha no filtro. Cada coluna soma o MRR da fase. Avançar move uma fase. Conquista só vem pelo aceite da proposta. Clique no cartão para abrir a ficha.'),

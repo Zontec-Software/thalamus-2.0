@@ -25,7 +25,7 @@ Os dados são fictícios e ficam salvos no navegador. Para voltar ao cenário in
 
 - **Cadastros:** Produtos com camadas por tipo, Pessoas, catálogo de Serviços e Ativos.
 - **Suprimentos:** Demandas, Compras e Almoxarifado, incluindo recebimento parcial e estorno de separação.
-- **Comercial:** CRM com duas trilhas (Produtos Roboflex e Soluções Zontec), meta por faturamento de competência, rotina de esforço por perfil com supervisão, carteira, canais, propostas multilinha, pedidos de Venda e Expedição. Notas fiscais, Agenda, Meet e ChatGPT/MCP são simulados.
+- **Comercial:** CRM com duas trilhas (Produtos Roboflex e Soluções Zontec), meta por faturamento de competência, rotina de esforço por perfil com supervisão, carteira, canais, propostas multilinha, pedidos de Venda e Expedição. A nova oportunidade nasce numa conversa com um assistente (chat minimizável no canto da tela), que também pode ser aberto pela extensão do Chrome no WhatsApp Web (`extensao-whatsapp/`). Notas fiscais, Agenda, Meet, ChatGPT/MCP e o assistente são simulados.
 - **Operações:** Planejamento, Produção, Qualidade e Tablet com revisão congelada na OP.
 - **Serviços:** Manutenção preventiva/corretiva e Assistência Técnica pós-venda.
 - **Gestão:** Indicadores, Projetos e tarefas por papel.

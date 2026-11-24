@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Thalamus · Oportunidade pelo WhatsApp",
+  "version": "0.1.0",
+  "description": "Cria uma oportunidade no Thalamus a partir da conversa aberta no WhatsApp Web. Protótipo para o mockup.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://zontec-software.github.io/*", "http://localhost:8080/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["content-whatsapp.js"],
+      "css": ["whatsapp.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://zontec-software.github.io/thalamus-2.0/*", "http://localhost:8080/*"],
+      "js": ["content-thalamus.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "options_ui": { "page": "options.html", "open_in_tab": false }
+}

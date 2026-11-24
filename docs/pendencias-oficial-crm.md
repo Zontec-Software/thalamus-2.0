@@ -24,7 +24,8 @@ O mockup recebeu a revisão do pacote "CRM Thalamus 2.0". Os repositórios `thal
 
 ## `thalamus2-comercial/web`
 
-- Copiar de `src/views/crm`: `CrmLayout`, `CrmDashboardView`, `CrmPipelineView`, `OpportunityListView`, `OpportunityPage`, `NewOpportunityModal`, `ActivityEvidenceModal`, `McpRecordModal`, `EffortWeekCard`, `BillingView`, `MyTasksView`, `ChannelsView`, `TeamView`, `shared.ts`; e `PartnersView.vue` (classe comercial e responsável da carteira).
+- Copiar de `src/views/crm`: `CrmLayout`, `CrmDashboardView`, `CrmPipelineView`, `OpportunityListView`, `OpportunityPage`, `ActivityEvidenceModal`, `McpRecordModal`, `EffortWeekCard`, `BillingView`, `MyTasksView`, `ChannelsView`, `TeamView`, `shared.ts`; e `PartnersView.vue` (classe comercial e responsável da carteira).
+- **Nova oportunidade (assistente):** o mockup trocou o formulário `NewOpportunityModal` (removido) por um chat com IA (`components/OpportunityChatDock.vue`, `stores/opportunityChat.ts`, `domain/whatsappContext.ts`). Fica de fora do oficial até o assistente existir: manter o formulário atual do `thalamus2-comercial/web` (a cópia do formulário sai do mockup, buscar no histórico do git). Quando o assistente for real, copiar o dock e a store, trocar a conversa de exemplo por chamadas à API e levar a extensão `extensao-whatsapp/` para um repositório próprio.
 - Rotas novas: `/crm/tarefas`, `/crm/faturamento`, `/crm/canais`, `/crm/equipe`.
 - Adaptador `web/src/stores/comercial.ts`: ações e estado novos com os nomes da store do mockup (`completeActivity`, `saveDiscovery`, `startImplementation`, `reviewEffort`, `correctEffort`, `saveSellerLink`, `saveEffortRule`, `assignPartnerOwner`, `setCommercialClass`, `createChannelCase`, `answerChannelCase`, `linkChannelOrder`, `registerActivityViaMcp`, `approveSalesGoal`, `crmSellers`).
 - Domínio local: `crmEffort.ts`, `crmRoutine.ts` (só leituras que a tela precisa) e `opportunityIsOpen`/`opportunityIsWon` em lugar de comparar com `'Ganho'`.

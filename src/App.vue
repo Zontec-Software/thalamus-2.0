@@ -5,6 +5,7 @@ import { BookOpen, ChevronDown, Compass, House, RotateCcw } from 'lucide-vue-nex
 import { IconAjuda, IconBusca, IconNotificacoes, IconTarefas } from './icons/ds'
 import BrandMark from './components/BrandMark.vue'
 import OpDrawer from './components/OpDrawer.vue'
+import OpportunityChatDock from './components/OpportunityChatDock.vue'
 import OrderDrawer from './components/OrderDrawer.vue'
 import RecordDrawer from './components/records/RecordDrawer.vue'
 import ToastHost from './components/ToastHost.vue'
@@ -300,6 +301,7 @@ watch(() => ui.tourSteps.length, length => { if (length === 0) maybeStartTour() 
   <OrderDrawer />
   <OpDrawer />
   <RecordDrawer />
+  <OpportunityChatDock v-if="!isTablet" />
   <ToastHost v-if="!isTablet" />
   <TourGuide />
 </template>
