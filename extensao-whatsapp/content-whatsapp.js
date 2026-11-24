@@ -39,19 +39,46 @@ async function onClick() {
 }
 
 /**
- * Põe o botão à esquerda do ícone de chamada de vídeo do cabeçalho. O WhatsApp Web troca os nomes dos ícones
- * (video-call, videocall, video-call-refreshed...), por isso a busca usa "video" no data-icon. Se o ícone
- * não for achado, o botão vai para o fim do cabeçalho, como antes.
+ * Acha o botão da chamada de vídeo no cabeçalho. O WhatsApp Web troca nomes e estrutura sem aviso, então há
+ * duas tentativas: (1) o texto "vídeo" no aria-label, no title ou no data-icon; (2) o ícone mais à esquerda
+ * entre os pequenos da metade direita do cabeçalho, que é onde fica a chamada de vídeo.
  */
+function findVideoButton(header) {
+  const mine = document.getElementById(BUTTON_ID)
+  const labelled = [...header.querySelectorAll('[aria-label], [title], [data-icon]')].find(element => {
+    if (mine?.contains(element)) return false
+    const text = `${element.getAttribute('aria-label') ?? ''} ${element.getAttribute('title') ?? ''} ${element.getAttribute('data-icon') ?? ''}`
+    return /v[ií]deo/i.test(text)
+  })
+  if (labelled) return { node: labelled.closest('[role="button"], button') ?? labelled, how: 'texto' }
+
+  const box = header.getBoundingClientRect()
+  const icons = [...header.querySelectorAll('[role="button"], button')]
+    .filter(element => !mine?.contains(element) && element.querySelector('svg, [data-icon]'))
+    .map(element => ({ element, rect: element.getBoundingClientRect() }))
+    .filter(({ rect }) => rect.width > 0 && rect.width <= 72 && rect.height <= 72 && rect.left > box.left + box.width / 2)
+    .sort((a, b) => a.rect.left - b.rect.left)
+  return icons.length ? { node: icons[0].element, how: 'posição' } : undefined
+}
+
+/** Põe o botão à esquerda da chamada de vídeo; se não achar, vai para o fim do cabeçalho. */
 function placeButton(button, header) {
-  const video = header.querySelector('[data-icon*="video"]')
-  const anchor = video?.closest('[role="button"], button') ?? null
-  if (anchor?.parentNode) {
-    if (button.parentNode === anchor.parentNode && button.nextElementSibling === anchor) return
-    anchor.parentNode.insertBefore(button, anchor)
-    return
+  const found = findVideoButton(header)
+  if (found) {
+    // Sobe enquanto o ícone estiver sozinho dentro de um invólucro, para ficar na mesma fileira dos outros.
+    let anchor = found.node
+    while (anchor.parentElement && anchor.parentElement !== header && anchor.parentElement.children.length === 1) anchor = anchor.parentElement
+    if (anchor.parentNode) {
+      if (button.parentNode === anchor.parentNode && button.nextElementSibling === anchor) return
+      anchor.parentNode.insertBefore(button, anchor)
+      console.debug(`[Thalamus] botão posicionado antes da chamada de vídeo (${found.how})`)
+      return
+    }
   }
-  if (button.parentNode !== header || header.lastElementChild !== button) header.appendChild(button)
+  if (button.parentNode !== header || header.lastElementChild !== button) {
+    header.appendChild(button)
+    console.debug('[Thalamus] chamada de vídeo não encontrada; botão no fim do cabeçalho')
+  }
 }
 
 function ensureButton() {
