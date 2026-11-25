@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Thalamus · Oportunidade pelo WhatsApp",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "Cria uma oportunidade no Thalamus a partir da conversa aberta no WhatsApp Web. Protótipo para o mockup.",
   "icons": { "16": "icons/thalamus.png", "48": "icons/thalamus.png", "128": "icons/thalamus.png" },
   "permissions": ["storage"],
@@ -14,7 +14,6 @@
     {
       "matches": ["https://web.whatsapp.com/*"],
       "js": ["content-whatsapp.js"],
-      "css": ["whatsapp.css"],
       "run_at": "document_idle"
     },
     {
