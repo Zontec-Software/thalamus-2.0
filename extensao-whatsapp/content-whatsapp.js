@@ -10,11 +10,12 @@
 // cópia da linha de "Encaminhar", para herdar o visual. Se o WhatsApp mudar esses textos ou a estrutura, a
 // opção deixa de aparecer. As mensagens "[Thalamus]" no console da aba dizem o que a extensão viu.
 
-const VERSION = '0.4.0'
+const VERSION = '0.4.2'
 const ITEM_ATTR = 'data-thalamus-item'
 const LABEL = 'Criar oportunidade'
-const FORWARD = /^(encaminhar|forward)$/i
-const MENU_WORDS = /^(responder|reply|copiar|copy|reagir|react|fixar|pin|favoritar|star|apagar|delete|denunciar|report)$/i
+const FORWARD = /^(encaminhar|reenviar|forward)$/i
+// Português, espanhol e inglês: o menu muda conforme o idioma do WhatsApp.
+const MENU_WORDS = /^(responder|responder en privado|reply|copiar|copy|reagir|reaccionar|react|encaminhar|reenviar|forward|fixar|pin|favoritar|destacar|star|apagar|eliminar|delete|denunciar|reportar|report|descargar|download)$/i
 const INVISIBLE = /[\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g
 // O ícone do menu é uma fonte de ligaduras: o texto dele é o nome ("ic-reply"), colado ao rótulo ("ic-replyResponder").
 const ICON_NAME = /^(?:wds-)?ic-[a-z0-9-]+$/
@@ -53,7 +54,7 @@ let timers = []
 function remember(event) {
   const row = event.target?.closest?.('[data-id]')
   if (row) lastRow = row
-  scheduleScans(event.type === 'contextmenu')
+  scheduleScans(event.type === 'contextmenu', Boolean(row))
 }
 document.addEventListener('pointerdown', remember, true)
 document.addEventListener('contextmenu', remember, true)
@@ -147,6 +148,12 @@ function inject(root) {
   return { ...found, reason: 'ok' }
 }
 
+/** Textos dos menus abertos na página, para o diagnóstico. */
+function openMenus() {
+  const menus = [...document.querySelectorAll('[role="menu"], [role="menuitem"]')].map(element => clean(element.textContent).slice(0, 160)).filter(Boolean)
+  return menus.length ? JSON.stringify(menus.slice(0, 12)) : 'nenhum'
+}
+
 /** Descreve a cadeia de elementos acima de um nó, para quem for ajustar a extensão. */
 function describe(element) {
   const lines = []
@@ -158,7 +165,7 @@ function describe(element) {
 }
 
 /** O menu aparece um instante depois do clique: procura algumas vezes e para quando a opção entra. */
-function scheduleScans(rightClick) {
+function scheduleScans(rightClick, onMessage) {
   timers.forEach(clearTimeout)
   const waits = [60, 160, 350, 700, 1200]
   timers = waits.map((wait, index) => setTimeout(() => {
@@ -170,7 +177,7 @@ function scheduleScans(rightClick) {
     }
     if (index !== waits.length - 1) return
     if (result.reason === 'sem-lista') console.info('[Thalamus] achei "Encaminhar", mas não a lista do menu. Estrutura:\n' + describe(result.label))
-    else if (rightClick) console.info('[Thalamus] botão direito sem a palavra "Encaminhar" na página: o menu não abriu ou está em outro idioma')
+    else if (rightClick || onMessage) console.info('[Thalamus] clique na mensagem, mas a opção não entrou. Menus abertos agora: ' + openMenus())
   }, wait))
 }
 
@@ -180,7 +187,7 @@ new MutationObserver(records => {
     for (const node of record.addedNodes) {
       if (node.nodeType !== 1) continue
       const text = node.textContent ?? ''
-      if (text.length > 800 || !/encaminhar|forward/i.test(text)) continue
+      if (text.length > 800 || !/encaminhar|reenviar|forward/i.test(text)) continue
       let root = node
       for (let level = 0; level < 6 && root; level += 1, root = root.parentElement) {
         if ((root.textContent?.length ?? 0) > 2000) break
