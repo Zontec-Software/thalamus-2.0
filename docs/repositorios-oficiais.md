@@ -6,8 +6,8 @@ O Thalamus 2.0 passa a existir em duas formas:
 
 | Forma | Onde | Dados | Para quê |
 | --- | --- | --- | --- |
-| Mockup geral | `thalamus-2.0` (este repositório) | `localStorage` e seed | Desenhar e revisar todos os módulos. Continua completo e navegável |
-| Sistema oficial | Repositórios `thalamus2-*` | Banco real, cadastrado pela tela | Operar. Recebe só o módulo que já foi revisado no mockup |
+| Mockup (protótipo) | `thalamus-2.0` (este repositório) | `localStorage` e seed | Desenhar e revisar todos os módulos. Continua completo e navegável |
+| Sistema oficial | Repositórios `thalamus2-*` | Banco real, cadastrado pela tela | Testar na homologação e operar na produção. Recebe só o módulo que já foi revisado no mockup |
 
 Um módulo só vai para o oficial depois de revisado aqui. O mockup continua sendo o lugar onde a regra nasce.
 
@@ -102,9 +102,9 @@ Quando Suprimentos for oficializado, ele lê Fornecedores pela API do Comercial 
 - Toda tela tem estado vazio com o botão para cadastrar o primeiro item.
 - A API do Omie é chamada pela API do módulo dono do dado, com a chave do cofre do core. Enquanto a chamada real não existe, a tela diz que a sincronização está pendente; não finge sucesso.
 
-## Homologação e produção
+## Mockup, homologação e produção
 
-O mockup é a homologação: a regra e a tela nascem e são revisadas aqui, com dados de demonstração. O oficial é a produção: as **mesmas telas**, com banco real. A diferença entre os dois se limita ao que um sistema real exige:
+O mockup é o protótipo: a regra e a tela nascem e são revisadas aqui, com dados de demonstração. O oficial roda em dois ambientes com o mesmo código: a **homologação**, onde o usuário testa com banco real, e a **produção**, a publicação para uso da empresa. O oficial tem as **mesmas telas** do mockup. A diferença entre os dois se limita ao que um sistema real exige:
 
 - login, sessão e troca de empresa (core);
 - permissões vindas do perfil, validadas na API, nunca só na tela;
