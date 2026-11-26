@@ -173,10 +173,8 @@ export const PAGE_TOURS: Record<string, TourStep[]> = {
     t('opp-mcp', 'Registrar pelo ChatGPT', 'Simulação: o registro vem do ChatGPT por MCP. Repetir a mesma chave não duplica, e uma tarefa existente é concluída em vez de criar outra. O autor aparece como ChatGPT via MCP.'),
     t('opp-kpis', 'Apresentação', 'Temperatura, ticket, MRR, CAC e previsão ficam na apresentação e podem ser editados. O status aceita texto ou o áudio simulado.'),
     t('opp-tabs', 'Dados e histórico', 'Dados traz cliente, contato, vendedor, tipo, origem, vertical e a motivação. As propostas mostram número, valor e se estão aprovadas, em análise ou canceladas. Ações reúne tarefa, reunião, demanda, e-mail, ligação, PAP e produto no mesmo campo. O histórico fica na outra subtela.'),
-  ],
-  '/crm/propostas': [
-    t('crm-proposals', 'Propostas', 'Em andamento, aceitas e recusadas. A validade vencida aparece em vermelho para cobrar retorno. Clique para abrir a proposta.', 'close'),
-    t('prop-actions', 'Enviar, aceitar ou recusar', 'Enviar mantém a oportunidade em Proposta. Cliente aceitou aprova o pedido no Omie, com todas as linhas de produto, e a oportunidade vira Conquista. Recusar registra o motivo.', 'proposal'),
+    t('opp-proposals', 'Propostas', 'As propostas da oportunidade ficam aqui, em andamento, aceitas e recusadas. A validade vencida aparece em vermelho para cobrar retorno. A proposta aceita leva ao pedido de venda que ela gerou.', 'close'),
+    t('prop-actions', 'Enviar, aceitar ou recusar', 'Enviar mantém a oportunidade em Proposta. Cliente aceitou cria o pedido de venda no Thalamus, com todas as linhas de produto, e a oportunidade fica ganha. Recusar registra o motivo.', 'proposal'),
     t('prop-items', 'Itens, desconto e condições', 'Produtos e serviços na mesma proposta. Em rascunho, quantidade e preço são editáveis e o desconto vai até 15%. Pagamento, validade e entrega sugerida ficam nas condições.', 'proposal'),
   ],
   '/assistencia': [

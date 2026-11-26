@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Ban, CalendarClock, CheckCircle2, CircleHelp, ClipboardList, PackageCheck, Truck, X } from 'lucide-vue-next'
+import { Ban, CalendarClock, CheckCircle2, CircleHelp, ClipboardList, ExternalLink, PackageCheck, Truck, X } from 'lucide-vue-next'
 import StatusBadge from './StatusBadge.vue'
 import { FLOW_STAGES, opProgress, salesOrderStatus } from '../domain/engine'
 import { useErpStore } from '../stores/erp'
@@ -25,6 +25,11 @@ const changeReason = ref('')
 const cancelling = ref(false)
 const cancelReason = ref('')
 const receiver = ref('')
+/** O pedido nasceu da proposta, que mora na oportunidade: a ficha do pedido leva até ela. */
+function openOpportunity(opportunityId: string) {
+  ui.orderDrawer = null
+  router.push(`/crm/oportunidade/${opportunityId}`)
+}
 watch(() => ui.orderDrawer, () => {
   edits.value = {}
   changeReason.value = ''
@@ -106,6 +111,7 @@ watch(order, async value => {
             <div v-else-if="status === 'Aguardando análise'" class="notice warning">Nasceu da proposta {{ order.proposalId ?? '' }}. Confira itens, preço e prazo; ao confirmar, o pedido segue para o PCP e para o Omie, se a empresa usa o Omie.</div>
 
             <div class="drawer-actions">
+              <button v-if="order.opportunityId" class="button secondary" @click="openOpportunity(order.opportunityId)"><ExternalLink :size="15" /> Ver oportunidade</button>
               <button v-if="status === 'Aguardando análise'" class="button" @click="store.confirmSalesOrder(order.id)"><CheckCircle2 :size="15" /> Confirmar pedido</button>
               <button v-if="stage === 'Entrada' && status === 'Confirmado'" class="button" @click="store.planOrder(order.id)"><ClipboardList :size="15" /> Planejar produção</button>
               <button v-if="editable" class="button secondary" @click="cancelling = !cancelling"><Ban :size="15" /> Cancelar pedido</button>

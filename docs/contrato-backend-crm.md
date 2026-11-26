@@ -94,7 +94,7 @@ Revisado no mockup em novembro de 2026 e ainda não levado ao `thalamus2-comerci
 
 ## Entrega oficial
 
-As telas de `thalamus2-comercial/web` são cópias das de `src/views/crm` e da gaveta `src/components/records/ProposalRecord.vue`, com as mesmas rotas (`/crm`, `/crm/oportunidades`, `/crm/funil`, `/crm/propostas`, `/crm/agenda`, `/crm/oportunidade/:id`) e o mesmo `meta`. Só a origem dos dados muda, por um adaptador (`web/src/stores/comercial.ts`) com os nomes da store do mockup.
+As telas de `thalamus2-comercial/web` são cópias das de `src/views/crm` e da gaveta `src/components/records/ProposalRecord.vue`, com as mesmas rotas (`/crm`, `/crm/oportunidades`, `/crm/funil`, `/crm/agenda`, `/crm/oportunidade/:id`) e o mesmo `meta`. Não há lista de propostas no menu: as propostas ficam na ficha da oportunidade, e as tarefas de aprovar desconto e cobrar retorno abrem a proposta pelo registro. `/crm/propostas` redireciona para `/crm/oportunidades`. Só a origem dos dados muda, por um adaptador (`web/src/stores/comercial.ts`) com os nomes da store do mockup.
 
 - **Painel:** igual. A meta grava na empresa ativa; o seletor de grupo só aparece com `crm.consultar_consolidado` e a soma é leitura.
 - **Oportunidades:** igual, sem o CAC no cartão de prévia.

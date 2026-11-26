@@ -23,6 +23,11 @@ describe('mapa da área', () => {
     expect(areaDestination(area('servicos'), module => module === 'Assistência Técnica')).toBe('/assistencia')
   })
 
+  it('propostas ficam na ficha da oportunidade, fora do menu', () => {
+    const destinations = AREAS.flatMap(entry => entry.groups.flatMap(group => group.items.map(item => item.to)))
+    expect(destinations).not.toContain('/crm/propostas')
+  })
+
   it('mantém a porta de quem abriu o cadastro de parceiros', () => {
     expect(areaOf('/parceiros', 'comercial')?.id).toBe('comercial')
     expect(areaOf('/parceiros', 'suprimentos')?.id).toBe('suprimentos')

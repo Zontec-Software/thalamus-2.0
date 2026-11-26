@@ -19,7 +19,7 @@ export const router = createRouter({
         { path: '', component: () => import('../views/crm/CrmDashboardView.vue'), meta: { title: 'CRM', eyebrow: 'Comercial' } },
         { path: 'oportunidades', component: () => import('../views/crm/OpportunityListView.vue'), meta: { title: 'Oportunidades', eyebrow: 'Comercial' } },
         { path: 'funil', component: () => import('../views/crm/CrmPipelineView.vue'), meta: { title: 'Funil', eyebrow: 'Comercial' } },
-        { path: 'propostas', component: () => import('../views/crm/ProposalListView.vue'), meta: { title: 'Propostas', eyebrow: 'Comercial' } },
+        { path: 'propostas', redirect: '/crm/oportunidades' },
         { path: 'tarefas', component: () => import('../views/crm/MyTasksView.vue'), meta: { title: 'Minhas tarefas', eyebrow: 'Comercial' } },
         { path: 'faturamento', component: () => import('../views/crm/BillingView.vue'), meta: { title: 'Faturamento', eyebrow: 'Comercial' } },
         { path: 'canais', component: () => import('../views/crm/ChannelsView.vue'), meta: { title: 'Canais', eyebrow: 'Comercial' } },

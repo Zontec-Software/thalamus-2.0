@@ -52,7 +52,6 @@ export const AREAS: Area[] = [
       { label: 'Relacionamento', items: [
         { label: 'Clientes', to: '/parceiros', query: { origem: 'comercial' }, icon: Handshake, module: 'Parceiros', home: true, hint: 'Quem compra da empresa. O cadastro é o mesmo dos fornecedores.' },
         { label: 'CRM', to: '/crm', icon: Users, module: 'CRM', home: true, hint: 'Painel e oportunidades' },
-        { label: 'Propostas', to: '/crm/propostas', icon: IconPedido, module: 'CRM', home: true, bar: false, hint: 'Propostas enviadas ao cliente' },
       ] },
       { label: 'Venda', items: [
         { label: 'Pedidos de venda', to: '/pedidos', icon: IconPedido, module: 'Vendas', home: true, hint: 'Pedidos nascidos da proposta aceita' },

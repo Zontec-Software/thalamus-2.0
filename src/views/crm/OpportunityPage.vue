@@ -308,7 +308,7 @@ function newProposal() {
           <div v-if="!closed" class="save-bar"><button class="button" :disabled="!discoveryDirty" @click="saveDiscovery">Salvar Discovery</button></div>
         </section>
 
-        <section class="person-section">
+        <section class="person-section" data-tour="opp-proposals">
           <h3>Propostas</h3>
           <div v-if="!closed" class="action-row" style="margin-bottom:10px"><button class="button small" @click="newProposal"><FilePlus2 :size="13" /> Criar proposta</button></div>
           <table class="dense">
@@ -321,7 +321,7 @@ function newProposal() {
               </tr>
             </tbody>
           </table>
-          <p v-if="!proposals.length" class="empty-note">Nenhuma proposta. A proposta abre no módulo de vendas.</p>
+          <p v-if="!proposals.length" class="empty-note">Nenhuma proposta ainda.</p>
         </section>
 
         <section class="person-section" data-tour="opp-activities">

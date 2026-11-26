@@ -1175,13 +1175,13 @@ export const MANUAL: ManualChapter[] = [
       },
       {
         id: 'propostas', title: 'Propostas',
-        summary: 'Preço, desconto, condições e aceite.',
+        summary: 'Preço, desconto, condições e aceite, na ficha da oportunidade.',
         roles: ['Comercial', 'Gestor'],
-        screens: [{ label: 'Propostas', to: '/crm/propostas' }],
-        tour: '/crm/propostas',
+        screens: [{ label: 'Oportunidades', to: '/crm/oportunidades' }],
+        tour: '/crm/oportunidade',
         blocks: [
           { kind: 'flow', items: ['Rascunho', 'Em aprovação (desconto acima do limite)', 'Enviada', 'Aceita, Recusada, Vencida ou Cancelada'] },
-          { kind: 'p', text: 'A proposta nasce em rascunho com os produtos da oportunidade, o preço vigente da tabela padrão de cada item e uma data sugerida que considera o prazo de fabricação e o lead time de compra dos componentes. Produtos, kits e serviços podem estar na mesma proposta. Validade padrão de 15 dias e pagamento em 28 dias.' },
+          { kind: 'p', text: 'A proposta não tem tela própria: nasce e é acompanhada na **ficha da oportunidade**, na seção Propostas. A aprovação de desconto e a cobrança de retorno chegam como tarefa e abrem a proposta direto. A proposta nasce em rascunho com os produtos da oportunidade, o preço vigente da tabela padrão de cada item e uma data sugerida que considera o prazo de fabricação e o lead time de compra dos componentes. Produtos, kits e serviços podem estar na mesma proposta. Validade padrão de 15 dias e pagamento em 28 dias.' },
           {
             kind: 'rules',
             items: [

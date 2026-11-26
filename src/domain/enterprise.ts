@@ -1389,7 +1389,7 @@ export function tasksForRole(state: ErpState, role: Role, userId = '') {
       tasks.push({ id: entry.id, title: entry.nextAction, detail: `${entry.title} · ${entry.stage}`, to: `/crm/oportunidade/${entry.id}` })
     }
     for (const entry of state.proposals.filter(item => item.status === 'Enviada' && item.validUntil <= addDays(today(), 3))) {
-      tasks.push({ id: entry.id, title: `${entry.id} vence em breve`, detail: 'Cobrar retorno do cliente', to: '/crm/propostas', record: { kind: 'proposal', id: entry.id } })
+      tasks.push({ id: entry.id, title: `${entry.id} vence em breve`, detail: 'Cobrar retorno do cliente', to: `/crm/oportunidade/${entry.opportunityId}`, record: { kind: 'proposal', id: entry.id } })
     }
     for (const entry of state.salesOrders.filter(item => salesOrderStatus(state, item) === 'Aguardando análise')) {
       tasks.push({ id: `${entry.id}-analise`, title: `Confirmar ${entry.id}`, detail: 'Pedido do Thalamus aguardando análise técnica e comercial', to: '/pedidos' })
@@ -1397,7 +1397,7 @@ export function tasksForRole(state: ErpState, role: Role, userId = '') {
   }
   if (hasFullAccess(role)) {
     for (const entry of state.proposals.filter(item => item.status === 'Em aprovação')) {
-      tasks.push({ id: `${entry.id}-desconto`, title: `Aprovar desconto de ${entry.id}`, detail: `${entry.discount}% pedido por ${entry.approvalRequestedBy ?? '—'}`, to: '/crm/propostas', record: { kind: 'proposal', id: entry.id } })
+      tasks.push({ id: `${entry.id}-desconto`, title: `Aprovar desconto de ${entry.id}`, detail: `${entry.discount}% pedido por ${entry.approvalRequestedBy ?? '—'}`, to: `/crm/oportunidade/${entry.opportunityId}`, record: { kind: 'proposal', id: entry.id } })
     }
   }
   if (is('Compras')) {
