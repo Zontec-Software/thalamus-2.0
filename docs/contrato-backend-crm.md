@@ -35,7 +35,7 @@ Repositório `thalamus2-comercial`: API em `api/` (schema `t2_comercial`) e tela
 ## Regras
 
 1. Etapas: Novo contato, Qualificação, Levantamento, Proposta, Negociação, Ganho (100%), Perdido (0%). Mudar a etapa atualiza a probabilidade. Origem, motivo de perda e motivo de recusa vêm das listas de Cadastros gerais (Indicação, Site, Prospecção, Cliente existente, Outro; Preço, Prazo, Solução, Concorrente, Cancelamento, Outro; Preço, Prazo, Solução, Concorrente, Outro).
-2. Oportunidade nova exige título e cliente com papel Cliente ativo. Nasce em Prospecção, Frio, Venda.
+2. Oportunidade nova exige título e cliente com papel Cliente ativo. Nasce na primeira fase da trilha (Novo contato em Produtos, Prospecção em Soluções) e Frio.
 3. Oportunidade encerrada (Ganho ou Perdido) não é editada.
 4. Ganho só vem da proposta aceita. Perdido só com motivo; as propostas em andamento são canceladas com o mesmo motivo.
 5. Atividade exige texto. A próxima ação da oportunidade é a primeira atividade pendente em ordem de data.
@@ -94,7 +94,7 @@ Revisado no mockup em novembro de 2026 e ainda não levado ao `thalamus2-comerci
 
 ## Entrega oficial
 
-As telas de `thalamus2-comercial/web` são cópias das de `src/views/crm` e da gaveta `src/components/records/ProposalRecord.vue`, com as mesmas rotas (`/crm`, `/crm/oportunidades`, `/crm/funil`, `/crm/agenda`, `/crm/oportunidade/:id`) e o mesmo `meta`. Não há lista de propostas no menu: as propostas ficam na ficha da oportunidade, e as tarefas de aprovar desconto e cobrar retorno abrem a proposta pelo registro. `/crm/propostas` redireciona para `/crm/oportunidades`. Só a origem dos dados muda, por um adaptador (`web/src/stores/comercial.ts`) com os nomes da store do mockup.
+As telas de `thalamus2-comercial/web` são cópias das de `src/views/crm` e da gaveta `src/components/records/ProposalRecord.vue`, com as mesmas rotas (`/crm`, `/crm/oportunidades`, `/crm/funil`, `/crm/agenda`, `/crm/oportunidade/:id`) e o mesmo `meta`. Hoje o oficial ainda tem a lista de propostas em `/crm/propostas` e no menu. No mockup ela saiu: as propostas ficam na ficha da oportunidade, as tarefas de aprovar desconto e cobrar retorno abrem a proposta pelo registro e `/crm/propostas` redireciona para `/crm/oportunidades`. A lista sai do oficial quando a evolução do CRM for copiada. Só a origem dos dados muda, por um adaptador (`web/src/stores/comercial.ts`) com os nomes da store do mockup.
 
 - **Painel:** igual. A meta grava na empresa ativa; o seletor de grupo só aparece com `crm.consultar_consolidado` e a soma é leitura.
 - **Oportunidades:** igual, sem o CAC no cartão de prévia.

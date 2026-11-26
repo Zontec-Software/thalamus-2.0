@@ -81,6 +81,6 @@ Repositório `thalamus2-pessoas`: API em `api/` (schema `t2_pessoas`) e tela em 
 
 Situação em 05/11/2026: telas copiadas do mockup em `thalamus2-pessoas/web/src/views/people`, com rotas aninhadas sob `/pessoas` (Colaboradores, Admissão, Desligamento, Organograma, Cargos). O adaptador `web/src/stores/people.ts` traduz a API para o formato das telas do mockup.
 
-Fica de fora no oficial, por decisão: conta Google (Admin SDK), Participar de um projeto, PIN do tablet e os guias por tela. O "O que ela vê" da aba Acesso lista módulos, sem as áreas do shell. Não há visão "financeira" separada: quem consulta dados sensíveis vê a ficha completa e os demais, a profissional.
+A conta Google (Admin SDK) é real no oficial: a efetivação cria a conta, com a senha temporária mostrada uma única vez, e o desligamento a suspende; a falha do Google fica registrada sem desfazer o desligamento. O aviso de pendências de diretório nas listas (`DirectoryAlert`) ainda não foi copiado. Fica de fora no oficial, por decisão: Participar de um projeto, PIN do tablet e os guias por tela. O "O que ela vê" da aba Acesso lista módulos, sem as áreas do shell. Não há visão "financeira" separada: quem consulta dados sensíveis vê a ficha completa e os demais, a profissional.
 
 Pendências no core: uma funcionalidade de leitura consolidada de Pessoas no grupo (hoje o diretório usa os `groupPeers` da sessão) e um endpoint da navegação para a aba Acesso mostrar as áreas.

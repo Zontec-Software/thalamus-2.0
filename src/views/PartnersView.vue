@@ -10,6 +10,7 @@ import { BRAZIL_STATES, documentError, loadBrazilCities, lookupCnpj, maskCnpj, m
 import { currentOwnerOf } from '../domain/crmEffort'
 import { COMMERCIAL_CLASSES } from '../domain/crmRoutine'
 import { ADDRESS_PURPOSES, CLIENT_VERTICALS, clientSalesBase, duplicatePartner, homologationsOf, phaseOf, roleStatus, supplierReceiptBase } from '../domain/partners'
+import { maskPhone } from '../domain/organization'
 import { useErpStore } from '../stores/erp'
 import { useUiStore } from '../stores/ui'
 import type { AddressPurpose, BusinessPartner, CommercialClass, PartnerRoleName } from '../types/domain'
@@ -45,6 +46,15 @@ const form = reactive({
 })
 const contactFromQuery = ref(false)
 const contact = reactive({ name: '', duty: '', phone: '', email: '' })
+// Telefone de fora do Brasil não segue o formato com DDD.
+function onFormPhone(event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  form.phone = form.origin === 'Brasil' ? maskPhone(value) : value
+}
+function onContactPhone(event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  contact.phone = !partner.value?.country || partner.value.country === 'Brasil' ? maskPhone(value) : value
+}
 const address = reactive({ purpose: 'Entrega' as AddressPurpose, line: '', city: '', state: '' })
 const master = reactive({ origin: 'Brasil' as 'Brasil' | 'Estrangeiro', country: '', personType: 'Jurídica' as 'Física' | 'Jurídica', legalName: '', tradeName: '', document: '' })
 const formCities = ref<string[]>([])
@@ -609,7 +619,7 @@ function inactivate(reason: string) {
       <div class="form-grid">
         <div class="field"><label>Nome</label><input v-model="form.contactName" /></div>
         <div class="field"><label>Função</label><input v-model="form.duty" /></div>
-        <div class="field"><label>Telefone</label><input v-model="form.phone" /></div>
+        <div class="field"><label>Telefone</label><input :value="form.phone" inputmode="tel" @input="onFormPhone" /></div>
         <div class="field"><label>E-mail</label><input v-model="form.email" type="email" /></div>
       </div>
       <h3 class="partner-h">Endereço</h3>
@@ -640,7 +650,7 @@ function inactivate(reason: string) {
     <form id="new-contact" class="form-grid" @submit.prevent="saveContact">
       <div class="field"><label>Nome</label><input v-model="contact.name" required /></div>
       <div class="field"><label>Função</label><input v-model="contact.duty" /></div>
-      <div class="field"><label>Telefone</label><input v-model="contact.phone" /></div>
+      <div class="field"><label>Telefone</label><input :value="contact.phone" inputmode="tel" @input="onContactPhone" /></div>
       <div class="field"><label>E-mail</label><input v-model="contact.email" type="email" /></div>
     </form>
     <template #footer>

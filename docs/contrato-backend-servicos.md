@@ -37,4 +37,4 @@ A tela do oficial é a do mockup (`/servicos/:id?`), com o mesmo desenho. O adap
 - **Setor e fornecedor:** setor vem de `GET /api/sectors` do módulo Pessoas; fornecedor, de `GET /api/partners?role=Fornecedor&active=1` do Comercial, pelos nomes `pessoas` e `comercial` em `config/thalamus.php`. Não há chave estrangeira. Se o outro módulo não responder, a lista volta vazia com a mensagem e o cadastro que não usa esse dado segue.
 - **Uso em roteiro:** vazio. O oficial não grava roteiro (`ProductState` devolve `routing: []`). A aba Uso mostra o texto do mockup e zero linhas. Proposta, demanda e ordem não são desta API.
 
-O atalho da área continua como Em breve até `/servicos` entrar em `OFFICIAL_MODULES` da Engenharia, em `thalamus2-core/web`. Esta entrega não altera a casca. A rota registrada pelo remoto já responde em `/servicos`.
+`/servicos` está em `OFFICIAL_MODULES` da Engenharia, em `thalamus2-core/web`: o atalho da área abre a tela registrada pelo remoto.
